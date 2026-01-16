@@ -30,10 +30,12 @@ import {
   Lock,
   Wifi,
   WifiOff,
-  Target
+  Target,
+  Mail
 } from 'lucide-react';
 import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client } from '../types';
 import ClientGoals from './ClientGoals';
+import ClientOverviewGoals from './ClientOverviewGoals';
 import { supabase } from '../lib/supabase';
 import Modal from './ui/Modal';
 
@@ -56,30 +58,115 @@ const ClientDetail: React.FC = () => {
   const [modalLoading, setModalLoading] = useState(false);
 
   // Form State
-  const [newLead, setNewLead] = useState({ name: '', phone: '', company: '' });
+  const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', company: '' });
   const [newWebhook, setNewWebhook] = useState({ name: '', url: '', type: 'inbound' as const });
   const [newNumber, setNewNumber] = useState({ nickname: '', phone: '' });
+  const [leadType, setLeadType] = useState<'whatsapp' | 'email'>('whatsapp');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Stats State
+  const [stats, setStats] = useState({
+    totalLeads: 0,
+    activeTags: 0,
+    optInRate: '0%',
+    bounces: 0
+  });
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientId) return;
     setModalLoading(true);
     try {
-      const { error } = await supabase.from('leads').insert({
+      const payload: any = {
         client_id: clientId,
         name: newLead.name,
-        phone: newLead.phone,
         status: 'valid',
         tags: [],
         custom_fields: { empresa: newLead.company }
-      });
+      };
+
+      if (leadType === 'whatsapp') {
+        payload.phone = newLead.phone;
+      } else {
+        payload.email = newLead.email;
+        // Ensure we explicitly send phone as null if it's an email lead, 
+        // though Supabase might handle it.
+        payload.phone = null;
+      }
+
+      const { error } = await supabase.from('leads').insert(payload);
       if (error) throw error;
       setActiveModal('none');
-      setNewLead({ name: '', phone: '', company: '' });
+      setNewLead({ name: '', phone: '', email: '', company: '' });
       fetchData();
     } catch (err) { console.error(err); alert('Erro ao criar lead'); }
     finally { setModalLoading(false); }
   };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !clientId) return;
+
+    setLoading(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const rows = text.split('\n').map(row => row.trim()).filter(row => row.length > 0);
+        if (rows.length < 2) return;
+
+        const headers = rows[0].split(';').length > 1 ? rows[0].split(';') : rows[0].split(',');
+        const isEmail = headers.some(h => h.toLowerCase().includes('e-mail') || h.toLowerCase().includes('email'));
+        const nameIdx = headers.findIndex(h => h.toLowerCase().includes('nome'));
+        const contactIdx = headers.findIndex(h => h.toLowerCase().includes(isEmail ? 'e-mail' : 'telefone') || h.toLowerCase().includes(isEmail ? 'email' : 'phone'));
+        const tagsIdx = headers.findIndex(h => h.toLowerCase().includes('etiquetas') || h.toLowerCase().includes('tags'));
+
+        if (nameIdx === -1 || contactIdx === -1) {
+          alert('Formato inválido. Colunas obrigatórias: Nome, Telefone/E-mail');
+          return;
+        }
+
+        const leadsToInsert = rows.slice(1).map(row => {
+          const cols = row.split(';').length > 1 ? row.split(';') : row.split(',');
+          const name = cols[nameIdx]?.trim();
+          const contact = cols[contactIdx]?.trim();
+          const tagsRaw = tagsIdx !== -1 ? cols[tagsIdx]?.trim() : '';
+
+          if (!name || !contact) return null;
+
+          // Parse tags if needed, assuming comma separated inside the column? 
+          // For now, let's simple string split
+          const tagsList = tagsRaw ? tagsRaw.split('|').map(t => t.trim()) : [];
+
+          return {
+            client_id: clientId,
+            name,
+            [isEmail ? 'email' : 'phone']: contact,
+            tags: tagsList, // We need to handle tag ID creation or text tags. 
+            // The DB expects tags text[], but frontend logic often uses IDs. 
+            // The user prompt implies text labels. I will save text for now.
+            status: 'valid'
+          };
+        }).filter(l => l !== null);
+
+        if (leadsToInsert.length > 0) {
+          const { error } = await supabase.from('leads').insert(leadsToInsert);
+          if (error) throw error;
+          alert(`${leadsToInsert.length} leads importados com sucesso!`);
+          fetchData();
+        }
+
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao processar arquivo');
+      } finally {
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
 
   const handleCreateWebhook = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,6 +249,7 @@ const ClientDetail: React.FC = () => {
           clientId: l.client_id,
           name: l.name,
           phone: l.phone,
+          email: l.email,
           tags: l.tags || [],
           customFields: l.custom_fields || {},
           status: l.status
@@ -219,6 +307,14 @@ const ClientDetail: React.FC = () => {
           headers: w.headers || {}
         })));
       }
+
+      // Update stats based on fetched data
+      setStats({
+        totalLeads: leadsData?.length || 0,
+        activeTags: tagsData?.length || 0,
+        optInRate: leadsData?.length ? '100%' : '-', // Placeholder logic
+        bounces: 0 // Placeholder as we don't track bounces yet
+      });
 
     } catch (err) {
       console.error(err);
@@ -307,22 +403,24 @@ const ClientDetail: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-center">
                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Total Leads</div>
-                    <div className="text-2xl font-black text-slate-900">1.242</div>
+                    <div className="text-2xl font-black text-slate-900">{stats.totalLeads}</div>
                   </div>
                   <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 text-center">
                     <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-1">Opt-in</div>
-                    <div className="text-2xl font-black text-emerald-700">98%</div>
+                    <div className="text-2xl font-black text-emerald-700">{stats.optInRate}</div>
                   </div>
                   <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-center">
                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Tags Ativas</div>
-                    <div className="text-2xl font-black text-slate-900">12</div>
+                    <div className="text-2xl font-black text-slate-900">{stats.activeTags}</div>
                   </div>
                   <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100 text-center">
                     <div className="text-[10px] text-rose-600 font-bold uppercase tracking-wider mb-1">Bounces</div>
-                    <div className="text-2xl font-black text-rose-700">4</div>
+                    <div className="text-2xl font-black text-rose-700">{stats.bounces}</div>
                   </div>
                 </div>
               </div>
+
+              <ClientOverviewGoals clientId={clientId!} />
 
               <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
                 <h3 className="font-bold text-slate-900 mb-6 flex items-center space-x-2">
@@ -354,8 +452,10 @@ const ClientDetail: React.FC = () => {
                   <h4 className="text-lg font-bold mb-1">Endpoint Token</h4>
                   <p className="text-slate-400 text-xs mb-6 leading-relaxed">Use este segredo para autenticar requisições via webhook externas para este tenant.</p>
                   <div className="bg-white/10 p-4 rounded-2xl flex items-center justify-between backdrop-blur-sm border border-white/10">
-                    <code className="text-xs font-mono truncate mr-4">sk_live_51M89B0L...</code>
-                    <button onClick={() => copyToClipboard('sk_live_51M89B0L', 'cid')} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+                    <code className="text-xs font-mono truncate mr-4">
+                      sk_live_{clientId?.replace(/-/g, '').substring(0, 8)}...
+                    </code>
+                    <button onClick={() => copyToClipboard(`sk_live_${clientId?.replace(/-/g, '')}`, 'cid')} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
                       {copied === 'cid' ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
                     </button>
                   </div>
@@ -373,10 +473,12 @@ const ClientDetail: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                      <div className={`w-2 h-2 rounded-full ${numbers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
                       <span className="text-xs font-medium text-slate-600">Primary Instance</span>
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Online</span>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${numbers.length > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      {numbers.length > 0 ? 'Online' : 'Offline'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -405,8 +507,8 @@ const ClientDetail: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {numbers.map((num, i) => {
-                // Mocking a status for the second number for variety
-                const isOnline = i === 0;
+                // Determine status based on num.status
+                const isOnline = num.status === 'active' || num.status === 'connected';
                 return (
                   <div key={num.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative group overflow-hidden">
                     <div className="flex justify-between items-start mb-6">
@@ -515,15 +617,24 @@ const ClientDetail: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setActiveModal('lead')}
+                  onClick={() => setActiveModal('lead-type-selection' as any)}
                   className="flex items-center space-x-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-md shadow-slate-900/10"
                 >
                   <Plus size={14} />
                   <span>Add Lead</span>
                 </button>
-                <button className="p-2.5 bg-white border border-slate-200 text-slate-400 rounded-xl hover:bg-slate-50">
-                  <FileUp size={20} />
-                </button>
+                <div onClick={() => fileInputRef.current?.click()}>
+                  <button className="p-2.5 bg-white border border-slate-200 text-slate-400 rounded-xl hover:bg-slate-50 cursor-pointer">
+                    <FileUp size={20} />
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept=".csv"
+                    onChange={handleFileUpload}
+                  />
+                </div>
               </div>
             </div>
 
@@ -546,7 +657,7 @@ const ClientDetail: React.FC = () => {
                         <div className="text-[10px] text-slate-400 uppercase tracking-tight">{lead.customFields.empresa}</div>
                       </td>
                       <td className="px-8 py-5 font-mono text-slate-500 font-medium">
-                        {lead.phone}
+                        {lead.phone || lead.email}
                       </td>
                       <td className="px-8 py-5">
                         <div className="flex flex-wrap gap-1.5">
@@ -610,10 +721,36 @@ const ClientDetail: React.FC = () => {
       </div>
 
       {/* Modals */}
-      <Modal isOpen={activeModal === 'lead'} onClose={() => setActiveModal('none')} title="Adicionar Novo Lead">
+
+      <Modal isOpen={activeModal === 'lead-type-selection' as any} onClose={() => setActiveModal('none')} title="Tipo de Contato">
+        <div className="grid grid-cols-2 gap-4 pb-4">
+          <button
+            onClick={() => { setLeadType('whatsapp'); setActiveModal('lead'); }}
+            className="flex flex-col items-center justify-center p-6 bg-emerald-50 border-2 border-emerald-100 rounded-2xl hover:border-emerald-500 hover:bg-emerald-100 transition-all group"
+          >
+            <div className="p-3 bg-emerald-200 rounded-full mb-3 text-emerald-800 group-hover:scale-110 transition-transform"><Smartphone size={24} /></div>
+            <span className="font-bold text-emerald-900">WhatsApp Lead</span>
+            <span className="text-xs text-emerald-600/70 text-center mt-1">Contato via número</span>
+          </button>
+          <button
+            onClick={() => { setLeadType('email'); setActiveModal('lead'); }}
+            className="flex flex-col items-center justify-center p-6 bg-blue-50 border-2 border-blue-100 rounded-2xl hover:border-blue-500 hover:bg-blue-100 transition-all group"
+          >
+            <div className="p-3 bg-blue-200 rounded-full mb-3 text-blue-800 group-hover:scale-110 transition-transform"><Mail size={24} /></div>
+            <span className="font-bold text-blue-900">E-mail Lead</span>
+            <span className="text-xs text-blue-600/70 text-center mt-1">Contato via e-mail</span>
+          </button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'lead'} onClose={() => setActiveModal('none')} title={`Novo Lead (${leadType === 'whatsapp' ? 'WhatsApp' : 'E-mail'})`}>
         <form onSubmit={handleCreateLead} className="space-y-4">
           <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Nome Completo" value={newLead.name} onChange={e => setNewLead({ ...newLead, name: e.target.value })} required />
-          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Telefone (Ex: 5511999999999)" value={newLead.phone} onChange={e => setNewLead({ ...newLead, phone: e.target.value })} required />
+          {leadType === 'whatsapp' ? (
+            <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Telefone (Ex: 5511999999999)" value={newLead.phone} onChange={e => setNewLead({ ...newLead, phone: e.target.value })} required />
+          ) : (
+            <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="E-mail (ex: nome@empresa.com)" value={newLead.email} onChange={e => setNewLead({ ...newLead, email: e.target.value })} required type="email" />
+          )}
           <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Empresa (Opcional)" value={newLead.company} onChange={e => setNewLead({ ...newLead, company: e.target.value })} />
           <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Salvar'}</button></div>
         </form>

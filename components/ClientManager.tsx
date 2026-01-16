@@ -108,7 +108,7 @@ const ClientManager: React.FC = () => {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Gestão de Clientes</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Clientes</h1>
           <p className="text-slate-500 mt-1">Gerencie múltiplos tenants e seus ambientes isolados.</p>
         </div>
         <button

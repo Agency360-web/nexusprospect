@@ -22,8 +22,8 @@ const SidebarItem: React.FC<{
     <Link
         to={to}
         className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${active
-                ? 'bg-slate-900 text-white shadow-md'
-                : 'text-slate-600 hover:bg-slate-100'
+            ? 'bg-slate-900 text-white shadow-md'
+            : 'text-slate-600 hover:bg-slate-100'
             }`}
     >
         {icon}
@@ -113,12 +113,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             {location.pathname === '/' ? 'Home' : location.pathname.split('/')[1].replace('-', ' ')}
                         </span>
                     </div>
-                    <div className="flex items-center space-x-4">
-                        <div className="hidden md:flex items-center space-x-2 bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-semibold border border-slate-200">
-                            <span>Multi-tenant Mode</span>
-                        </div>
-                        <img src="https://picsum.photos/seed/admin/32/32" className="w-8 h-8 rounded-full border border-slate-200" alt="Avatar" />
-                    </div>
+
                 </header>
 
                 <div className="p-8 max-w-7xl mx-auto">

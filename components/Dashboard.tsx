@@ -46,7 +46,10 @@ const Dashboard: React.FC = () => {
     clients: 0,
     leads: 0,
     transmissions: 0,
-    loading: true
+    loading: true,
+    numbers: [] as any[], // Accommodate fetched numbers
+    globalLimit: 0,
+    globalSent: 0
   });
 
   useEffect(() => {
@@ -55,17 +58,25 @@ const Dashboard: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const [clientsRes, leadsRes, transRes] = await Promise.all([
+      const [clientsRes, leadsRes, transRes, numbersRes] = await Promise.all([
         supabase.from('clients').select('*', { count: 'exact', head: true }),
         supabase.from('leads').select('*', { count: 'exact', head: true }),
-        supabase.from('transmissions').select('*', { count: 'exact', head: true })
+        supabase.from('transmissions').select('*', { count: 'exact', head: true }),
+        supabase.from('whatsapp_numbers').select('*, clients(name)')
       ]);
+
+      const numbers = numbersRes.data || [];
+      const globalSent = numbers.reduce((acc, curr) => acc + (curr.sent_today || 0), 0);
+      const globalLimit = numbers.reduce((acc, curr) => acc + (curr.daily_limit || 0), 0);
 
       setStats({
         clients: clientsRes.count || 0,
         leads: leadsRes.count || 0,
         transmissions: transRes.count || 0,
-        loading: false
+        loading: false,
+        numbers,
+        globalLimit,
+        globalSent
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -133,29 +144,31 @@ const Dashboard: React.FC = () => {
             </select>
           </div>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[300px]">
               {stats.transmissions > 0 ? (
-                <AreaChart data={initialData}>
-                  <defs>
-                    <linearGradient id="colorEnvios" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1} />
-                      <stop offset="95%" stopColor="#0f172a" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Area type="monotone" dataKey="envios" stroke="#0f172a" strokeWidth={2} fillOpacity={1} fill="url(#colorEnvios)" />
-                </AreaChart>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={initialData}>
+                    <defs>
+                      <linearGradient id="colorEnvios" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1} />
+                        <stop offset="95%" stopColor="#0f172a" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    />
+                    <Area type="monotone" dataKey="envios" stroke="#0f172a" strokeWidth={2} fillOpacity={1} fill="url(#colorEnvios)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center text-slate-400">
+                <div className="flex w-full h-full items-center justify-center text-slate-400">
                   <p>Nenhum dado de disparo registrado ainda.</p>
                 </div>
               )}
-            </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
@@ -170,37 +183,48 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="space-y-4 flex-1">
-            {[
-              { provider: 'Gateway Central', location: 'SP-Brazil', status: 'online', latency: '42ms' },
-              { provider: 'Instance Backup', location: 'RJ-Brazil', status: 'online', latency: '58ms' },
-              { provider: 'Twilio Cloud', location: 'US-East', status: 'offline', latency: '-' },
-              { provider: 'Meta API', location: 'Global', status: 'online', latency: '120ms' },
-            ].map((infra, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-2 h-2 rounded-full ${infra.status === 'online' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`}></div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900">{infra.provider}</div>
-                    <div className="text-[10px] text-slate-400 uppercase font-medium">{infra.location}</div>
-                  </div>
+            <div className="space-y-4 flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+              {stats.loading ? (
+                <div className="flex justify-center py-10"><Activity className="animate-spin text-slate-300" /></div>
+              ) : stats.numbers.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-slate-400 text-sm">Nenhuma conexão ativa.</p>
                 </div>
-                <div className="text-right">
-                  <div className={`text-[10px] font-black uppercase ${infra.status === 'online' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                    {infra.status}
-                  </div>
-                  <div className="text-[9px] text-slate-400 font-mono">{infra.latency}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 p-4 bg-slate-900 rounded-xl text-white">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs font-bold">Uso Global API</span>
-              <span className="text-xs font-mono">1.2k req/s</span>
+              ) : (
+                stats.numbers.map((num, i) => {
+                  const isOnline = num.status === 'active' || num.status === 'connected';
+                  return (
+                    <div key={num.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-400'}`}></div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">{num.nickname}</div>
+                          <div className="text-[10px] text-slate-400 uppercase font-medium">{num.clients?.name || 'Desconhecido'}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-[10px] font-black uppercase ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          {isOnline ? 'ONLINE' : 'OFFLINE'}
+                        </div>
+                        <div className="text-[9px] text-slate-400 font-mono">{num.phone}</div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
-            <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-400" style={{ width: '65%' }}></div>
+
+            <div className="mt-6 p-4 bg-slate-900 rounded-xl text-white">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold">Uso Limite Diário (Global)</span>
+                <span className="text-xs font-mono">{stats.globalSent} / {stats.globalLimit}</span>
+              </div>
+              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-400 transition-all duration-500"
+                  style={{ width: `${stats.globalLimit > 0 ? (stats.globalSent / stats.globalLimit) * 100 : 0}%` }}
+                ></div>
+              </div>
             </div>
           </div>
         </div>

@@ -41,6 +41,7 @@ export interface Lead {
   id: string;
   clientId: string;
   name: string;
+  email?: string;
   phone: string;
   tags: string[];
   customFields: Record<string, string>;

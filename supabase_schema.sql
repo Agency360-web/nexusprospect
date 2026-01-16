@@ -31,6 +31,7 @@ create table if not exists public.leads (
     client_id uuid references public.clients(id) on delete cascade,
     name text not null,
     phone text,
+    email text,
     tags text[], -- Array of strings for tags
     custom_fields jsonb default '{}'::jsonb,
     status text check (status in ('valid', 'invalid', 'pending')) default 'pending',
