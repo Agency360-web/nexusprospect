@@ -1,5 +1,6 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import {
   Users,
   CheckCircle2,
@@ -11,19 +12,13 @@ import {
   Activity,
   Globe,
   Wifi,
-  WifiOff
+  WifiOff,
+  Building2
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const data = [
-  { name: 'Seg', envios: 400 },
-  { name: 'Ter', envios: 300 },
-  { name: 'Qua', envios: 600 },
-  { name: 'Qui', envios: 800 },
-  { name: 'Sex', envios: 500 },
-  { name: 'Sáb', envios: 200 },
-  { name: 'Dom', envios: 100 },
-];
+// Empty initial data
+const initialData: any[] = [];
 
 const StatCard: React.FC<{ label: string, value: string, subValue: string, icon: React.ReactNode, color: string }> = ({ label, value, subValue, icon, color }) => (
   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -46,49 +41,78 @@ const StatCard: React.FC<{ label: string, value: string, subValue: string, icon:
 );
 
 const Dashboard: React.FC = () => {
-  const [period, setPeriod] = React.useState('7d');
+  const [period, setPeriod] = useState('7d');
+  const [stats, setStats] = useState({
+    clients: 0,
+    leads: 0,
+    transmissions: 0,
+    loading: true
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const [clientsRes, leadsRes, transRes] = await Promise.all([
+        supabase.from('clients').select('*', { count: 'exact', head: true }),
+        supabase.from('leads').select('*', { count: 'exact', head: true }),
+        supabase.from('transmissions').select('*', { count: 'exact', head: true })
+      ]);
+
+      setStats({
+        clients: clientsRes.count || 0,
+        leads: leadsRes.count || 0,
+        transmissions: transRes.count || 0,
+        loading: false
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Bom dia, Engenheiro!</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Bom dia!</h1>
           <p className="text-slate-500">Aqui está o resumo dos seus disparos nas últimas 24 horas.</p>
         </div>
         <div className="flex items-center space-x-2 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-2xl">
           <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-          <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Infraestrutura 100% Online</span>
+          <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Sistema Online</span>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          label="Total Enviado"
-          value="12.840"
-          subValue="+12.5%"
-          icon={<Users className="text-blue-600" size={24} />}
+          label="Total Clientes"
+          value={stats.clients.toString()}
+          subValue="Ativos"
+          icon={<Building2 className="text-blue-600" size={24} />}
           color="bg-blue-50"
         />
         <StatCard
-          label="Taxa de Entrega"
-          value="98.2%"
-          subValue="+0.4%"
-          icon={<CheckCircle2 className="text-emerald-600" size={24} />}
+          label="Leads Cadastrados"
+          value={stats.leads.toString()}
+          subValue="Total"
+          icon={<Users className="text-emerald-600" size={24} />}
           color="bg-emerald-50"
         />
         <StatCard
-          label="Falhas"
-          value="42"
-          subValue="-2.1%"
-          icon={<AlertCircle className="text-amber-600" size={24} />}
+          label="Disparos Feitos"
+          value={stats.transmissions.toString()}
+          subValue="Histórico"
+          icon={<CheckCircle2 className="text-amber-600" size={24} />}
           color="bg-amber-50"
         />
         <StatCard
-          label="Abertura"
-          value="76.4%"
-          subValue="+5.2%"
+          label="Taxa de Entrega"
+          value="-"
+          subValue="Aguardando dados"
           icon={<BarChart3 className="text-purple-600" size={24} />}
           color="bg-purple-50"
         />
@@ -110,21 +134,27 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <defs>
-                  <linearGradient id="colorEnvios" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#0f172a" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                />
-                <Area type="monotone" dataKey="envios" stroke="#0f172a" strokeWidth={2} fillOpacity={1} fill="url(#colorEnvios)" />
-              </AreaChart>
+              {stats.transmissions > 0 ? (
+                <AreaChart data={initialData}>
+                  <defs>
+                    <linearGradient id="colorEnvios" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#0f172a" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Area type="monotone" dataKey="envios" stroke="#0f172a" strokeWidth={2} fillOpacity={1} fill="url(#colorEnvios)" />
+                </AreaChart>
+              ) : (
+                <div className="flex h-full items-center justify-center text-slate-400">
+                  <p>Nenhum dado de disparo registrado ainda.</p>
+                </div>
+              )}
             </ResponsiveContainer>
           </div>
         </div>

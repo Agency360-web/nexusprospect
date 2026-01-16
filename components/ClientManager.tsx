@@ -35,16 +35,24 @@ const ClientManager: React.FC = () => {
     fetchClients();
   }, []);
 
+  // Get user from auth
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+  }, []);
+
   const createClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClientName || !newClientEmail) return;
+    if (!newClientName || !newClientEmail || !user) return;
 
     setCreateLoading(true);
     try {
       const { error } = await supabase.from('clients').insert({
         name: newClientName,
         email: newClientEmail,
-        status: 'active'
+        status: 'active',
+        user_id: user.id
       });
 
       if (error) throw error;
