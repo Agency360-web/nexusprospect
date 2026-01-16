@@ -60,6 +60,9 @@ const ClientDetail: React.FC = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Bulk Actions State
+  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+
   // Form State
   const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', company: '', tags: '' });
   const [newWebhook, setNewWebhook] = useState({ name: '', url: '', type: 'inbound' as const });
@@ -213,6 +216,52 @@ const ClientDetail: React.FC = () => {
       fetchData();
     } catch (err) { console.error(err); alert('Erro ao vincular número'); }
     finally { setModalLoading(false); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Tem certeza que deseja excluir ${selectedLeads.length} leads? Esta ação não pode ser desfeita.`)) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .in('id', selectedLeads);
+
+      if (error) throw error;
+
+      // Optimistic update
+      setLeads(prev => prev.filter(l => !selectedLeads.includes(l.id)));
+      setSelectedLeads([]);
+
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        totalLeads: prev.totalLeads - selectedLeads.length
+      }));
+
+    } catch (error) {
+      console.error('Error deleting leads:', error);
+      alert('Erro ao excluir leads. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLeads.length === leads.length) {
+      setSelectedLeads([]);
+    } else {
+      setSelectedLeads(leads.map(l => l.id));
+    }
+  };
+
+  const toggleSelectLead = (id: string) => {
+    if (selectedLeads.includes(id)) {
+      setSelectedLeads(prev => prev.filter(lid => lid !== id));
+    } else {
+      setSelectedLeads(prev => [...prev, id]);
+    }
   };
 
   const handleCreateEmailSender = async (e: React.FormEvent) => {
@@ -697,21 +746,55 @@ const ClientDetail: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm relative">
+
+              {/* Bulk Actions Bar */}
+              {selectedLeads.length > 0 && (
+                <div className="absolute top-0 left-0 right-0 h-16 bg-slate-900 text-white flex items-center justify-between px-8 z-10 animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm font-bold">{selectedLeads.length} selecionados</span>
+                    <button onClick={() => setSelectedLeads([])} className="text-xs text-slate-400 hover:text-white underline">Cancelar</button>
+                  </div>
+                  <button
+                    onClick={handleBulkDelete}
+                    className="flex items-center space-x-2 px-4 py-2 bg-rose-500 hover:bg-rose-600 rounded-xl text-xs font-bold transition-colors"
+                  >
+                    <Trash2 size={16} />
+                    <span>Excluir Selecionados</span>
+                  </button>
+                </div>
+              )}
+
               <table className="w-full text-left">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lead / Identificação</th>
-                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">WhatsApp</th>
-                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Segmentação</th>
-                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                    <th className="px-8 py-5 w-12">
+                      <input
+                        type="checkbox"
+                        checked={leads.length > 0 && selectedLeads.length === leads.length}
+                        onChange={toggleSelectAll}
+                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                      />
+                    </th>
+                    <th className="px-2 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Lead / Identificação</th>
+                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">WhatsApp</th>
+                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Segmentação</th>
+                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Status</th>
                     <th className="px-8 py-5 text-right"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {leads.map(lead => (
-                    <tr key={lead.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={lead.id} className={`hover:bg-slate-50/50 transition-colors ${selectedLeads.includes(lead.id) ? 'bg-slate-50' : ''}`}>
                       <td className="px-8 py-5">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeads.includes(lead.id)}
+                          onChange={() => toggleSelectLead(lead.id)}
+                          className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                        />
+                      </td>
+                      <td className="px-2 py-5">
                         <div className="font-bold text-slate-900">{lead.name}</div>
                         <div className="text-[10px] text-slate-400 uppercase tracking-tight">{lead.customFields.empresa}</div>
                       </td>

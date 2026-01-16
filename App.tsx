@@ -11,6 +11,7 @@ import HistoryLogs from './components/HistoryLogs';
 import ClientManager from './components/ClientManager';
 import ClientDetail from './components/ClientDetail';
 import SettingsPage from './components/SettingsPage';
+import AdministrationDashboard from './components/AdministrationDashboard';
 
 const App: React.FC = () => {
   return (
@@ -30,6 +31,7 @@ const App: React.FC = () => {
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
                   <Route path="/new-campaign" element={<CampaignWizard />} />
                   <Route path="/history" element={<HistoryLogs />} />
+                  <Route path="/admin" element={<AdministrationDashboard />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </Layout>
@@ -45,6 +47,7 @@ const App: React.FC = () => {
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
                   <Route path="/new-campaign" element={<CampaignWizard />} />
                   <Route path="/history" element={<HistoryLogs />} />
+                  <Route path="/admin" element={<AdministrationDashboard />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </Layout>
