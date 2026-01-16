@@ -16,6 +16,7 @@ import {
   Building2
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useAuth } from '../contexts/AuthContext';
 
 // Empty initial data
 const initialData: any[] = [];
@@ -41,6 +42,7 @@ const StatCard: React.FC<{ label: string, value: string, subValue: string, icon:
 );
 
 const Dashboard: React.FC = () => {
+  const { user } = useAuth();
   const [period, setPeriod] = useState('7d');
   const [stats, setStats] = useState({
     clients: 0,
@@ -88,7 +90,9 @@ const Dashboard: React.FC = () => {
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Bom dia!</h1>
+          <h1 className="text-3xl font-bold text-slate-900">
+            Bom dia{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name}` : ''} <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
+          </h1>
           <p className="text-slate-500">Aqui está o resumo dos seus disparos nas últimas 24 horas.</p>
         </div>
         <div className="flex items-center space-x-2 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-2xl">

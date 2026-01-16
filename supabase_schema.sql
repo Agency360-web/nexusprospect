@@ -64,3 +64,20 @@ create policy "Allow all access for public" on public.transmissions for all usin
 create index idx_goals_client on public.goals(client_id);
 create index idx_leads_client on public.leads(client_id);
 create index idx_transmissions_client_channel on public.transmissions(client_id, channel);
+
+-- Email Senders Table
+create table if not exists public.email_senders (
+    id uuid primary key default uuid_generate_v4(),
+    client_id uuid references public.clients(id) on delete cascade,
+    email text not null,
+    provider text not null, -- 'smtp', 'sendgrid', 'aws_ses', etc.
+    from_name text,
+    status text check (status in ('active', 'inactive', 'unverified')) default 'active',
+    daily_limit int default 500,
+    sent_today int default 0,
+    config jsonb default '{}'::jsonb, -- Store API keys or SMTP settings (encrypted ideally, but simple here)
+    created_at timestamptz default now()
+);
+
+alter table public.email_senders enable row level security;
+create policy "Allow all access for public" on public.email_senders for all using (true);

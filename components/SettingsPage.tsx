@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from './ui/Modal';
+import { supabase } from '../lib/supabase';
 
 type SettingsTab = 'general' | 'users' | 'clients' | 'webhooks' | 'whatsapp' | 'leads' | 'campaigns' | 'security' | 'audit';
 
@@ -39,6 +40,8 @@ const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [saveLoading, setSaveLoading] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
+  const [platformName, setPlatformName] = useState(user?.user_metadata?.platform_name || 'NexusDispatch');
 
   // Interactive States
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -46,13 +49,24 @@ const SettingsPage: React.FC = () => {
   const [autoBlock, setAutoBlock] = useState(5);
   const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaveLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setSaveLoading(false);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: displayName,
+          platform_name: platformName
+        }
+      });
+      if (error) throw error;
       alert('Alterações salvas com sucesso!');
-    }, 800);
+      window.location.reload(); // Reload to refresh context
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Erro ao salvar alterações.');
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   const handleCreateUser = (e: React.FormEvent) => {
@@ -141,8 +155,25 @@ const SettingsPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-6">
                   <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">Nome de Exibição (Seu Nome)</label>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Ex: Lucas Renato"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 transition-all font-bold text-slate-900"
+                    />
+                    <p className="text-xs text-slate-400">Este nome aparecerá na saudação do Dashboard.</p>
+                  </div>
+
+                  <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">Nome da Plataforma</label>
-                    <input type="text" defaultValue="NexusDispatch" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 transition-all" />
+                    <input
+                      type="text"
+                      value={platformName}
+                      onChange={(e) => setPlatformName(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 transition-all"
+                    />
                   </div>
 
                   <div className="space-y-2">

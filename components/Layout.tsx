@@ -72,7 +72,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <SidebarItem
                             to="/clients"
                             icon={<Users size={20} />}
-                            label="Clientes (Tenants)"
+                            label="Clientes"
                             active={location.pathname.startsWith('/clients')}
                         />
                         <SidebarItem

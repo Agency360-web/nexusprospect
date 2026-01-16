@@ -30,6 +30,17 @@ export interface WhatsAppNumber {
   sentToday: number;
 }
 
+export interface EmailSender {
+  id: string;
+  clientId: string;
+  email: string;
+  provider: string;
+  fromName: string;
+  status: 'active' | 'inactive' | 'unverified';
+  dailyLimit: number;
+  sentToday: number;
+}
+
 export interface Tag {
   id: string;
   name: string;

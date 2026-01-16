@@ -31,9 +31,10 @@ import {
   Wifi,
   WifiOff,
   Target,
-  Mail
+  Mail,
+  AtSign
 } from 'lucide-react';
-import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client } from '../types';
+import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client, EmailSender } from '../types';
 import ClientGoals from './ClientGoals';
 import ClientOverviewGoals from './ClientOverviewGoals';
 import { supabase } from '../lib/supabase';
@@ -51,16 +52,19 @@ const ClientDetail: React.FC = () => {
   const [tags, setTags] = useState<Tag[]>([]);
 
   const [numbers, setNumbers] = useState<WhatsAppNumber[]>([]);
+  const [emailSenders, setEmailSenders] = useState<EmailSender[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
 
   // Modal State
-  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'webhook' | 'number'>('none');
+  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'webhook' | 'number' | 'email' | 'success'>('none');
   const [modalLoading, setModalLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Form State
-  const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', company: '' });
+  const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', company: '', tags: '' });
   const [newWebhook, setNewWebhook] = useState({ name: '', url: '', type: 'inbound' as const });
   const [newNumber, setNewNumber] = useState({ nickname: '', phone: '' });
+  const [newEmail, setNewEmail] = useState({ email: '', provider: 'smtp', fromName: '' });
   const [leadType, setLeadType] = useState<'whatsapp' | 'email'>('whatsapp');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -81,7 +85,7 @@ const ClientDetail: React.FC = () => {
         client_id: clientId,
         name: newLead.name,
         status: 'valid',
-        tags: [],
+        tags: newLead.tags ? newLead.tags.split(',').map(t => t.trim()).filter(t => t) : [],
         custom_fields: { empresa: newLead.company }
       };
 
@@ -97,7 +101,7 @@ const ClientDetail: React.FC = () => {
       const { error } = await supabase.from('leads').insert(payload);
       if (error) throw error;
       setActiveModal('none');
-      setNewLead({ name: '', phone: '', email: '', company: '' });
+      setNewLead({ name: '', phone: '', email: '', company: '', tags: '' });
       fetchData();
     } catch (err) { console.error(err); alert('Erro ao criar lead'); }
     finally { setModalLoading(false); }
@@ -152,7 +156,8 @@ const ClientDetail: React.FC = () => {
         if (leadsToInsert.length > 0) {
           const { error } = await supabase.from('leads').insert(leadsToInsert);
           if (error) throw error;
-          alert(`${leadsToInsert.length} leads importados com sucesso!`);
+          setSuccessMessage(`${leadsToInsert.length} leads importados com sucesso!`);
+          setActiveModal('success');
           fetchData();
         }
 
@@ -207,6 +212,29 @@ const ClientDetail: React.FC = () => {
       setNewNumber({ nickname: '', phone: '' });
       fetchData();
     } catch (err) { console.error(err); alert('Erro ao vincular número'); }
+    finally { setModalLoading(false); }
+  };
+
+  const handleCreateEmailSender = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientId) return;
+    setModalLoading(true);
+    try {
+      const { error } = await supabase.from('email_senders').insert({
+        client_id: clientId,
+        email: newEmail.email,
+        provider: newEmail.provider,
+        from_name: newEmail.fromName,
+        status: 'active',
+        daily_limit: 500
+      });
+      if (error) throw error;
+      setActiveModal('none');
+      setNewEmail({ email: '', provider: 'smtp', fromName: '' });
+      setSuccessMessage('E-mail vinculado com sucesso!');
+      setActiveModal('success');
+      fetchData();
+    } catch (err) { console.error(err); alert('Erro ao vincular e-mail'); }
     finally { setModalLoading(false); }
   };
 
@@ -286,6 +314,25 @@ const ClientDetail: React.FC = () => {
           status: n.status,
           dailyLimit: n.daily_limit,
           sentToday: n.sent_today
+        })));
+      }
+
+      // 4.5 Fetch Email Senders
+      const { data: emailsData } = await supabase
+        .from('email_senders')
+        .select('*')
+        .eq('client_id', clientId);
+
+      if (emailsData) {
+        setEmailSenders(emailsData.map((e: any) => ({
+          id: e.id,
+          clientId: e.client_id,
+          email: e.email,
+          provider: e.provider,
+          fromName: e.from_name,
+          status: e.status,
+          dailyLimit: e.daily_limit,
+          sentToday: e.sent_today
         })));
       }
 
@@ -497,15 +544,27 @@ const ClientDetail: React.FC = () => {
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-slate-900">Canais de Disparo Ativos</h3>
-              <button
-                onClick={() => setActiveModal('number')}
-                className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
-              >
-                <Plus size={14} />
-                <span>Vincular Novo Número</span>
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setActiveModal('email')}
+                  className="flex items-center space-x-2 px-4 py-2 bg-white border border-slate-200 text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors"
+                >
+                  <Plus size={14} />
+                  <span>Vincular Novo E-mail</span>
+                </button>
+                <button
+                  onClick={() => setActiveModal('number')}
+                  className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+                >
+                  <Plus size={14} />
+                  <span>Vincular Novo Número</span>
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            {/* WhatsApp Numbers Grid */}
+            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">WhatsApp</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
               {numbers.map((num, i) => {
                 // Determine status based on num.status
                 const isOnline = num.status === 'active' || num.status === 'connected';
@@ -752,6 +811,7 @@ const ClientDetail: React.FC = () => {
             <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="E-mail (ex: nome@empresa.com)" value={newLead.email} onChange={e => setNewLead({ ...newLead, email: e.target.value })} required type="email" />
           )}
           <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Empresa (Opcional)" value={newLead.company} onChange={e => setNewLead({ ...newLead, company: e.target.value })} />
+          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Etiquetas (separadas por vírgula)" value={newLead.tags} onChange={e => setNewLead({ ...newLead, tags: e.target.value })} />
           <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Salvar'}</button></div>
         </form>
       </Modal>
@@ -776,6 +836,41 @@ const ClientDetail: React.FC = () => {
           <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Número (Ex: 5511999999999)" value={newNumber.phone} onChange={e => setNewNumber({ ...newNumber, phone: e.target.value })} required />
           <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Vincular'}</button></div>
         </form>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'email'} onClose={() => setActiveModal('none')} title="Vincular Conta de E-mail">
+        <form onSubmit={handleCreateEmailSender} className="space-y-4">
+          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Nome do Remetente" value={newEmail.fromName} onChange={e => setNewEmail({ ...newEmail, fromName: e.target.value })} required />
+          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Endereço de E-mail" type="email" value={newEmail.email} onChange={e => setNewEmail({ ...newEmail, email: e.target.value })} required />
+          <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" value={newEmail.provider} onChange={e => setNewEmail({ ...newEmail, provider: e.target.value })}>
+            <option value="smtp">SMTP Personalizado</option>
+            <option value="sendgrid">SendGrid API</option>
+            <option value="aws">AWS SES</option>
+            <option value="resend">Resend</option>
+          </select>
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-500 mb-2 font-bold">Configurações de Autenticação</p>
+            <input className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none text-sm mb-2" placeholder="API Key / Senha SMTP" type="password" />
+            <input className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none text-sm" placeholder="Host (para SMTP)" disabled={newEmail.provider !== 'smtp'} />
+          </div>
+          <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Vincular'}</button></div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'success'} onClose={() => setActiveModal('none')} title="">
+        <div className="flex flex-col items-center justify-center text-center p-6 space-y-4">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-2 animate-in zoom-in duration-300">
+            <CheckCircle2 size={32} className="text-emerald-600" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900">Sucesso!</h3>
+          <p className="text-slate-500">{successMessage}</p>
+          <button
+            onClick={() => setActiveModal('none')}
+            className="mt-6 px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors w-full"
+          >
+            Continuar
+          </button>
+        </div>
       </Modal>
     </div >
   );
