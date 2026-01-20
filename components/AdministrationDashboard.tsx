@@ -583,7 +583,7 @@ const AdministrationDashboard: React.FC = () => {
                                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trx.amount)}
                                                         </td>
                                                         <td className="px-8 py-5">
-                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-bold uppercase tracking-wide border ${trx.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${trx.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                                                                 trx.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
                                                                     trx.status === 'atrasado' ? 'bg-rose-50 text-rose-700 border-rose-100' :
                                                                         'bg-slate-50 text-slate-700 border-slate-100'
