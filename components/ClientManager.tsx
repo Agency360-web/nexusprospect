@@ -33,6 +33,7 @@ const ClientManager: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingClient, setEditingClient] = useState<ClientWithStats | null>(null);
+  const [activeMenuClientId, setActiveMenuClientId] = useState<string | null>(null);
 
   const [clientForm, setClientForm] = useState({
     name: '',
@@ -298,26 +299,35 @@ const ClientManager: React.FC = () => {
                     </div>
 
                     {/* Gear Menu */}
-                    <div className="relative group/menu" onClick={(e) => e.stopPropagation()}>
-                      <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors">
+                    <div className="relative" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setActiveMenuClientId(activeMenuClientId === client.id ? null : client.id)}
+                        className={`p-2 rounded-lg transition-colors ${activeMenuClientId === client.id ? 'bg-slate-100 text-slate-900' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-900'}`}
+                      >
                         <Settings size={18} />
                       </button>
-                      <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden hidden group-hover/menu:block z-20">
-                        <button
-                          onClick={(e) => handleOpenEdit(e, client)}
-                          className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-slate-50 text-slate-600 text-sm font-medium transition-colors"
-                        >
-                          <Edit2 size={16} />
-                          <span>Editar</span>
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteClient(e, client.id)}
-                          className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-rose-50 text-rose-500 text-sm font-medium transition-colors border-t border-slate-50"
-                        >
-                          <Trash2 size={16} />
-                          <span>Excluir</span>
-                        </button>
-                      </div>
+
+                      {activeMenuClientId === client.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setActiveMenuClientId(null)} />
+                          <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-200">
+                            <button
+                              onClick={(e) => { setActiveMenuClientId(null); handleOpenEdit(e, client); }}
+                              className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-slate-50 text-slate-600 text-sm font-medium transition-colors"
+                            >
+                              <Edit2 size={16} />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              onClick={(e) => { setActiveMenuClientId(null); handleDeleteClient(e, client.id); }}
+                              className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-rose-50 text-rose-500 text-sm font-medium transition-colors border-t border-slate-50"
+                            >
+                              <Trash2 size={16} />
+                              <span>Excluir</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

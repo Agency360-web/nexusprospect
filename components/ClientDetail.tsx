@@ -36,7 +36,8 @@ import {
   Mail,
   AtSign,
 
-  ListTodo
+  ListTodo,
+  X
 } from 'lucide-react';
 import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client, EmailSender, Task } from '../types';
 import ClientGoals from './ClientGoals';
@@ -85,7 +86,7 @@ const ClientDetail: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskFilter, setTaskFilter] = useState<'pending' | 'completed'>('pending');
   const [newTask, setNewTask] = useState({
-    title: '', description: '', startDate: '', dueDate: '',
+    title: '', description: '', startDate: '', dueDate: '', status: 'pending',
     checklist: [] as { text: string, completed: boolean }[]
   });
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -336,6 +337,14 @@ const ClientDetail: React.FC = () => {
     setActiveModal('number');
   };
 
+  const formatDateForInput = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const offset = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 16);
+  };
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientId) return;
@@ -345,15 +354,15 @@ const ClientDetail: React.FC = () => {
         client_id: clientId,
         title: newTask.title,
         description: newTask.description,
-        start_date: newTask.startDate || null,
-        due_date: newTask.dueDate || null,
-        status: 'pending',
+        start_date: newTask.startDate ? new Date(newTask.startDate).toISOString() : null,
+        due_date: newTask.dueDate ? new Date(newTask.dueDate).toISOString() : null,
+        status: newTask.status,
         checklist: newTask.checklist
       });
       if (error) throw error;
 
       setActiveModal('none');
-      setNewTask({ title: '', description: '', startDate: '', dueDate: '', checklist: [] });
+      setNewTask({ title: '', description: '', startDate: '', dueDate: '', status: 'pending', checklist: [] });
       fetchData();
     } catch (err: any) {
       console.error(err);
@@ -371,8 +380,8 @@ const ClientDetail: React.FC = () => {
       const { error } = await supabase.from('tasks').update({
         title: selectedTask.title,
         description: selectedTask.description,
-        start_date: selectedTask.startDate,
-        due_date: selectedTask.dueDate,
+        start_date: selectedTask.startDate ? new Date(selectedTask.startDate).toISOString() : null,
+        due_date: selectedTask.dueDate ? new Date(selectedTask.dueDate).toISOString() : null,
         status: selectedTask.status,
         checklist: selectedTask.checklist
       }).eq('id', selectedTask.id);
@@ -425,7 +434,8 @@ const ClientDetail: React.FC = () => {
       setSelectedTask(task);
       setActiveModal('task-detail');
     } else {
-      setNewTask({ title: '', description: '', startDate: '', dueDate: '', checklist: [] });
+      setSelectedTask(null); // Critical fix: Clear selectedTask so checklist adds to newTask
+      setNewTask({ title: '', description: '', startDate: '', dueDate: '', status: 'pending', checklist: [] });
       setActiveModal('task-create');
     }
   };
@@ -856,26 +866,37 @@ const ClientDetail: React.FC = () => {
                   {tasks.filter(t => t.status === taskFilter).length === 0 ? (
                     <div className="text-center py-8 text-slate-400 text-sm">Nenhuma tarefa {taskFilter === 'pending' ? 'pendente' : 'concluída'}</div>
                   ) : (
-                    tasks.filter(t => t.status === taskFilter).map(task => (
-                      <div key={task.id} onClick={() => handleOpenTaskModal(task)} className="group flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer">
-                        <div className="flex items-center space-x-3">
-                          <div onClick={(e) => { e.stopPropagation(); toggleTaskSelection(task.id); }} className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer ${selectedTasks.includes(task.id) ? 'bg-slate-900 border-slate-900 text-white' : 'border-slate-300 hover:border-slate-400'}`}>
-                            {selectedTasks.includes(task.id) && <Check size={12} />}
-                          </div>
-                          <div>
-                            <div className={`font-bold text-slate-900 ${task.status === 'completed' ? 'line-through text-slate-400' : ''}`}>{task.title}</div>
-                            <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
-                              {task.dueDate && (
-                                <span className="flex items-center"><Clock size={10} className="mr-1" /> {new Date(task.dueDate).toLocaleDateString('pt-BR')}</span>
-                              )}
+                    tasks.filter(t => t.status === taskFilter).map(task => {
+                      const isOverdue = task.status !== 'completed' && task.dueDate && new Date(task.dueDate) < new Date();
+
+                      return (
+                        <div
+                          key={task.id}
+                          onClick={() => handleOpenTaskModal(task)}
+                          className={`group flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${isOverdue
+                            ? 'bg-rose-50 border-rose-200 hover:border-rose-300'
+                            : 'bg-white border-slate-100 hover:border-slate-300'
+                            }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div onClick={(e) => { e.stopPropagation(); toggleTaskSelection(task.id); }} className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer transition-colors ${selectedTasks.includes(task.id) ? 'bg-slate-900 border-slate-900 text-white' : isOverdue ? 'border-rose-300 hover:border-rose-400' : 'border-slate-300 hover:border-slate-400'}`}>
+                              {selectedTasks.includes(task.id) && <Check size={12} />}
+                            </div>
+                            <div>
+                              <div className={`font-bold ${task.status === 'completed' ? 'line-through text-slate-400' : isOverdue ? 'text-rose-900' : 'text-slate-900'}`}>{task.title}</div>
+                              <div className={`flex items-center space-x-2 text-xs mt-1 ${isOverdue ? 'text-rose-600/80' : 'text-slate-500'}`}>
+                                {task.dueDate && (
+                                  <span className="flex items-center"><Clock size={10} className="mr-1" /> {new Date(task.dueDate).toLocaleDateString('pt-BR')}</span>
+                                )}
+                              </div>
                             </div>
                           </div>
+                          <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getTaskStatusColor(task)}`}>
+                            {task.status === 'completed' ? 'Concluída' : isOverdue ? 'Atrasada' : 'Em dia'}
+                          </div>
                         </div>
-                        <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getTaskStatusColor(task)}`}>
-                          {task.status === 'completed' ? 'Concluída' : task.dueDate && new Date(task.dueDate) < new Date() ? 'Atrasada' : 'Em dia'}
-                        </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </div>
@@ -1355,6 +1376,198 @@ const ClientDetail: React.FC = () => {
           </div>
           <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Vincular'}</button></div>
         </form>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'task-create'} onClose={() => setActiveModal('none')} title="Nova Tarefa">
+        <form onSubmit={handleCreateTask} className="space-y-4">
+          <input
+            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+            placeholder="Título da Tarefa"
+            value={newTask.title}
+            onChange={e => setNewTask({ ...newTask, title: e.target.value })}
+            required
+          />
+          <textarea
+            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none h-24"
+            placeholder="Descrição detalhada..."
+            value={newTask.description}
+            onChange={e => setNewTask({ ...newTask, description: e.target.value })}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Data de Início</label>
+              <input
+                type="datetime-local"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                value={newTask.startDate}
+                onChange={e => setNewTask({ ...newTask, startDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Data de Vencimento</label>
+              <input
+                type="datetime-local"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                value={newTask.dueDate}
+                onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Status</label>
+            <select
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm appearance-none"
+              value={newTask.status}
+              onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
+            >
+              <option value="pending">Pendente</option>
+              <option value="completed">Concluída</option>
+            </select>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <label className="text-xs font-bold text-slate-500 uppercase ml-1 block">Checklist</label>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                placeholder="Adicionar item..."
+                value={newChecklistItem}
+                onChange={e => setNewChecklistItem(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddChecklistItem())}
+              />
+              <button
+                type="button"
+                onClick={handleAddChecklistItem}
+                className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-600 transition-colors"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+            <div className="space-y-2 mt-2 max-h-40 overflow-y-auto">
+              {newTask.checklist.map((item, idx) => (
+                <div key={idx} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${item.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggleChecklistItem(idx, false)}
+                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300 hover:border-emerald-400'}`}
+                  >
+                    {item.completed && <Check size={12} strokeWidth={3} />}
+                  </button>
+                  <span className={`text-sm flex-1 font-medium ${item.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{item.text}</span>
+                  <button type="button" onClick={() => setNewTask({ ...newTask, checklist: newTask.checklist.filter((_, i) => i !== idx) })} className="text-slate-400 hover:text-rose-500 p-1">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-slate-100">
+            <button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">
+              {modalLoading ? <Loader2 className="animate-spin" /> : 'Criar Tarefa'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+
+      <Modal isOpen={activeModal === 'task-detail'} onClose={() => setActiveModal('none')} title="Detalhes da Tarefa">
+        {selectedTask && (
+          <form onSubmit={handleUpdateTask} className="space-y-4">
+            <input
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-lg"
+              value={selectedTask.title}
+              onChange={e => setSelectedTask({ ...selectedTask, title: e.target.value })}
+            />
+            <textarea
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none h-24"
+              value={selectedTask.description || ''}
+              onChange={e => setSelectedTask({ ...selectedTask, description: e.target.value })}
+              placeholder="Sem descrição"
+            />
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Status</label>
+              <select
+                className={`w-full px-4 py-3 border rounded-xl outline-none text-sm appearance-none font-bold ${selectedTask.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
+                value={selectedTask.status}
+                onChange={e => setSelectedTask({ ...selectedTask, status: e.target.value as 'pending' | 'completed' })}
+              >
+                <option value="pending">Pendente</option>
+                <option value="completed">Concluída</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Início</label>
+                <input
+                  type="datetime-local"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                  value={formatDateForInput(selectedTask.startDate)}
+                  onChange={e => setSelectedTask({ ...selectedTask, startDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Vencimento</label>
+                <input
+                  type="datetime-local"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                  value={formatDateForInput(selectedTask.dueDate)}
+                  onChange={e => setSelectedTask({ ...selectedTask, dueDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <label className="text-xs font-bold text-slate-500 uppercase ml-1 block">Checklist</label>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                  placeholder="Novo item..."
+                  value={newChecklistItem}
+                  onChange={e => setNewChecklistItem(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddChecklistItem())}
+                />
+                <button type="button" onClick={handleAddChecklistItem} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-600">
+                  <Plus size={20} />
+                </button>
+              </div>
+              <div className="space-y-2 mt-2 max-h-40 overflow-y-auto">
+                {(selectedTask.checklist || []).map((item: any, idx: number) => (
+                  <div key={idx} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${item.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                    <button
+                      type="button"
+                      onClick={() => toggleChecklistItem(idx, true)}
+                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300 hover:border-emerald-400'}`}
+                    >
+                      {item.completed && <Check size={12} strokeWidth={3} />}
+                    </button>
+                    <span className={`text-sm flex-1 font-medium ${item.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{item.text}</span>
+                    <button type="button" onClick={() => setSelectedTask({ ...selectedTask, checklist: selectedTask.checklist.filter((_, i) => i !== idx) })} className="text-slate-400 hover:text-rose-500 p-1">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={handleCompleteTask}
+                className={`px-4 py-2 rounded-xl font-bold flex items-center space-x-2 transition-colors ${selectedTask.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
+              >
+                <CheckCircle2 size={18} />
+                <span>{selectedTask.status === 'completed' ? 'Tarefa Concluída' : 'Marcar como Concluída'}</span>
+              </button>
+              <button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">
+                {modalLoading ? <Loader2 className="animate-spin" /> : 'Salvar Alterações'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <Modal isOpen={activeModal === 'success'} onClose={() => setActiveModal('none')} title="">
