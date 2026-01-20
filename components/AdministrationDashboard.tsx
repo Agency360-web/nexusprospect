@@ -24,6 +24,7 @@ import {
     Plus
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import ContractManager from './ContractManager';
 
 // Interfaces
 interface FinancialKPIs {
@@ -56,7 +57,7 @@ interface Transaction {
 
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'admin' | 'finance' | 'legal'>('finance');
+    const [activeTab, setActiveTab] = useState<'admin' | 'finance' | 'contracts'>('finance');
     const [kpis, setKpis] = useState<FinancialKPIs | null>(null);
     const [monthlyMetrics, setMonthlyMetrics] = useState<MonthlyMetric[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -140,8 +141,7 @@ const AdministrationDashboard: React.FC = () => {
             {/* Tabs Nav */}
             <div className="bg-white border-b border-slate-200 sticky top-16 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
                 <TabButton id="admin" label="Administrativo" icon={Building2} />
-                <TabButton id="finance" label="Financeiro" icon={DollarSign} />
-                <TabButton id="legal" label="Jurídico" icon={Scale} />
+                <TabButton id="contracts" label="Gestão de Contratos" icon={FileText} />
             </div>
 
             <div className="pt-6">
@@ -424,6 +424,13 @@ const AdministrationDashboard: React.FC = () => {
                     </div>
                 )}
 
+                {/* Contracts Tab */}
+                {activeTab === 'contracts' && (
+                    <div className="animate-in slide-in-from-bottom-2 duration-300">
+                        <ContractManager />
+                    </div>
+                )}
+
                 {/* Admin Tab (Placeholder) */}
                 {activeTab === 'admin' && (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400 animate-in slide-in-from-bottom-2 duration-300">
@@ -438,19 +445,6 @@ const AdministrationDashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Legal Tab (Placeholder) */}
-                {activeTab === 'legal' && (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 animate-in slide-in-from-bottom-2 duration-300">
-                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-                            <Scale size={40} className="text-slate-300" />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">Módulo Jurídico em Construção</h3>
-                        <p className="max-w-md text-center">Gestão de processos, contratos legais e compliance em desenvolvimento.</p>
-                        <button className="mt-8 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">
-                            Ver Roadmap
-                        </button>
-                    </div>
-                )}
             </div>
 
         </div>

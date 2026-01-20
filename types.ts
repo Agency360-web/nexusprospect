@@ -115,3 +115,22 @@ export interface Task {
   checklist: { text: string; completed: boolean }[];
   createdAt: string;
 }
+
+export interface ContractTemplate {
+  id: string;
+  user_id: string;
+  name: string;
+  content: string;
+  created_at: string;
+}
+
+export interface Contract {
+  id: string;
+  user_id: string;
+  template_id?: string;
+  client_name: string;
+  status: 'draft' | 'generated' | 'signed';
+  variables: Record<string, string>;
+  content_snapshot: string;
+  created_at: string;
+}
