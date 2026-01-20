@@ -127,16 +127,25 @@ const AdministrationDashboard: React.FC = () => {
     );
 
     const handleTestSync = async () => {
+        if (!user) return;
         try {
             setLoading(true);
-            const response = await fetch('/api/sync-asaas');
+            // Call Vercel Serverless Function (relative path)
+            const response = await fetch('/api/sync-asaas', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ userId: user.id })
+            });
             const data = await response.json();
 
             if (!data.success) {
                 throw new Error(data.error || 'Unknown error from server');
             }
 
-            alert(`Sucesso! Conexão estabelecida com Vercel. ${data.payments_found || 0} pagamentos encontrados.`);
+            // Refresh the page or data to show new numbers
+            window.location.reload();
         } catch (error: any) {
             console.error('Sync error:', error);
             const errorMessage = error?.message || error?.error || JSON.stringify(error);
