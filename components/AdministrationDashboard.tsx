@@ -61,9 +61,13 @@ const AdministrationDashboard: React.FC = () => {
 
     // Filter State
     const [dateRange, setDateRange] = useState<DateRange>('thisMonth');
-    const [customStartDate, setCustomStartDate] = useState<string>('');
-    const [customEndDate, setCustomEndDate] = useState<string>('');
-    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+    const toggleFilter = () => setIsFilterOpen(!isFilterOpen);
+    const selectRange = (range: DateRange) => {
+        setDateRange(range);
+        setIsFilterOpen(false);
+    };
 
     const [loading, setLoading] = useState(true);
 
@@ -269,9 +273,13 @@ const AdministrationDashboard: React.FC = () => {
 
                         {/* Filters Toolbar */}
                         <div className="flex justify-end">
-                            <div className="relative group">
-                                <button className="flex items-center space-x-2 bg-white border border-slate-200 px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm">
-                                    <Calendar size={16} className="text-slate-500" />
+                            <div className="relative">
+                                <button
+                                    onClick={toggleFilter}
+                                    className={`flex items-center space-x-2 bg-white border px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${isFilterOpen ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    <Calendar size={16} className={isFilterOpen ? "text-slate-900" : "text-slate-500"} />
                                     <span>
                                         {dateRange === 'today' && 'Hoje'}
                                         {dateRange === 'last7' && 'Últimos 7 dias'}
@@ -280,18 +288,46 @@ const AdministrationDashboard: React.FC = () => {
                                         {dateRange === 'lastMonth' && 'Mês Passado'}
                                         {dateRange === 'all' && 'Todo o Período'}
                                     </span>
-                                    <ChevronDown size={14} className="text-slate-400" />
+                                    <ChevronDown size={14} className={`transition-transform duration-200 ${isFilterOpen ? 'rotate-180 text-slate-900' : 'text-slate-400'}`} />
                                 </button>
+
+                                {/* Overlay to close */}
+                                {isFilterOpen && (
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)}></div>
+                                )}
+
                                 {/* Dropdown */}
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg p-1 hidden group-hover:block z-50">
-                                    <button onClick={() => setDateRange('today')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Hoje</button>
-                                    <button onClick={() => setDateRange('last7')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Últimos 7 dias</button>
-                                    <button onClick={() => setDateRange('last30')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Últimos 30 dias</button>
-                                    <button onClick={() => setDateRange('thisMonth')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Este Mês</button>
-                                    <button onClick={() => setDateRange('lastMonth')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Mês Passado</button>
-                                    <div className="h-px bg-slate-100 my-1"></div>
-                                    <button onClick={() => setDateRange('all')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg font-bold">Todo o Período</button>
-                                </div>
+                                {isFilterOpen && (
+                                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                                        <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Período</div>
+                                        <button onClick={() => selectRange('today')} className={`w-full text-left px-3 py-2 text-sm rounded-lg mb-1 flex items-center justify-between ${dateRange === 'today' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <span>Hoje</span>
+                                            {dateRange === 'today' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
+                                        </button>
+                                        <button onClick={() => selectRange('last7')} className={`w-full text-left px-3 py-2 text-sm rounded-lg mb-1 flex items-center justify-between ${dateRange === 'last7' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <span>Últimos 7 dias</span>
+                                            {dateRange === 'last7' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
+                                        </button>
+                                        <button onClick={() => selectRange('last30')} className={`w-full text-left px-3 py-2 text-sm rounded-lg mb-1 flex items-center justify-between ${dateRange === 'last30' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <span>Últimos 30 dias</span>
+                                            {dateRange === 'last30' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
+                                        </button>
+                                        <div className="h-px bg-slate-100 my-1"></div>
+                                        <button onClick={() => selectRange('thisMonth')} className={`w-full text-left px-3 py-2 text-sm rounded-lg mb-1 flex items-center justify-between ${dateRange === 'thisMonth' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <span>Este Mês</span>
+                                            {dateRange === 'thisMonth' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
+                                        </button>
+                                        <button onClick={() => selectRange('lastMonth')} className={`w-full text-left px-3 py-2 text-sm rounded-lg mb-1 flex items-center justify-between ${dateRange === 'lastMonth' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <span>Mês Passado</span>
+                                            {dateRange === 'lastMonth' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
+                                        </button>
+                                        <div className="h-px bg-slate-100 my-1"></div>
+                                        <button onClick={() => selectRange('all')} className={`w-full text-left px-3 py-2 text-sm rounded-lg flex items-center justify-between ${dateRange === 'all' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <span>Todo o Período</span>
+                                            {dateRange === 'all' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -473,9 +509,9 @@ const AdministrationDashboard: React.FC = () => {
                                                         </td>
                                                         <td className="px-8 py-5">
                                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${trx.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                                    trx.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                                        trx.status === 'atrasado' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                                                                            'bg-slate-50 text-slate-700 border-slate-100'
+                                                                trx.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                                    trx.status === 'atrasado' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                                                        'bg-slate-50 text-slate-700 border-slate-100'
                                                                 }`}>
                                                                 {trx.status}
                                                             </span>
