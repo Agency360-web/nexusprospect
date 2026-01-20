@@ -129,12 +129,18 @@ const AdministrationDashboard: React.FC = () => {
     const handleTestSync = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase.functions.invoke('sync-asaas');
-            if (error) throw error;
-            alert(`Sucesso! Conexão estabelecida. ${data.payments_found || 0} pagamentos encontrados.`);
-        } catch (error) {
+            const response = await fetch('/api/sync-asaas');
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Unknown error from server');
+            }
+
+            alert(`Sucesso! Conexão estabelecida com Vercel. ${data.payments_found || 0} pagamentos encontrados.`);
+        } catch (error: any) {
             console.error('Sync error:', error);
-            alert('Erro na conexão. Verifique se a Chave API está correta nos Segredos do Supabase e se a função foi "deployada".');
+            const errorMessage = error?.message || error?.error || JSON.stringify(error);
+            alert(`Erro na conexão: ${errorMessage}`);
         } finally {
             setLoading(false);
         }

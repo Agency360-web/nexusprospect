@@ -10,15 +10,12 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
-        const authHeader = req.headers.get("Authorization");
-        // In a real Cron trigger, we might want to check for a specific header or just rely on internal network restrictions.
-        // For now, we allow invocations with valid Supabase Auth context or internal service key.
-
         const supabaseClient = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -26,49 +23,61 @@ serve(async (req) => {
 
         const asaasApiKey = Deno.env.get("ASAAS_API_KEY");
 
+        // If key is missing, return success: false instead of crashing
         if (!asaasApiKey) {
-            throw new Error("ASAAS_API_KEY not configured");
+            return new Response(
+                JSON.stringify({
+                    success: false,
+                    error: "ASAAS_API_KEY not configured in Supabase Secrets"
+                }),
+                {
+                    status: 200,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" }
+                }
+            );
         }
 
         // 1. Fetch data from Asaas
-        // This is a simplified fetch logic. You'd likely need pagination for production.
         const paymentsResponse = await fetch(`${ASAAS_API_URL}/payments?status=RECEIVED&dateCreated[ge]=${new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]}`, {
             headers: { "access_token": asaasApiKey }
         });
 
-        // Check if response is OK to avoid JSON parse errors
         if (!paymentsResponse.ok) {
-            console.error("Asaas API Error:", await paymentsResponse.text());
-            throw new Error("Failed to fetch payments from Asaas");
+            const errorText = await paymentsResponse.text();
+            return new Response(
+                JSON.stringify({
+                    success: false,
+                    error: `Asaas API Error: ${paymentsResponse.status} - ${errorText}`
+                }),
+                {
+                    status: 200,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" }
+                }
+            );
         }
 
         const paymentsData = await paymentsResponse.json();
         const payments = paymentsData.data || [];
 
-        // 2. Process Data (Calculate KPIs)
-        // Simple example: Total Revenue (MRR approximation)
-        let totalRevenue = 0;
-
-        // 3. Sync Logic (Upsert to Supabase)
-        // We would iterate over payments and insert into financial_transactions
-        // And update financial_kpis
-
-        // For this initial template, we will just return success 
-        // and logged data to prove connectivity once the user sets the key.
+        // 2. Process & Sync (Placeholder for now)
 
         return new Response(
             JSON.stringify({
                 message: "Sync started successfully",
                 payments_found: payments.length,
-                status: "success"
+                status: "success",
+                success: true
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
 
     } catch (error) {
         return new Response(
-            JSON.stringify({ error: error.message }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({
+                success: false,
+                error: error.message
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 });
