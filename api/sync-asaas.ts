@@ -17,6 +17,39 @@ function mapStatus(asaasStatus) {
     return map[asaasStatus] || 'pendente';
 }
 
+// Helper to fetch all pages from Asaas
+async function fetchAll(url, apiKey, maxPages = 10) {
+    let allData = [];
+    let offset = 0;
+    const limit = 100;
+    let hasMore = true;
+    let pageCount = 0;
+
+    while (hasMore && pageCount < maxPages) {
+        const separator = url.includes('?') ? '&' : '?';
+        const pagedUrl = `${url}${separator}limit=${limit}&offset=${offset}`;
+
+        const response = await fetch(pagedUrl, {
+            headers: { "access_token": apiKey }
+        });
+
+        if (!response.ok) {
+            console.error(`Error fetching page ${pageCount}: ${response.status}`);
+            break;
+        }
+
+        const json = await response.json();
+        const data = json.data || [];
+        allData = allData.concat(data);
+
+        hasMore = json.hasMore;
+        offset += limit;
+        pageCount++;
+    }
+
+    return allData;
+}
+
 export default async function handler(req, res) {
     // 1. CORS Configuration
     res.setHeader('Access-Control-Allow-Credentials', true);
@@ -38,46 +71,25 @@ export default async function handler(req, res) {
         const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-        // Get userId from Body
         const { userId } = req.body || {};
 
-        if (!asaasApiKey) {
-            return res.status(200).json({ success: false, error: 'ASAAS_API_KEY not configured' });
-        }
-        if (!supabaseUrl || !supabaseKey) {
-            return res.status(200).json({ success: false, error: 'Supabase credentials missing' });
-        }
-        if (!userId) {
-            return res.status(200).json({ success: false, error: 'User ID is required for sync' });
+        if (!asaasApiKey || !supabaseUrl || !supabaseKey || !userId) {
+            return res.status(200).json({ success: false, error: 'Configuration or UserID missing' });
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // --- 2. Fetch Data from Asaas ---
+        // --- 2. Fetch Data (Paginated) ---
 
-        // A. Fetch Customers (to get Names)
-        // Limit 100 is risky for big bases, but ok for MVP. Ideally pagination.
-        const customersResponse = await fetch(`${ASAAS_API_URL}/customers?limit=100`, {
-            headers: { "access_token": asaasApiKey }
-        });
-        const customersData = await customersResponse.ok ? await customersResponse.json() : { data: [] };
-        const customersMap = new Map(customersData.data?.map(c => [c.id, c.name || c.email]) || []);
+        // A. Customers (To map names) - Fetching up to 500 customers for now
+        const customers = await fetchAll(`${ASAAS_API_URL}/customers`, asaasApiKey, 5);
+        const customersMap = new Map(customers.map(c => [c.id, c.name || c.email || 'Cliente sem nome']));
 
-        // B. Fetch Payments (Deep history + Future)
-        // We need future payments for MRR (next 12 months)
-        // We need recent history for Churn? 
+        // B. Payments (Deep history + Future)
+        // Fetching payments from 12 months ago to present/future
         const startDate = new Date();
-        startDate.setFullYear(startDate.getFullYear() - 1); // Last 12 months
-
-        const paymentsResponse = await fetch(`${ASAAS_API_URL}/payments?limit=100&dateCreated[ge]=${startDate.toISOString().split('T')[0]}`, {
-            headers: { "access_token": asaasApiKey }
-        });
-
-        if (!paymentsResponse.ok) {
-            throw new Error(`Asaas Payments Error: ${paymentsResponse.status}`);
-        }
-        const paymentsData = await paymentsResponse.json();
-        const payments = paymentsData.data || [];
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        const payments = await fetchAll(`${ASAAS_API_URL}/payments?dateCreated[ge]=${startDate.toISOString().split('T')[0]}`, asaasApiKey, 20); // Up to 2000 payments
 
         // --- 3. Calculate KPIs ---
 
@@ -88,7 +100,7 @@ export default async function handler(req, res) {
         next30Days.setDate(now.getDate() + 30);
 
         // A. MRR (Total Receivable Next 12 Months / 12)
-        // User definition: "pegar tudo que temos para receber pelos próximos 12 meses... e fazer uma divisão"
+        // Considers PENDING, CONFIRMED, OVERDUE payments due in the next 12 months.
         const futurePayments = payments.filter(p => {
             const dueDate = new Date(p.dueDate);
             return (p.status === 'PENDING' || p.status === 'CONFIRMED' || p.status === 'OVERDUE') &&
@@ -105,64 +117,45 @@ export default async function handler(req, res) {
         });
         const forecast = forecastPayments.reduce((acc, curr) => acc + curr.value, 0);
 
-        // C. Overdue (Vencidas)
-        // Asaas has a status 'OVERDUE'
+        // C. Overdue (All time overdue found in the fetch window)
         const overduePayments = payments.filter(p => p.status === 'OVERDUE');
         const overdueAmount = overduePayments.reduce((acc, curr) => acc + curr.value, 0);
 
-        // D. Ticket Médio (Average of Contracts/Payments)
-        // Using all active/paid payments to calculate average
-        // Filter out deleted/refunded
+        // D. Active Subscribers (Unique customers with at least one Sync'd payment)
+        // Or accurate logic: Unique Customers who have a FUTURE payment pending?
+        // Let's use 'Unique Customers in the Payment List' as a base.
+        const activeSubscribers = new Set(payments.filter(p => p.status !== 'DELETED').map(p => p.customer)).size;
+
+        // E. Ticket Médio (Average Transaction Value of VALID payments)
         const validPayments = payments.filter(p => p.status !== 'DELETED' && p.status !== 'REFUNDED');
         const avgTicket = validPayments.length > 0
             ? validPayments.reduce((acc, curr) => acc + curr.value, 0) / validPayments.length
             : 0;
 
-        // E. Churn Rate
-        // "média dos clientes que saíram nos últimos 12 meses"
-        // Without proper subscription events, we can approximate:
-        // Clients who had a PAYMENT 'RECEIVED' > 30 days ago BUT NO PAYMENT in list < 30 days?
-        // Or simply count 'DELETED' subscriptions?
-        // Let's rely on standard calculation: (Lost Customers / Total Customers at Start). 
-        // For now, let's look for payments with status 'REFUNDED' or manual logic?
-        // User asked: "dados das empresas que já tinham cobrança gerada... e não estão mais recebendo"
-        // Hard to do strictly with just /payments list. 
-        // Let's try to fetch /subscriptions?status=INACTIVE ?
-        // For MVP speed: let's placeholder 0% or try:
-        // Count customers with LAST payment > 60 days ago?
-        // Let's set Churn to 0 for now unless we fetch subscriptions. 
-        // Optimization: Let's assume Churn is 0 until we have a specific 'subscriptions' fetch.
-        // Actually, let's fetch subscriptions to be nice.
-
+        // F. Churn Rate (Mocked or simple for now)
+        // We lack historical subscription state here. 
+        // We will query subscriptions briefly.
         let churnRate = 0;
         try {
-            const subResponse = await fetch(`${ASAAS_API_URL}/subscriptions?limit=100`, { headers: { "access_token": asaasApiKey } });
-            if (subResponse.ok) {
-                const subData = await subResponse.json();
-                const subs = subData.data || [];
-                const totalSubs = subs.length;
-                const inactiveSubs = subs.filter(s => s.status === 'INACTIVE' || s.status === 'EXPIRED').length;
-                churnRate = totalSubs > 0 ? (inactiveSubs / totalSubs) * 100 : 0;
-            }
+            const subs = await fetchAll(`${ASAAS_API_URL}/subscriptions`, asaasApiKey, 5); // Up to 500
+            const totalSubs = subs.length;
+            const inactiveSubs = subs.filter(s => s.status === 'INACTIVE' || s.status === 'EXPIRED').length;
+            churnRate = totalSubs > 0 ? (inactiveSubs / totalSubs) * 100 : 0;
         } catch (e) {
-            console.warn('Failed to fetch subscriptions for churn', e);
+            // Ignore sub fetch error, default 0
         }
 
         // --- 4. Transform Transactions for DB ---
-        // Sort by date desc
-        payments.sort((a, b) => new Date(b.dueDate || b.dateCreated) - new Date(a.dueDate || a.dateCreated));
+        // Sort by Due Date descending
+        payments.sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate));
 
         const dbTransactions = payments.map(p => {
-            const customerName = customersMap.get(p.customer) || 'Cliente Desconhecido';
+            const customerName = customersMap.get(p.customer) || 'Cliente';
             return {
                 user_id: userId,
-                client_name: customerName, // Now using Real Name!
-                description: p.description || `Fatura Asaas ${p.installmentNumber ? `#${p.installmentNumber}` : ''}`,
-                transaction_date: p.dateCreated, // Or paymentDate if paid? Let's use dateCreated or dueDate. User wants "Datas preenchidas corretamente".
-                // Usually transaction date = when it happened.
-                // If paid, use paymentDate. If pending, use dueDate? 
-                // DB column is transaction_date.
-                // Let's use: paymentDate (if paid) > creditDate > dueDate > dateCreated.
+                client_name: customerName,
+                description: p.description || `Fatura ${customerName}`,
+                transaction_date: p.dueDate || p.dateCreated, // Using Due Date as primary reference for financial timeline
                 amount: p.value,
                 status: mapStatus(p.status)
             };
@@ -170,14 +163,12 @@ export default async function handler(req, res) {
 
         // --- 5. Database Upsert ---
 
-        // A. Clear old
         const { error: deleteError } = await supabase
             .from('financial_transactions')
             .delete()
             .eq('user_id', userId);
         if (deleteError) throw deleteError;
 
-        // B. Insert new
         if (dbTransactions.length > 0) {
             const { error: insertError } = await supabase
                 .from('financial_transactions')
@@ -185,7 +176,6 @@ export default async function handler(req, res) {
             if (insertError) throw insertError;
         }
 
-        // C. Update KPIs
         const { error: upsertError } = await supabase
             .from('financial_kpis')
             .upsert({
@@ -193,7 +183,7 @@ export default async function handler(req, res) {
                 mrr: mrr,
                 forecast_30d: forecast,
                 overdue_amount: overdueAmount,
-                active_subscribers: customersMap.size,
+                active_subscribers: activeSubscribers,
                 avg_ticket: avgTicket,
                 churn_rate: churnRate
             }, { onConflict: 'user_id' });
@@ -203,22 +193,13 @@ export default async function handler(req, res) {
         return res.status(200).json({
             success: true,
             status: "success",
-            message: "Data synced refined",
+            message: "Data synced refined with pagination",
             payments_found: payments.length,
-            kpis: {
-                mrr,
-                forecast,
-                overdueAmount,
-                avgTicket,
-                churnRate
-            }
+            kpis: { mrr, forecast, overdueAmount }
         });
 
     } catch (error) {
         console.error('Vercel Sync Error:', error);
-        return res.status(200).json({
-            success: false,
-            error: error.message
-        });
+        return res.status(200).json({ success: false, error: error.message });
     }
 }
