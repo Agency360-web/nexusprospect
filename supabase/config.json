@@ -1,0 +1,7 @@
+{
+    "functions": {
+        "sync-asaas": {
+            "schedule": "*/30 * * * *"
+        }
+    }
+}

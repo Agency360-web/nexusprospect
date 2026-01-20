@@ -57,7 +57,7 @@ interface Transaction {
 
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'admin' | 'finance' | 'contracts'>('finance');
+    const [activeTab, setActiveTab] = useState<'finance' | 'contracts'>('finance');
     const [kpis, setKpis] = useState<FinancialKPIs | null>(null);
     const [monthlyMetrics, setMonthlyMetrics] = useState<MonthlyMetric[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -126,6 +126,20 @@ const AdministrationDashboard: React.FC = () => {
         </button>
     );
 
+    const handleTestSync = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase.functions.invoke('sync-asaas');
+            if (error) throw error;
+            alert(`Sucesso! Conexão estabelecida. ${data.payments_found || 0} pagamentos encontrados.`);
+        } catch (error) {
+            console.error('Sync error:', error);
+            alert('Erro na conexão. Verifique se a Chave API está correta nos Segredos do Supabase e se a função foi "deployada".');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
 
@@ -135,22 +149,35 @@ const AdministrationDashboard: React.FC = () => {
                     <h1 className="text-3xl font-bold text-slate-900">Administração</h1>
                     <p className="text-slate-500">Gestão centralizada de departamentos e recursos.</p>
                 </div>
-                {/* Global Actions (optional, maybe contextual per tab?) */}
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleTestSync}
+                        disabled={loading}
+                        className="text-xs font-bold text-slate-500 hover:text-slate-900 underline underline-offset-2 disabled:opacity-50"
+                    >
+                        {loading ? 'Testando...' : 'Testar Conexão'}
+                    </button>
+                    <div className="h-4 w-px bg-slate-200"></div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-100">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                        <span>Sincronização Automática Ativa</span>
+                    </div>
+                    <span className="text-xs text-slate-400">
+                        Atualizado: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                </div>
             </div>
 
             {/* Tabs Nav */}
             <div className="bg-white border-b border-slate-200 sticky top-16 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
-                <TabButton id="admin" label="Administrativo" icon={Building2} />
+                <TabButton id="finance" label="Financeiro" icon={Activity} />
                 <TabButton id="contracts" label="Gestão de Contratos" icon={FileText} />
             </div>
 
             <div className="pt-6">
-                {/* Finance Tab (Previously FinancialDashboard) */}
+                {/* Finance Tab (Default) */}
                 {activeTab === 'finance' && (
                     <div className="space-y-8 animate-in slide-in-from-bottom-2 duration-300">
-                        {/* Finance Header Actions */}
-                        {/* Finance Header Actions - Removed by user request */}
-
                         {/* Metric Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                             {/* MRR */}
@@ -430,21 +457,6 @@ const AdministrationDashboard: React.FC = () => {
                         <ContractManager />
                     </div>
                 )}
-
-                {/* Admin Tab (Placeholder) */}
-                {activeTab === 'admin' && (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 animate-in slide-in-from-bottom-2 duration-300">
-                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-                            <Building2 size={40} className="text-slate-300" />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">Módulo Administrativo em Construção</h3>
-                        <p className="max-w-md text-center">Gerencie contratos, inventário e recursos humanos em breve.</p>
-                        <button className="mt-8 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">
-                            Ver Roadmap
-                        </button>
-                    </div>
-                )}
-
             </div>
 
         </div>
