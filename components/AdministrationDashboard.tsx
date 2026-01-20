@@ -46,9 +46,83 @@ interface Transaction {
     transaction_date: string;
     amount: number;
     status: 'pago' | 'pendente' | 'atrasado' | 'cancelado';
+    manual_override?: boolean;
+    payment_method?: string;
 }
 
 type DateRange = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'all';
+
+const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void }> = ({ transaction, onUpdate }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const handleMarkPaid = async (method: string) => {
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('financial_transactions')
+                .update({
+                    status: 'pago',
+                    manual_override: true,
+                    payment_method: method
+                })
+                .eq('id', transaction.id);
+
+            if (error) throw error;
+            onUpdate();
+        } catch (err: any) {
+            alert('Erro: ' + err.message);
+        } finally {
+            setLoading(false);
+            setIsOpen(false);
+        }
+    };
+
+    return (
+        <div className="relative">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                disabled={loading}
+            >
+                <MoreHorizontal size={18} />
+            </button>
+
+            {/* Backdrop */}
+            {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>}
+
+            {/* Menu */}
+            {isOpen && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                    <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Ações</div>
+
+                    {transaction.status !== 'pago' && (
+                        <>
+                            <button
+                                onClick={() => handleMarkPaid('dinheiro')}
+                                className="w-full text-left px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 rounded-lg flex items-center gap-2"
+                            >
+                                <DollarSign size={14} />
+                                <span>Receber (Dinheiro)</span>
+                            </button>
+                            <button
+                                onClick={() => handleMarkPaid('pix')}
+                                className="w-full text-left px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 rounded-lg flex items-center gap-2"
+                            >
+                                <ArrowDownRight size={14} />
+                                <span>Receber (PIX)</span>
+                            </button>
+                        </>
+                    )}
+
+                    <button className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                        Ver Detalhes
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
@@ -489,6 +563,7 @@ const AdministrationDashboard: React.FC = () => {
                                                 <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descrição</th>
                                                 <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
                                                 <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                                <th className="px-8 py-4"></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -513,8 +588,15 @@ const AdministrationDashboard: React.FC = () => {
                                                                     trx.status === 'atrasado' ? 'bg-rose-50 text-rose-700 border-rose-100' :
                                                                         'bg-slate-50 text-slate-700 border-slate-100'
                                                                 }`}>
-                                                                {trx.status}
                                                             </span>
+                                                        </td>
+                                                        <td className="px-8 py-5 text-right pr-8">
+                                                            <TransactionMenu
+                                                                transaction={trx}
+                                                                onUpdate={() => {
+                                                                    fetchFinancialData(); // Refresh UI
+                                                                }}
+                                                            />
                                                         </td>
                                                     </tr>
                                                 ))

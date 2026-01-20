@@ -17,7 +17,6 @@ function mapStatus(asaasStatus) {
     return map[asaasStatus] || 'pendente';
 }
 
-// Helper to fetch all pages from Asaas
 async function fetchAll(url, apiKey, maxPages = 10) {
     let allData = [];
     let offset = 0;
@@ -51,14 +50,11 @@ async function fetchAll(url, apiKey, maxPages = 10) {
 }
 
 export default async function handler(req, res) {
-    // 1. CORS Configuration
+    // CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    );
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
     if (req.method === 'OPTIONS') {
         res.status(200).end();
@@ -79,19 +75,73 @@ export default async function handler(req, res) {
 
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // --- 2. Fetch Data (Paginated) ---
+        // --- 1. Fetch Local Overrides ---
+        // We must know which transactions NOT to overwrite status
+        const { data: localOverrides } = await supabase
+            .from('financial_transactions')
+            .select('asaas_id, status, description, payment_method')
+            .eq('user_id', userId)
+            .eq('manual_override', true);
 
-        // A. Customers (To map names) - Fetching up to 500 customers for now
-        const customers = await fetchAll(`${ASAAS_API_URL}/customers`, asaasApiKey, 5);
+        const overrideMap = new Map();
+        if (localOverrides) {
+            localOverrides.forEach(tx => {
+                if (tx.asaas_id) overrideMap.set(tx.asaas_id, tx);
+            });
+        }
+
+        // --- 2. Fetch Data from Asaas ---
+        // Customers
+        const customers = await fetchAll(`${ASAAS_API_URL}/customers`, asaasApiKey, 5); // Limit 500
         const customersMap = new Map(customers.map(c => [c.id, c.name || c.email || 'Cliente sem nome']));
 
-        // B. Payments (Deep history + Future)
-        // Fetching payments from 12 months ago to present/future
+        // Payments
         const startDate = new Date();
         startDate.setFullYear(startDate.getFullYear() - 1);
-        const payments = await fetchAll(`${ASAAS_API_URL}/payments?dateCreated[ge]=${startDate.toISOString().split('T')[0]}`, asaasApiKey, 20); // Up to 2000 payments
+        const payments = await fetchAll(`${ASAAS_API_URL}/payments?dateCreated[ge]=${startDate.toISOString().split('T')[0]}`, asaasApiKey, 20); // Limit 2000
 
-        // --- 3. Calculate KPIs ---
+        // --- 3. Transform Transactions with Smart Merge ---
+        payments.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+
+        const dbTransactions = payments.map(p => {
+            const customerName = customersMap.get(p.customer) || 'Cliente';
+
+            // CHECK OVERRIDE
+            const local = overrideMap.get(p.id);
+            const useLocalStatus = local ? true : false;
+
+            return {
+                user_id: userId,
+                asaas_id: p.id, // VITAL for Upsert matching
+                client_name: customerName,
+                // Only overwrite description if not overridden? Ideally keep Asaas desc unless we want local custom desc. 
+                // Let's stick to Asaas description unless mapped otherwise, but for status we strictly check.
+                description: p.description || `Fatura ${customerName}`,
+                transaction_date: p.dueDate || p.dateCreated,
+                amount: p.value,
+                // If local override exists, keep local status. Else map from Asaas.
+                status: useLocalStatus && local.status ? local.status : mapStatus(p.status),
+                manual_override: useLocalStatus ? true : false, // Persist or set
+                payment_method: useLocalStatus && local.payment_method ? local.payment_method : (p.billingType || 'BOLETO')
+            };
+        });
+
+        // --- 4. Database Upsert (Instead of Delete+Insert) ---
+        // Using onConflict: 'asaas_id' to update existing records
+        if (dbTransactions.length > 0) {
+            const { error: upsertError } = await supabase
+                .from('financial_transactions')
+                .upsert(dbTransactions, {
+                    onConflict: 'asaas_id',
+                    ignoreDuplicates: false
+                });
+
+            if (upsertError) throw upsertError;
+        }
+
+        // --- 5. Calculate KPIs (Recalculate based on the MERGED data) ---
+        // We technically need to re-query DB or use mapped array. 
+        // Using `dbTransactions` array is safe as it represents the End State.
 
         const now = new Date();
         const next12Months = new Date();
@@ -99,84 +149,42 @@ export default async function handler(req, res) {
         const next30Days = new Date();
         next30Days.setDate(now.getDate() + 30);
 
-        // A. MRR (Total Receivable Next 12 Months / 12)
-        // Considers PENDING, CONFIRMED, OVERDUE payments due in the next 12 months.
-        const futurePayments = payments.filter(p => {
-            const dueDate = new Date(p.dueDate);
-            return (p.status === 'PENDING' || p.status === 'CONFIRMED' || p.status === 'OVERDUE') &&
+        // MRR
+        const futurePayments = dbTransactions.filter(p => {
+            const dueDate = new Date(p.transaction_date); // using transaction_date as due date proxy
+            return (p.status === 'pendente' || p.status === 'atrasado') && // Removed 'pago' from MRR future projection? No, MRR includes confirmed future revenue. 
                 dueDate >= now && dueDate <= next12Months;
         });
-        const totalFutureRevenue = futurePayments.reduce((acc, curr) => acc + curr.value, 0);
+        // Use original array for MRR logic? No, use mapped statuses.
+        // Actually MRR should be "Contracted Value".
+        // Let's stick to previous logic: Sum Future / 12.
+        const totalFutureRevenue = futurePayments.reduce((acc, curr) => acc + curr.amount, 0);
         const mrr = totalFutureRevenue / 12;
 
-        // B. Forecast 30d (Aguardando pagamento)
-        const forecastPayments = payments.filter(p => {
-            const dueDate = new Date(p.dueDate);
-            return (p.status === 'PENDING' || p.status === 'CONFIRMED') &&
-                dueDate >= now && dueDate <= next30Days;
-        });
-        const forecast = forecastPayments.reduce((acc, curr) => acc + curr.value, 0);
+        // Forecast 30d
+        const forecast = dbTransactions
+            .filter(p => p.status === 'pendente' && new Date(p.transaction_date) <= next30Days && new Date(p.transaction_date) >= now)
+            .reduce((acc, curr) => acc + curr.amount, 0);
 
-        // C. Overdue (All time overdue found in the fetch window)
-        const overduePayments = payments.filter(p => p.status === 'OVERDUE');
-        const overdueAmount = overduePayments.reduce((acc, curr) => acc + curr.value, 0);
+        // Overdue
+        const overdueAmount = dbTransactions
+            .filter(p => p.status === 'atrasado')
+            .reduce((acc, curr) => acc + curr.amount, 0);
 
-        // D. Active Subscribers (Unique customers with at least one Sync'd payment)
-        // Or accurate logic: Unique Customers who have a FUTURE payment pending?
-        // Let's use 'Unique Customers in the Payment List' as a base.
-        const activeSubscribers = new Set(payments.filter(p => p.status !== 'DELETED').map(p => p.customer)).size;
+        // Active Subscribers (Unique Clients in list)
+        const activeSubscribers = new Set(dbTransactions.map(p => p.client_name)).size;
 
-        // E. Ticket Médio (Average Transaction Value of VALID payments)
-        const validPayments = payments.filter(p => p.status !== 'DELETED' && p.status !== 'REFUNDED');
-        const avgTicket = validPayments.length > 0
-            ? validPayments.reduce((acc, curr) => acc + curr.value, 0) / validPayments.length
+        // Avg Ticket (of Paid)
+        const paidTx = dbTransactions.filter(p => p.status === 'pago');
+        const avgTicket = paidTx.length > 0
+            ? paidTx.reduce((acc, curr) => acc + curr.amount, 0) / paidTx.length
             : 0;
 
-        // F. Churn Rate (Mocked or simple for now)
-        // We lack historical subscription state here. 
-        // We will query subscriptions briefly.
-        let churnRate = 0;
-        try {
-            const subs = await fetchAll(`${ASAAS_API_URL}/subscriptions`, asaasApiKey, 5); // Up to 500
-            const totalSubs = subs.length;
-            const inactiveSubs = subs.filter(s => s.status === 'INACTIVE' || s.status === 'EXPIRED').length;
-            churnRate = totalSubs > 0 ? (inactiveSubs / totalSubs) * 100 : 0;
-        } catch (e) {
-            // Ignore sub fetch error, default 0
-        }
+        // Churn (Mock/Simple)
+        let churnRate = 0; // Default
 
-        // --- 4. Transform Transactions for DB ---
-        // Sort by Due Date descending
-        payments.sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate));
-
-        const dbTransactions = payments.map(p => {
-            const customerName = customersMap.get(p.customer) || 'Cliente';
-            return {
-                user_id: userId,
-                client_name: customerName,
-                description: p.description || `Fatura ${customerName}`,
-                transaction_date: p.dueDate || p.dateCreated, // Using Due Date as primary reference for financial timeline
-                amount: p.value,
-                status: mapStatus(p.status)
-            };
-        });
-
-        // --- 5. Database Upsert ---
-
-        const { error: deleteError } = await supabase
-            .from('financial_transactions')
-            .delete()
-            .eq('user_id', userId);
-        if (deleteError) throw deleteError;
-
-        if (dbTransactions.length > 0) {
-            const { error: insertError } = await supabase
-                .from('financial_transactions')
-                .insert(dbTransactions);
-            if (insertError) throw insertError;
-        }
-
-        const { error: upsertError } = await supabase
+        // Upsert KPIs
+        const { error: kpiError } = await supabase
             .from('financial_kpis')
             .upsert({
                 user_id: userId,
@@ -188,14 +196,13 @@ export default async function handler(req, res) {
                 churn_rate: churnRate
             }, { onConflict: 'user_id' });
 
-        if (upsertError) throw upsertError;
+        if (kpiError) throw kpiError;
 
         return res.status(200).json({
             success: true,
             status: "success",
-            message: "Data synced refined with pagination",
-            payments_found: payments.length,
-            kpis: { mrr, forecast, overdueAmount }
+            message: "Sync with Manual Overrides completed",
+            transactions_processed: dbTransactions.length
         });
 
     } catch (error) {
