@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -21,14 +21,15 @@ import {
     Briefcase,
     Scale,
     Building2,
-    Plus
+    Plus,
+    ChevronDown
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import ContractManager from './ContractManager';
 
 // Interfaces
 interface FinancialKPIs {
-    mrr: number;
+    mrr: number; // Stored MRR (Projection)
     mrr_growth_percent: number;
     forecast_30d: number;
     overdue_amount: number;
@@ -36,14 +37,6 @@ interface FinancialKPIs {
     active_subscribers: number;
     churn_rate: number;
     churn_growth_percent: number;
-}
-
-interface MonthlyMetric {
-    month_label: string;
-    revenue: number;
-    expense: number;
-    target: number;
-    sort_order?: number;
 }
 
 interface Transaction {
@@ -55,12 +48,23 @@ interface Transaction {
     status: 'pago' | 'pendente' | 'atrasado' | 'cancelado';
 }
 
+type DateRange = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'all';
+
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'finance' | 'contracts'>('finance');
-    const [kpis, setKpis] = useState<FinancialKPIs | null>(null);
-    const [monthlyMetrics, setMonthlyMetrics] = useState<MonthlyMetric[]>([]);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+    // Data State
+    const [storedKpis, setStoredKpis] = useState<FinancialKPIs | null>(null);
+    const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+    const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+
+    // Filter State
+    const [dateRange, setDateRange] = useState<DateRange>('thisMonth');
+    const [customStartDate, setCustomStartDate] = useState<string>('');
+    const [customEndDate, setCustomEndDate] = useState<string>('');
+    const [showDatePicker, setShowDatePicker] = useState(false);
+
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -69,42 +73,120 @@ const AdministrationDashboard: React.FC = () => {
         }
     }, [user, activeTab]);
 
+    // Filter Logic
+    useEffect(() => {
+        if (!allTransactions.length) return;
+
+        const now = new Date();
+        let start = new Date(0); // Epoch
+        let end = new Date(); // Now
+
+        switch (dateRange) {
+            case 'today':
+                start = new Date(now.setHours(0, 0, 0, 0));
+                break;
+            case 'last7':
+                start = new Date(now.setDate(now.getDate() - 7));
+                break;
+            case 'last30':
+                start = new Date(now.setDate(now.getDate() - 30));
+                break;
+            case 'thisMonth':
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'lastMonth':
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+                break;
+            case 'all':
+                // Default start
+                break;
+        }
+
+        const filtered = allTransactions.filter(t => {
+            const tDate = new Date(t.transaction_date);
+            return tDate >= start && tDate <= end;
+        });
+
+        setFilteredTransactions(filtered);
+
+    }, [dateRange, allTransactions]);
+
+    // Dynamic KPIs Calculation
+    const dynamicKPIs = useMemo(() => {
+        if (!filteredTransactions.length) return {
+            revenue: 0,
+            forecast: 0,
+            overdue: 0,
+            avgTicket: 0,
+            count: 0
+        };
+
+        const revenue = filteredTransactions
+            .filter(t => t.status === 'pago')
+            .reduce((acc, curr) => acc + curr.amount, 0);
+
+        const forecast = filteredTransactions
+            .filter(t => t.status === 'pendente')
+            .reduce((acc, curr) => acc + curr.amount, 0);
+
+        const overdue = filteredTransactions
+            .filter(t => t.status === 'atrasado')
+            .reduce((acc, curr) => acc + curr.amount, 0);
+
+        const paidCount = filteredTransactions.filter(t => t.status === 'pago').length;
+        const avgTicket = paidCount > 0 ? revenue / paidCount : 0;
+
+        return { revenue, forecast, overdue, avgTicket, count: filteredTransactions.length };
+    }, [filteredTransactions]);
+
+    // Chart Data Generation
+    const chartData = useMemo(() => {
+        // Group by day for the selected period
+        const grouped = new Map<string, number>();
+
+        filteredTransactions.forEach(t => {
+            if (t.status === 'pago') {
+                const dateKey = new Date(t.transaction_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                grouped.set(dateKey, (grouped.get(dateKey) || 0) + t.amount);
+            }
+        });
+
+        return Array.from(grouped.entries()).map(([date, value]) => ({
+            month_label: date,
+            revenue: value,
+            target: 0 // Could be dynamic
+        })).reverse(); // Re-sort if needed, expensive op here. Ideally sort by date. 
+        // Actually map iteration order is insertion order usually, but safer to sort.
+    }, [filteredTransactions]);
+
+
     const fetchFinancialData = async () => {
         setLoading(true);
         try {
-            // 1. Fetch KPIs
+            // 1. Fetch Stored KPIs (for MRR reference)
             const { data: kpiData } = await supabase
                 .from('financial_kpis')
                 .select('*')
                 .eq('user_id', user?.id)
                 .single();
 
-            if (kpiData) setKpis(kpiData);
+            if (kpiData) setStoredKpis(kpiData);
 
-            // 2. Fetch Monthly Metrics
-            const { data: metricsData } = await supabase
-                .from('financial_monthly_metrics')
-                .select('*')
-                .eq('user_id', user?.id)
-                .order('sort_order', { ascending: true });
-
-            if (metricsData) setMonthlyMetrics(metricsData.map(m => ({
-                month_label: m.month_label,
-                revenue: m.revenue,
-                expense: m.expense,
-                target: m.target,
-                sort_order: m.sort_order
-            })));
-
-            // 3. Fetch Transactions
+            // 2. Fetch ALL Transactions (Limit 5000)
             const { data: trxData } = await supabase
                 .from('financial_transactions')
                 .select('*')
                 .eq('user_id', user?.id)
                 .order('transaction_date', { ascending: false })
-                .limit(10);
+                .limit(5000);
 
-            if (trxData) setTransactions(trxData);
+            if (trxData) {
+                const mappedTrx = trxData.map(t => ({ ...t, amount: t.amount || 0 })); // Ensure amount
+                setAllTransactions(mappedTrx);
+                setFilteredTransactions(mappedTrx); // Init
+            }
 
         } catch (error) {
             console.error('Error fetching financial data:', error);
@@ -130,21 +212,15 @@ const AdministrationDashboard: React.FC = () => {
         if (!user) return;
         try {
             setLoading(true);
-            // Call Vercel Serverless Function (relative path)
             const response = await fetch('/api/sync-asaas', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: user.id })
             });
             const data = await response.json();
 
-            if (!data.success) {
-                throw new Error(data.error || 'Unknown error from server');
-            }
+            if (!data.success) throw new Error(data.error || 'Unknown error');
 
-            // Refresh the page or data to show new numbers
             window.location.reload();
         } catch (error: any) {
             console.error('Sync error:', error);
@@ -170,16 +246,13 @@ const AdministrationDashboard: React.FC = () => {
                         disabled={loading}
                         className="text-xs font-bold text-slate-500 hover:text-slate-900 underline underline-offset-2 disabled:opacity-50"
                     >
-                        {loading ? 'Testando...' : 'Testar Conexão'}
+                        {loading ? 'Sincronizando...' : 'Sincronizar Agora'}
                     </button>
                     <div className="h-4 w-px bg-slate-200"></div>
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-100">
                         <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                        <span>Sincronização Automática Ativa</span>
+                        <span>Auto-Sync Ativo</span>
                     </div>
-                    <span className="text-xs text-slate-400">
-                        Atualizado: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
                 </div>
             </div>
 
@@ -193,9 +266,38 @@ const AdministrationDashboard: React.FC = () => {
                 {/* Finance Tab (Default) */}
                 {activeTab === 'finance' && (
                     <div className="space-y-8 animate-in slide-in-from-bottom-2 duration-300">
+
+                        {/* Filters Toolbar */}
+                        <div className="flex justify-end">
+                            <div className="relative group">
+                                <button className="flex items-center space-x-2 bg-white border border-slate-200 px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-all shadow-sm">
+                                    <Calendar size={16} className="text-slate-500" />
+                                    <span>
+                                        {dateRange === 'today' && 'Hoje'}
+                                        {dateRange === 'last7' && 'Últimos 7 dias'}
+                                        {dateRange === 'last30' && 'Últimos 30 dias'}
+                                        {dateRange === 'thisMonth' && 'Este Mês'}
+                                        {dateRange === 'lastMonth' && 'Mês Passado'}
+                                        {dateRange === 'all' && 'Todo o Período'}
+                                    </span>
+                                    <ChevronDown size={14} className="text-slate-400" />
+                                </button>
+                                {/* Dropdown */}
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg p-1 hidden group-hover:block z-50">
+                                    <button onClick={() => setDateRange('today')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Hoje</button>
+                                    <button onClick={() => setDateRange('last7')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Últimos 7 dias</button>
+                                    <button onClick={() => setDateRange('last30')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Últimos 30 dias</button>
+                                    <button onClick={() => setDateRange('thisMonth')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Este Mês</button>
+                                    <button onClick={() => setDateRange('lastMonth')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Mês Passado</button>
+                                    <div className="h-px bg-slate-100 my-1"></div>
+                                    <button onClick={() => setDateRange('all')} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg font-bold">Todo o Período</button>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Metric Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                            {/* MRR */}
+                            {/* MRR (Static / Projeção) - Doesn't change with filter generally unless we want historic MRR */}
                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="p-3 bg-slate-50 rounded-xl text-slate-900 group-hover:scale-110 transition-transform">
@@ -203,34 +305,51 @@ const AdministrationDashboard: React.FC = () => {
                                     </div>
                                     <div className="flex items-center space-x-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-xs font-bold">
                                         <TrendingUp size={12} />
-                                        <span>+12%</span>
+                                        <span>Projeção 12m</span>
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">MRR Atual</h3>
+                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">MRR (Recorrente)</h3>
                                     <div className="text-2xl font-black text-slate-900">
-                                        {kpis?.mrr ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpis.mrr) : 'R$ 0,00'}
+                                        {storedKpis?.mrr ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(storedKpis.mrr) : 'R$ 0,00'}
                                     </div>
+                                    <div className="text-[10px] text-slate-400 font-medium mt-1">Baseado em contratos futuros</div>
                                 </div>
                             </div>
 
-                            {/* Forecast */}
+                            {/* Revenue (Dynamic) */}
                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-slate-50 rounded-xl text-slate-900 group-hover:scale-110 transition-transform">
-                                        <TrendingUp size={20} />
+                                    <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600 group-hover:scale-110 transition-transform">
+                                        <CheckCircle2 size={20} />
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Previsão (30D)</h3>
-                                    <div className="text-2xl font-black text-slate-900">
-                                        {kpis?.forecast_30d ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpis.forecast_30d) : 'R$ 0,00'}
+                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Receita (Periodo)</h3>
+                                    <div className="text-2xl font-black text-emerald-600">
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.revenue)}
                                     </div>
-                                    <div className="text-[10px] text-emerald-600 font-bold mt-1 uppercase tracking-wide">CONFIRMADO</div>
+                                    <div className="text-[10px] text-emerald-600 font-bold mt-1 uppercase tracking-wide">RECEBIDO</div>
                                 </div>
                             </div>
 
-                            {/* Overdue */}
+                            {/* Forecast (Dynamic) */}
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="p-3 bg-amber-50 rounded-xl text-amber-500 group-hover:scale-110 transition-transform">
+                                        <Clock size={20} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">A Receber</h3>
+                                    <div className="text-2xl font-black text-slate-900">
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.forecast)}
+                                    </div>
+                                    <div className="text-[10px] text-amber-500 font-bold mt-1 uppercase tracking-wide">PENDENTE</div>
+                                </div>
+                            </div>
+
+                            {/* Overdue (Dynamic) */}
                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="p-3 bg-rose-50 rounded-xl text-rose-500 group-hover:scale-110 transition-transform">
@@ -240,72 +359,42 @@ const AdministrationDashboard: React.FC = () => {
                                 <div>
                                     <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Em Atraso</h3>
                                     <div className="text-2xl font-black text-rose-500">
-                                        {kpis?.overdue_amount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpis.overdue_amount) : 'R$ 0,00'}
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.overdue)}
                                     </div>
-                                    <div className="text-[10px] text-rose-400 font-bold mt-1 uppercase tracking-wide">Ação Necessária</div>
+                                    <div className="text-[10px] text-rose-400 font-bold mt-1 uppercase tracking-wide">AÇÃO NECESSÁRIA</div>
                                 </div>
                             </div>
 
-                            {/* Avg Ticket */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-slate-50 rounded-xl text-slate-900 group-hover:scale-110 transition-transform">
-                                        <Users size={20} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Ticket Médio</h3>
-                                    <div className="text-2xl font-black text-slate-900">
-                                        {kpis?.avg_ticket ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpis.avg_ticket) : 'R$ 0,00'}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wide">{kpis?.active_subscribers || 0} Assinantes Ativos</div>
-                                </div>
-                            </div>
-
-                            {/* Churn */}
+                            {/* Churn (Static) */}
                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="p-3 bg-slate-50 rounded-xl text-slate-900 group-hover:scale-110 transition-transform">
                                         <AlertCircle size={20} />
                                     </div>
-                                    <div className="flex items-center space-x-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-xs font-bold">
-                                        <ArrowDownRight size={12} />
-                                        <span>-0.5%</span>
-                                    </div>
                                 </div>
                                 <div>
                                     <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Churn Rate</h3>
-                                    <div className="text-2xl font-black text-slate-900">{kpis?.churn_rate || 0}%</div>
+                                    <div className="text-2xl font-black text-slate-900">{storedKpis?.churn_rate ? storedKpis.churn_rate.toFixed(1) : 0}%</div>
                                     <div className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wide">Mensal</div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Main Grid */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Main Grid: Chart & Table */}
+                        <div className="grid grid-cols-1 gap-8">
 
                             {/* Revenue Chart */}
-                            <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
                                 <div className="flex justify-between items-center mb-8">
                                     <div>
-                                        <h2 className="text-lg font-bold text-slate-900">Projeção de Receita</h2>
-                                        <p className="text-xs text-slate-500 mt-1">Comparativo de Receita Real vs Prevista (Semestral)</p>
-                                    </div>
-                                    <div className="flex items-center text-xs font-bold space-x-4">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="w-2 h-2 rounded-full bg-slate-900"></div>
-                                            <span className="text-slate-600">Realizado</span>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-                                            <span className="text-slate-600">Previsto</span>
-                                        </div>
+                                        <h2 className="text-lg font-bold text-slate-900">Fluxo de Caixa (Periodo)</h2>
+                                        <p className="text-xs text-slate-500 mt-1">Receitas confirmadas por dia no período selecionado</p>
                                     </div>
                                 </div>
 
-                                <div className="h-[350px] w-full">
+                                <div className="h-[300px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={monthlyMetrics} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                                        <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1} />
@@ -317,18 +406,18 @@ const AdministrationDashboard: React.FC = () => {
                                                 dataKey="month_label"
                                                 axisLine={false}
                                                 tickLine={false}
-                                                tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                                                tick={{ fill: '#94a3b8', fontSize: 10 }}
                                                 dy={10}
+                                                interval="preserveStartEnd"
                                             />
                                             <YAxis
                                                 axisLine={false}
                                                 tickLine={false}
-                                                tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                                                tick={{ fill: '#94a3b8', fontSize: 12 }}
                                                 tickFormatter={(value) => `k ${(value / 1000).toFixed(0)}`}
                                             />
                                             <Tooltip
                                                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                                                labelStyle={{ color: '#64748b', fontWeight: 'bold', marginBottom: '4px' }}
                                             />
                                             <Area
                                                 type="monotone"
@@ -338,131 +427,80 @@ const AdministrationDashboard: React.FC = () => {
                                                 fillOpacity={1}
                                                 fill="url(#colorReceita)"
                                             />
-                                            <ReferenceLine y={20000} stroke="#f43f5e" strokeDasharray="3 3" />
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
                             </div>
 
-                            {/* Financial Health */}
-                            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
-                                <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                                    <Activity size={20} className="text-slate-400" />
-                                    Saúde Financeira
-                                </h2>
-
-                                <div className="flex-1 space-y-8">
-
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-sm font-bold text-slate-700">Taxa de Adimplência</span>
-                                            <span className="text-xl font-black text-emerald-600">98%</span>
+                            {/* Transactions Table */}
+                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <h2 className="text-lg font-bold text-slate-900">Transações ({filteredTransactions.length})</h2>
+                                    <div className="flex items-center space-x-2">
+                                        <div className="relative">
+                                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input type="text" placeholder="Buscar..." className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-slate-900 transition-all w-64" />
                                         </div>
-                                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-emerald-500 w-[98%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.3)]"></div>
-                                        </div>
-                                        <p className="text-xs text-slate-400 leading-relaxed">
-                                            Excelente! A saúde de pagamentos da sua base está acima da média de mercado (92%).
-                                        </p>
                                     </div>
-
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-sm font-bold text-slate-700">Ponto de Equilíbrio (Break-even)</span>
-                                            <span className="text-xl font-black text-slate-900">112%</span>
-                                        </div>
-                                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-slate-900 w-[100%] rounded-full"></div>
-                                        </div>
-                                        <p className="text-xs text-slate-400 leading-relaxed">
-                                            Você já cobriu seus custos fixos operacionais este mês. Todo lucro agora é margem líquida.
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-sm font-bold text-slate-700">Meta MRR (Q1)</span>
-                                            <span className="text-xl font-black text-rose-500">75%</span>
-                                        </div>
-                                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-rose-500 w-[75%] rounded-full shadow-[0_0_10px_rgba(244,63,94,0.3)]"></div>
-                                        </div>
-                                        <p className="text-xs text-slate-400 leading-relaxed">
-                                            Atenção: Você precisa de mais R$ 12.500 em novos contratos para bater a meta trimestral.
-                                        </p>
-                                    </div>
-
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* Transactions Table */}
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <h2 className="text-lg font-bold text-slate-900">Transações Recentes</h2>
-                                <div className="flex items-center space-x-2">
-                                    <div className="relative">
-                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input type="text" placeholder="Buscar..." className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-slate-900 transition-all w-64" />
-                                    </div>
-                                    <button className="p-2 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-100 transition-colors">
-                                        <Filter size={18} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/50">
-                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-10">ID Transação</th>
-                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</th>
-                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Data</th>
-                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
-                                        <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                                        <th className="px-8 py-4"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {transactions.length > 0 ? (
-                                        transactions.map((trx, i) => (
-                                            <tr key={trx.id} className="hover:bg-slate-50 transition-colors group">
-                                                <td className="px-8 py-5 text-sm font-mono text-slate-500 font-medium pl-10">#{trx.id.substring(0, 8)}...</td>
-                                                <td className="px-8 py-5">
-                                                    <div className="font-bold text-slate-900">{trx.client_name}</div>
-                                                </td>
-                                                <td className="px-8 py-5 text-sm text-slate-500">{new Date(trx.transaction_date).toLocaleDateString()}</td>
-                                                <td className="px-8 py-5 text-sm font-black text-slate-900">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trx.amount)}</td>
-                                                <td className="px-8 py-5">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${trx.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                        trx.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                            'bg-rose-50 text-rose-700 border-rose-100'
-                                                        }`}>
-                                                        {trx.status === 'pago' && <CheckCircle2 size={10} className="mr-1" />}
-                                                        {trx.status === 'pendente' && <Clock size={10} className="mr-1" />}
-                                                        {trx.status === 'atrasado' && <AlertTriangle size={10} className="mr-1" />}
-                                                        {trx.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-8 py-5 text-right pr-8">
-                                                    <button className="text-slate-300 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <MoreHorizontal size={18} />
-                                                    </button>
-                                                </td>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-100 bg-slate-50/50">
+                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-10">Data</th>
+                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</th>
+                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descrição</th>
+                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
+                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
                                             </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={6} className="py-20 text-center">
-                                                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-50 mb-4 text-slate-300">
-                                                    <Search size={24} />
-                                                </div>
-                                                <p className="text-slate-500 font-medium">Nenhuma transação encontrada.</p>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {filteredTransactions.length > 0 ? (
+                                                filteredTransactions.map((trx, i) => (
+                                                    <tr key={trx.id} className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="px-8 py-5 text-sm text-slate-500 pl-10">
+                                                            {new Date(trx.transaction_date).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-8 py-5">
+                                                            <div className="font-bold text-slate-900 text-sm">{trx.client_name}</div>
+                                                        </td>
+                                                        <td className="px-8 py-5 text-sm text-slate-500 max-w-[200px] truncate" title={trx.description}>
+                                                            {trx.description}
+                                                        </td>
+                                                        <td className="px-8 py-5 text-sm font-black text-slate-900">
+                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trx.amount)}
+                                                        </td>
+                                                        <td className="px-8 py-5">
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${trx.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                                                    trx.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                                                        trx.status === 'atrasado' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                                                            'bg-slate-50 text-slate-700 border-slate-100'
+                                                                }`}>
+                                                                {trx.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={5} className="py-20 text-center text-slate-500">
+                                                        Nenhuma transação encontrada neste período.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Financial Health - Simplified or Removed? Moved to side or keep? 
+                            Let's remove Financial Health for cleaner UI as user focused on filtering data. 
+                            Or keep it? 
+                            User said "remove Mock Data". Health was mock data. I will remove it to be safe.
+                        */}
+
                     </div>
                 )}
 
