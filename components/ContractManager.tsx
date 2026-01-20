@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Contract } from '../types';
-import { Plus, Search, FileText, MoreHorizontal, Download, Clock, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, FileText, MoreHorizontal, Download, Clock, CheckCircle2, Send, Trash2, Edit2, Eye } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ContractGeneratorModal from './ContractGeneratorModal';
+import ContractViewerModal from './ContractViewerModal';
 
 const ContractManager: React.FC = () => {
     const { user } = useAuth();
@@ -11,6 +12,9 @@ const ContractManager: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [viewContract, setViewContract] = useState<Contract | null>(null);
+    const [editingContract, setEditingContract] = useState<Contract | null>(null);
+    const [activeMenuContractId, setActiveMenuContractId] = useState<string | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -33,6 +37,26 @@ const ContractManager: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!confirm('Tem certeza que deseja excluir este contrato? Esta ação não pode ser desfeita.')) return;
+
+        try {
+            const { error } = await supabase.from('contracts').delete().eq('id', id);
+            if (error) throw error;
+            fetchContracts();
+        } catch (error) {
+            console.error('Error deleting contract:', error);
+            alert('Erro ao excluir contrato');
+        }
+    };
+
+    const handleEdit = (e: React.MouseEvent, contract: Contract) => {
+        e.stopPropagation();
+        setEditingContract(contract);
+        setIsModalOpen(true);
     };
 
     const filteredContracts = contracts.filter(c =>
@@ -81,7 +105,11 @@ const ContractManager: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredContracts.map((contract) => (
-                                <tr key={contract.id} className="hover:bg-slate-50 transition-colors group cursor-pointer">
+                                <tr
+                                    key={contract.id}
+                                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                                    onClick={() => setViewContract(contract)}
+                                >
                                     <td className="px-8 py-5 pl-10">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
@@ -95,13 +123,16 @@ const ContractManager: React.FC = () => {
                                     </td>
                                     <td className="px-8 py-5">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${contract.status === 'signed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                contract.status === 'generated' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                                    'bg-slate-100 text-slate-600 border-slate-200'
+                                            contract.status === 'generated' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                'bg-slate-100 text-slate-600 border-slate-200'
                                             }`}>
                                             {contract.status === 'signed' && <CheckCircle2 size={10} className="mr-1" />}
                                             {contract.status === 'generated' && <Clock size={10} className="mr-1" />}
+                                            {contract.status === 'sent_to_signature' && <Send size={10} className="mr-1" />}
                                             {contract.status === 'draft' && <FileText size={10} className="mr-1" />}
-                                            {contract.status === 'signed' ? 'Assinado' : contract.status === 'generated' ? 'Gerado' : 'Rascunho'}
+                                            {contract.status === 'signed' ? 'Assinado' :
+                                                contract.status === 'generated' ? 'Gerado' :
+                                                    contract.status === 'sent_to_signature' ? 'Enviado' : 'Rascunho'}
                                         </span>
                                     </td>
                                     <td className="px-8 py-5 text-sm text-slate-500">
@@ -110,10 +141,61 @@ const ContractManager: React.FC = () => {
                                     <td className="px-8 py-5 text-sm font-black text-slate-900">
                                         {contract.variables.valor_total ? contract.variables.valor_total : '-'}
                                     </td>
-                                    <td className="px-8 py-5 text-right pr-8">
-                                        <button className="text-slate-300 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-all">
+                                    <td className="px-8 py-5 text-right pr-8 relative">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveMenuContractId(activeMenuContractId === contract.id ? null : contract.id);
+                                            }}
+                                            className={`transition-all ${activeMenuContractId === contract.id ? 'text-slate-900 opacity-100' : 'text-slate-300 hover:text-slate-600 opacity-0 group-hover:opacity-100'}`}
+                                        >
                                             <MoreHorizontal size={18} />
                                         </button>
+
+                                        {activeMenuContractId === contract.id && (
+                                            <>
+                                                <div
+                                                    className="fixed inset-0 z-10"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActiveMenuContractId(null);
+                                                    }}
+                                                />
+                                                <div className="absolute right-8 top-10 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-200">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setActiveMenuContractId(null);
+                                                            setViewContract(contract);
+                                                        }}
+                                                        className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-slate-50 text-slate-600 text-sm font-medium transition-colors"
+                                                    >
+                                                        <Eye size={16} />
+                                                        <span>Visualizar</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            setActiveMenuContractId(null);
+                                                            handleEdit(e, contract);
+                                                        }}
+                                                        className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-slate-50 text-slate-600 text-sm font-medium transition-colors border-t border-slate-50"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                        <span>Editar</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            setActiveMenuContractId(null);
+                                                            handleDelete(e, contract.id);
+                                                        }}
+                                                        className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-rose-50 text-rose-500 text-sm font-medium transition-colors border-t border-slate-50"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                        <span>Excluir</span>
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -138,8 +220,22 @@ const ContractManager: React.FC = () => {
 
             <ContractGeneratorModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingContract(null);
+                }}
                 onSuccess={fetchContracts}
+                contractToEdit={editingContract}
+            />
+
+            <ContractViewerModal
+                isOpen={!!viewContract}
+                onClose={() => setViewContract(null)}
+                contract={viewContract}
+                onUpdate={() => {
+                    fetchContracts();
+                    // Optionally keep modal open or close it
+                }}
             />
         </div>
     );

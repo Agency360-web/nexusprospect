@@ -1,15 +1,31 @@
 
 export interface Client {
   id: string;
-  name: string;
+  name: string; // Internal/Display name (Nome Fantasia)
   status: 'active' | 'inactive' | 'overdue' | 'terminated';
   createdAt: string;
   email: string;
   phone?: string;
   observations?: string;
+
+  // Company Data
+  corporateName?: string; // Razão Social
   cnpj?: string;
-  corporateName?: string;
-  address?: string;
+  contactPerson?: string; // Responsável
+
+  // Address
+  address?: string; // Endereço completo (Rua, Número, Compl)
+  zipCode?: string; // CEP
+  neighborhood?: string; // Bairro
+  city?: string;
+  state?: string;
+
+  // Contract Defaults
+  defaultServices?: string;
+  defaultTerm?: string;
+  defaultValue?: string;
+  defaultPaymentMethod?: string;
+  defaultPaymentConditions?: string;
 }
 
 export type WebhookType = 'inbound' | 'outbound' | 'status';
@@ -129,7 +145,7 @@ export interface Contract {
   user_id: string;
   template_id?: string;
   client_name: string;
-  status: 'draft' | 'generated' | 'signed';
+  status: 'draft' | 'generated' | 'sent_to_signature' | 'signed';
   variables: Record<string, string>;
   content_snapshot: string;
   created_at: string;

@@ -1,46 +1,130 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ContractTemplate, Contract, Client } from '../types';
-import { X, Save, FileText, ChevronRight, Download, Edit3, Plus, UserCheck, ArrowLeft } from 'lucide-react';
+import { X, Save, FileText, ChevronRight, UserCheck, ArrowLeft, Type, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Highlighter, Palette, Plus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { EditorContent, useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import UnderlineExtension from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+import { TextStyle } from '@tiptap/extension-text-style';
+import FontFamily from '@tiptap/extension-font-family';
+import Color from '@tiptap/extension-color';
+import Highlight from '@tiptap/extension-highlight';
+
+// Simple Error Boundary to catch crashes
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+    constructor(props: { children: React.ReactNode }) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error) {
+        return { hasError: true, error };
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="p-8 text-center">
+                    <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+                        <h3 className="font-bold mb-2">Algo deu errado no editor</h3>
+                        <pre className="text-xs text-left overflow-auto max-h-40">{this.state.error?.message}</pre>
+                    </div>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 
 interface ContractGeneratorModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    contractToEdit?: Contract | null;
 }
 
-const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen, onClose, onSuccess }) => {
+const MenuBar = ({ editor }: { editor: any }) => {
+    if (!editor) {
+        return null;
+    }
+
+    return (
+        <div className="flex items-center gap-1 p-2 border-b border-slate-200 bg-slate-50 flex-wrap sticky top-0 z-10">
+            <button
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                disabled={!editor.can().chain().focus().toggleBold().run()}
+                className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.isActive('bold') ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                title="Negrito"
+            >
+                <Bold size={16} />
+            </button>
+            <button
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                disabled={!editor.can().chain().focus().toggleItalic().run()}
+                className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.isActive('italic') ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                title="Itálico"
+            >
+                <Italic size={16} />
+            </button>
+            <button
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.isActive('underline') ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                title="Sublinhado"
+            >
+                <Underline size={16} />
+            </button>
+            <div className="w-px h-6 bg-slate-300 mx-1"></div>
+            <button
+                onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.isActive({ textAlign: 'left' }) ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                title="Alinhar à Esquerda"
+            >
+                <AlignLeft size={16} />
+            </button>
+            <button
+                onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.isActive({ textAlign: 'center' }) ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                title="Centralizar"
+            >
+                <AlignCenter size={16} />
+            </button>
+            <button
+                onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.isActive({ textAlign: 'right' }) ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                title="Alinhar à Direita"
+            >
+                <AlignRight size={16} />
+            </button>
+            <div className="w-px h-6 bg-slate-300 mx-1"></div>
+            <button
+                onClick={() => editor.chain().focus().toggleHighlight().run()}
+                className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.isActive('highlight') ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                title="Marca-texto"
+            >
+                <Highlighter size={16} />
+            </button>
+            <button
+                onClick={() => editor.chain().focus().setFontFamily('Courier New').run()}
+                className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.isActive('textStyle', { fontFamily: 'Courier New' }) ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                title="Fonte Courier New (Padrão Contrato)"
+            >
+                <Type size={16} />
+            </button>
+        </div>
+    );
+};
+
+const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen, onClose, onSuccess, contractToEdit }) => {
     const { user } = useAuth();
     const [templates, setTemplates] = useState<ContractTemplate[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<ContractTemplate | null>(null);
     const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
     const [newTemplateName, setNewTemplateName] = useState('');
-    const [newTemplateContent, setNewTemplateContent] = useState('');
 
-    // Editor modules configuration
-    const modules = {
-        toolbar: [
-            [{ 'header': [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            [{ 'color': [] }, { 'background': [] }],
-            [{ 'font': [] }],
-            [{ 'align': [] }],
-            ['clean']
-        ],
-    };
-
-    const formats = [
-        'header',
-        'bold', 'italic', 'underline', 'strike',
-        'color', 'background',
-        'font',
-        'align'
-    ];
-
+    // Variables definition
     const [variables, setVariables] = useState<Record<string, string>>({
         razao_social: '',
         cnpj: '',
@@ -56,22 +140,74 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
         forma_pagamento: '',
         condicoes_pagamento: ''
     });
+
     const [loading, setLoading] = useState(false);
     const [previewContent, setPreviewContent] = useState('');
+
+    const editor = useEditor({
+        extensions: [
+            StarterKit,
+            UnderlineExtension,
+            TextAlign.configure({
+                types: ['heading', 'paragraph'],
+            }),
+            TextStyle,
+            FontFamily,
+            Color,
+            Highlight,
+        ],
+        content: '<p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</strong></p><p><br></p><p>CONTRATANTE: {{razao_social}}, CNPJ: {{cnpj}}...</p>',
+        editorProps: {
+            attributes: {
+                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl focus:outline-none min-h-[500px] p-8 font-mono',
+                style: 'font-family: "Courier New", Courier, monospace;',
+            },
+        },
+    });
+    // const editor = null; // Debugging: Disable editor initialization
 
     useEffect(() => {
         if (isOpen) {
             fetchTemplates();
             fetchClients();
-            resetState();
+            if (contractToEdit) {
+                // Edit Mode Setup
+                setIsCreatingTemplate(true); // Reuse the editor UI
+                setVariables(contractToEdit.variables || {});
+                if (editor) {
+                    editor.commands.setContent(contractToEdit.content_snapshot);
+                }
+            } else {
+                resetState();
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, contractToEdit]); // Added contractToEdit dependency
 
     useEffect(() => {
-        if (selectedTemplate && !isCreatingTemplate) {
+        if (contractToEdit && editor && isOpen) {
+            // Ensure content is loaded when editor becomes ready involved in edit mode
+            if (editor.isEmpty) {
+                editor.commands.setContent(contractToEdit.content_snapshot);
+            }
+        }
+    }, [editor, contractToEdit, isOpen]);
+
+    useEffect(() => {
+        if (selectedTemplate && !isCreatingTemplate && !contractToEdit) {
             updatePreview();
         }
-    }, [selectedTemplate, variables, isCreatingTemplate]);
+    }, [selectedTemplate, variables, isCreatingTemplate, contractToEdit]);
+
+    // Update editor content when switching to create mode
+    useEffect(() => {
+        if (isCreatingTemplate && editor) {
+            // Reset to default or keep current if valid? 
+            // Ideally we start fresh or with a basic template
+            if (!newTemplateName) {
+                editor.commands.setContent('<p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</strong></p><p><br></p><p>CONTRATANTE: {{razao_social}}, CNPJ: {{cnpj}}...</p>');
+            }
+        }
+    }, [isCreatingTemplate, editor]);
 
     const resetState = () => {
         setVariables({
@@ -92,7 +228,7 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
         setSelectedTemplate(null);
         setIsCreatingTemplate(false);
         setNewTemplateName('');
-        setNewTemplateContent('<p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</strong></p><p><br></p><p>CONTRATANTE: {{razao_social}}, CNPJ: {{cnpj}}...</p>');
+        // editor content reset is handled by effect
     };
 
     const fetchTemplates = async () => {
@@ -100,7 +236,8 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
             const { data } = await supabase
                 .from('contract_templates')
                 .select('*')
-                .eq('user_id', user?.id);
+                .eq('user_id', user?.id)
+                .order('created_at', { ascending: false });
             if (data) setTemplates(data);
         } catch (error) {
             console.error('Error fetching templates:', error);
@@ -130,7 +267,6 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
             endereco: client.address || '',
             email: client.email || '',
             responsavel: client.name,
-            // Keep other fields as they might be specific to the contract
         }));
     };
 
@@ -145,20 +281,33 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
     };
 
     const handleSaveContract = async () => {
-        if (!selectedTemplate) return;
         setLoading(true);
 
         try {
-            const { error } = await supabase.from('contracts').insert({
-                user_id: user?.id,
-                template_id: selectedTemplate.id,
-                client_name: variables.razao_social || 'Cliente Sem Nome',
-                status: 'generated',
-                variables: variables,
-                content_snapshot: previewContent
-            });
+            if (contractToEdit) {
+                // Update existing contract
+                const content = editor?.getHTML() || '';
+                const { error } = await supabase.from('contracts').update({
+                    content_snapshot: content,
+                    variables: variables,
+                    // We might want to allow updating status or other fields too
+                }).eq('id', contractToEdit.id);
 
-            if (error) throw error;
+                if (error) throw error;
+            } else {
+                // Create new contract
+                if (!selectedTemplate) return;
+                const { error } = await supabase.from('contracts').insert({
+                    user_id: user?.id,
+                    template_id: selectedTemplate.id,
+                    client_name: variables.razao_social || 'Cliente Sem Nome',
+                    status: 'generated',
+                    variables: variables,
+                    content_snapshot: previewContent
+                });
+                if (error) throw error;
+            }
+
             onSuccess();
             onClose();
         } catch (error) {
@@ -169,25 +318,34 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
     };
 
     const handleSaveTemplate = async () => {
-        if (!newTemplateName || !newTemplateContent) return;
+        if (!newTemplateName || !editor) return;
+        const content = editor.getHTML();
+        if (!content) return;
+
         setLoading(true);
 
         try {
             const { data, error } = await supabase.from('contract_templates').insert({
                 user_id: user?.id,
                 name: newTemplateName,
-                content: newTemplateContent
+                content: content
             }).select().single();
 
             if (error) throw error;
 
-            setTemplates([...templates, data]);
+            setTemplates([data, ...templates]);
             setIsCreatingTemplate(false);
             setSelectedTemplate(data);
         } catch (error) {
             console.error('Error saving template:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const insertVariable = (key: string) => {
+        if (editor) {
+            editor.chain().focus().insertContent(`{{${key}}}`).run();
         }
     };
 
@@ -203,9 +361,9 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                     <X size={20} />
                 </button>
 
-                {/* Sidebar / Form */}
-                <div className="w-[400px] border-r border-slate-200 flex flex-col bg-slate-50/50 shrink-0">
-                    <div className="p-8 border-b border-slate-200">
+                {/* Sidebar */}
+                <div className="w-[350px] border-r border-slate-200 flex flex-col bg-slate-50/50 shrink-0">
+                    <div className="p-6 border-b border-slate-200">
                         {isCreatingTemplate ? (
                             <button
                                 onClick={() => setIsCreatingTemplate(false)}
@@ -216,20 +374,15 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                             </button>
                         ) : null}
                         <h2 className="text-xl font-bold text-slate-900">
-                            {isCreatingTemplate ? 'Novo Modelo' : 'Novo Contrato'}
+                            {contractToEdit ? 'Editar Contrato' : isCreatingTemplate ? 'Novo Modelo' : 'Novo Contrato'}
                         </h2>
-                        <p className="text-sm text-slate-500 mt-1">
-                            {isCreatingTemplate
-                                ? 'Crie um novo modelo de contrato.'
-                                : 'Preencha os dados para gerar o documento.'}
-                        </p>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
                         {!isCreatingTemplate ? (
                             <>
-                                {/* Template Selection */}
+                                {/* Selection Mode */}
                                 <div className="space-y-3">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Modelo de Contrato</label>
                                     <select
@@ -275,11 +428,6 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                                             </select>
                                         </div>
 
-                                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                                            <Edit3 size={16} className="text-slate-900" />
-                                            <span className="text-sm font-bold text-slate-900">Variáveis do Contrato</span>
-                                        </div>
-
                                         <div className="grid grid-cols-1 gap-4">
                                             {Object.keys(variables).map((key) => (
                                                 <div key={key} className="space-y-1">
@@ -300,6 +448,7 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                                 )}
                             </>
                         ) : (
+                            // Creation Mode Sidebar - Variables
                             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nome do Modelo</label>
@@ -312,18 +461,38 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                                     />
                                 </div>
 
-                                <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-xs text-amber-800 leading-relaxed">
-                                    <strong>Dica:</strong> Use variáveis entre chaves duplas para criar campos dinâmicos. <br />
-                                    Ex: <code>{`{{razao_social}}`}</code>, <code>{`{{valor}}`}</code>, <code>{`{{prazo}}`}</code>.
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3 block">Variáveis Disponíveis</label>
+                                    <p className="text-xs text-slate-400 mb-4">Clique para inserir no cursor.</p>
+
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {Object.keys(variables).map((key) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => insertVariable(key)}
+                                                className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 transition-all group text-left"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                                        <FileText size={12} />
+                                                    </div>
+                                                    <span className="text-xs font-bold text-slate-600 group-hover:text-indigo-900 font-mono">
+                                                        {`{{${key}}}`}
+                                                    </span>
+                                                </div>
+                                                <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-400" />
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
 
                     <div className="p-6 border-t border-slate-200 bg-white">
-                        {!isCreatingTemplate ? (
+                        {!isCreatingTemplate || contractToEdit ? (
                             <button
-                                disabled={!selectedTemplate || loading}
+                                disabled={(!selectedTemplate && !contractToEdit) || loading}
                                 onClick={handleSaveContract}
                                 className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
@@ -360,25 +529,12 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                     <div className="w-full max-w-4xl bg-white shadow-xl min-h-[1000px] relative animate-in fade-in zoom-in-95 duration-300 flex flex-col">
 
                         {isCreatingTemplate ? (
-                            <div className="flex-1 flex flex-col h-full editor-container">
-                                <ReactQuill
-                                    theme="snow"
-                                    value={newTemplateContent}
-                                    onChange={setNewTemplateContent}
-                                    className="flex-1 flex flex-col h-full border-none"
-                                    modules={modules}
-                                    formats={formats}
-                                    style={{ height: '100%', fontFamily: 'Courier New' }}
-                                />
-                                <style>{`
-                                    .ql-container { font-family: 'Courier New', monospace; font-size: 14px; }
-                                    .ql-editor { min-height: 100%; padding: 4rem; }
-                                    .ql-toolbar { border-top: none !important; border-left: none !important; border-right: none !important; border-bottom: 1px solid #e2e8f0 !important; background: #f8fafc; }
-                                    .ql-container.ql-snow { border: none !important; }
-                                `}</style>
+                            <div className="flex-1 flex flex-col h-full">
+                                <MenuBar editor={editor} />
+                                <EditorContent editor={editor} className="flex-1" />
                             </div>
                         ) : selectedTemplate ? (
-                            <div className="p-16 prose max-w-none font-mono whitespace-pre-wrap text-slate-900 text-sm leading-relaxed" style={{ fontFamily: 'Courier New' }}>
+                            <div className="p-16 prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none font-mono whitespace-pre-wrap text-slate-900 leading-relaxed" style={{ fontFamily: 'Courier New' }}>
                                 <div dangerouslySetInnerHTML={{ __html: previewContent }} />
                             </div>
                         ) : (

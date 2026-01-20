@@ -44,6 +44,11 @@
   }
 }
 </script>
+<script>
+    if (typeof global === 'undefined') {
+      window.global = window;
+    }
+  </script>
 <link rel="stylesheet" href="/index.css">
 </head>
 <body>

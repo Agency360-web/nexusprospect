@@ -36,9 +36,27 @@ const ClientManager: React.FC = () => {
   const [activeMenuClientId, setActiveMenuClientId] = useState<string | null>(null);
 
   const [clientForm, setClientForm] = useState({
-    name: '',
+    name: '', // Nome Fantasia
+    corporateName: '', // Razão Social
+    cnpj: '',
     email: '',
     phone: '',
+    contactPerson: '', // Responsável
+
+    // Address
+    zipCode: '',
+    address: '',
+    neighborhood: '',
+    city: '',
+    state: '',
+
+    // Contract Defaults
+    defaultServices: '',
+    defaultTerm: '',
+    defaultValue: '',
+    defaultPaymentMethod: '',
+    defaultPaymentConditions: '',
+
     observations: ''
   });
 
@@ -58,7 +76,12 @@ const ClientManager: React.FC = () => {
   const handleOpenCreate = () => {
     setModalMode('create');
     setEditingClient(null);
-    setClientForm({ name: '', email: '', phone: '', observations: '' });
+    setClientForm({
+      name: '', corporateName: '', cnpj: '', email: '', phone: '', contactPerson: '',
+      zipCode: '', address: '', neighborhood: '', city: '', state: '',
+      defaultServices: '', defaultTerm: '', defaultValue: '', defaultPaymentMethod: '', defaultPaymentConditions: '',
+      observations: ''
+    });
     setIsModalOpen(true);
   };
 
@@ -68,8 +91,24 @@ const ClientManager: React.FC = () => {
     setEditingClient(client);
     setClientForm({
       name: client.name,
+      corporateName: client.corporateName || '',
+      cnpj: client.cnpj || '',
       email: client.email,
       phone: client.phone || '',
+      contactPerson: client.contactPerson || '',
+
+      zipCode: client.zipCode || '',
+      address: client.address || '',
+      neighborhood: client.neighborhood || '',
+      city: client.city || '',
+      state: client.state || '',
+
+      defaultServices: client.defaultServices || '',
+      defaultTerm: client.defaultTerm || '',
+      defaultValue: client.defaultValue || '',
+      defaultPaymentMethod: client.defaultPaymentMethod || '',
+      defaultPaymentConditions: client.defaultPaymentConditions || '',
+
       observations: client.observations || ''
     });
     setIsModalOpen(true);
@@ -101,8 +140,24 @@ const ClientManager: React.FC = () => {
       if (modalMode === 'create') {
         const { error } = await supabase.from('clients').insert({
           name: clientForm.name,
+          corporate_name: clientForm.corporateName,
+          cnpj: clientForm.cnpj,
           email: clientForm.email,
           phone: clientForm.phone,
+          contact_person: clientForm.contactPerson,
+
+          zip_code: clientForm.zipCode,
+          address: clientForm.address,
+          neighborhood: clientForm.neighborhood,
+          city: clientForm.city,
+          state: clientForm.state,
+
+          default_services: clientForm.defaultServices,
+          default_term: clientForm.defaultTerm,
+          default_value: clientForm.defaultValue,
+          default_payment_method: clientForm.defaultPaymentMethod,
+          default_payment_conditions: clientForm.defaultPaymentConditions,
+
           observations: clientForm.observations,
           status: 'active',
           user_id: user.id
@@ -111,8 +166,24 @@ const ClientManager: React.FC = () => {
       } else if (modalMode === 'edit' && editingClient) {
         const { error } = await supabase.from('clients').update({
           name: clientForm.name,
+          corporate_name: clientForm.corporateName,
+          cnpj: clientForm.cnpj,
           email: clientForm.email,
           phone: clientForm.phone,
+          contact_person: clientForm.contactPerson,
+
+          zip_code: clientForm.zipCode,
+          address: clientForm.address,
+          neighborhood: clientForm.neighborhood,
+          city: clientForm.city,
+          state: clientForm.state,
+
+          default_services: clientForm.defaultServices,
+          default_term: clientForm.defaultTerm,
+          default_value: clientForm.defaultValue,
+          default_payment_method: clientForm.defaultPaymentMethod,
+          default_payment_conditions: clientForm.defaultPaymentConditions,
+
           observations: clientForm.observations
         }).eq('id', editingClient.id);
         if (error) throw error;
@@ -143,10 +214,26 @@ const ClientManager: React.FC = () => {
       const clientsWithStats = (data || []).map((c: any) => ({
         id: c.id,
         name: c.name,
+        corporateName: c.corporate_name,
+        cnpj: c.cnpj,
         status: c.status,
         createdAt: c.created_at,
         email: c.email || '',
         phone: c.phone || '',
+        contactPerson: c.contact_person,
+
+        address: c.address,
+        zipCode: c.zip_code,
+        neighborhood: c.neighborhood,
+        city: c.city,
+        state: c.state,
+
+        defaultServices: c.default_services,
+        defaultTerm: c.default_term,
+        defaultValue: c.default_value,
+        defaultPaymentMethod: c.default_payment_method,
+        defaultPaymentConditions: c.default_payment_conditions,
+
         observations: c.observations || '',
         onlineNumbers: 0, // Placeholder: requires joining or separate count query
         totalNumbers: 0
@@ -187,44 +274,202 @@ const ClientManager: React.FC = () => {
         title={modalMode === 'create' ? "Novo Cliente" : "Editar Cliente"}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Nome da Empresa / Cliente</label>
-            <input
-              type="text"
-              placeholder="Ex: Tech Solutions Ltda"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-              value={clientForm.name}
-              onChange={e => setClientForm({ ...clientForm, name: e.target.value })}
-              required
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* Section 1: Company Info */}
+          <div className="space-y-4 pt-2">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Dados da Empresa</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Nome Fantasia (Interno)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Tech Solutions"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.name}
+                  onChange={e => setClientForm({ ...clientForm, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Razão Social</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Tech Solutions Ltda"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.corporateName}
+                  onChange={e => setClientForm({ ...clientForm, corporateName: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">CNPJ</label>
+                <input
+                  type="text"
+                  placeholder="00.000.000/0001-00"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.cnpj}
+                  onChange={e => setClientForm({ ...clientForm, cnpj: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">E-mail</label>
+                <input
+                  type="email"
+                  placeholder="contato@empresa.com"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.email}
+                  onChange={e => setClientForm({ ...clientForm, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Telefone / WhatsApp</label>
+                <input
+                  type="text"
+                  placeholder="(11) 99999-9999"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.phone}
+                  onChange={e => setClientForm({ ...clientForm, phone: e.target.value })}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Telefone / WhatsApp</label>
+              <label className="text-sm font-bold text-slate-700">Nome do Responsável</label>
               <input
                 type="text"
-                placeholder="Ex: 11999999999"
+                placeholder="Quem assina o contrato?"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                value={clientForm.phone}
-                onChange={e => setClientForm({ ...clientForm, phone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Email</label>
-              <input
-                type="email"
-                placeholder="admin@empresa.com"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                value={clientForm.email}
-                onChange={e => setClientForm({ ...clientForm, email: e.target.value })}
+                value={clientForm.contactPerson}
+                onChange={e => setClientForm({ ...clientForm, contactPerson: e.target.value })}
               />
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Observações</label>
+
+          {/* Section 2: Address */}
+          <div className="space-y-4 pt-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Endereço Completo</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-2 md:col-span-1">
+                <label className="text-sm font-bold text-slate-700">CEP</label>
+                <input
+                  type="text"
+                  placeholder="00000-000"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.zipCode}
+                  onChange={e => setClientForm({ ...clientForm, zipCode: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-3">
+                <label className="text-sm font-bold text-slate-700">Endereço (Rua, Número, Comp)</label>
+                <input
+                  type="text"
+                  placeholder="Av. Paulista, 1000 - Cj 10"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.address}
+                  onChange={e => setClientForm({ ...clientForm, address: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Bairro</label>
+                <input
+                  type="text"
+                  placeholder="Bairro"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.neighborhood}
+                  onChange={e => setClientForm({ ...clientForm, neighborhood: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Cidade</label>
+                <input
+                  type="text"
+                  placeholder="Cidade"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.city}
+                  onChange={e => setClientForm({ ...clientForm, city: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Estado</label>
+                <input
+                  type="text"
+                  placeholder="UF"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.state}
+                  onChange={e => setClientForm({ ...clientForm, state: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Contract Defaults */}
+          <div className="space-y-4 pt-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Dados Padrão do Contrato</h3>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Serviços Contratados</label>
+              <textarea
+                placeholder="Descrição resumida dos serviços..."
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 min-h-[60px]"
+                value={clientForm.defaultServices}
+                onChange={e => setClientForm({ ...clientForm, defaultServices: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Prazo do Contrato</label>
+                <input
+                  type="text"
+                  placeholder="Ex: 12 meses"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.defaultTerm}
+                  onChange={e => setClientForm({ ...clientForm, defaultTerm: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Valor Total</label>
+                <input
+                  type="text"
+                  placeholder="Ex: R$ 5.000,00"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.defaultValue}
+                  onChange={e => setClientForm({ ...clientForm, defaultValue: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Forma de Pagamento</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Boleto Bancário"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.defaultPaymentMethod}
+                  onChange={e => setClientForm({ ...clientForm, defaultPaymentMethod: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Condições de Pagamento</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Dia 10 de cada mês"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  value={clientForm.defaultPaymentConditions}
+                  onChange={e => setClientForm({ ...clientForm, defaultPaymentConditions: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Obs */}
+          <div className="space-y-2 pt-4 border-t border-slate-100">
+            <label className="text-sm font-bold text-slate-700">Observações Gerais</label>
             <textarea
               placeholder="Notas internas sobre o cliente..."
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 min-h-[100px]"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 min-h-[80px]"
               value={clientForm.observations}
               onChange={e => setClientForm({ ...clientForm, observations: e.target.value })}
             />
