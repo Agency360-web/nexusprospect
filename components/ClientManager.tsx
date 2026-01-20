@@ -10,7 +10,11 @@ import {
   Wifi,
   Circle,
   Loader2,
-  X
+  X,
+  Settings,
+  MoreVertical,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { Client } from '../types';
 import { supabase } from '../lib/supabase';
@@ -27,8 +31,16 @@ const ClientManager: React.FC = () => {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientEmail, setNewClientEmail] = useState('');
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [editingClient, setEditingClient] = useState<ClientWithStats | null>(null);
+
+  const [clientForm, setClientForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    observations: ''
+  });
+
   const [createLoading, setCreateLoading] = useState(false);
 
   useEffect(() => {
@@ -42,28 +54,74 @@ const ClientManager: React.FC = () => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
   }, []);
 
-  const createClient = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setModalMode('create');
+    setEditingClient(null);
+    setClientForm({ name: '', email: '', phone: '', observations: '' });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (e: React.MouseEvent, client: ClientWithStats) => {
+    e.stopPropagation(); // Prevent navigation
+    setModalMode('edit');
+    setEditingClient(client);
+    setClientForm({
+      name: client.name,
+      email: client.email,
+      phone: client.phone || '',
+      observations: client.observations || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteClient = async (e: React.MouseEvent, clientId: string) => {
+    e.stopPropagation();
+    if (!confirm('Tem certeza que deseja excluir este cliente? Todas as campanhas, leads e configurações serão perdidas.')) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('clients').delete().eq('id', clientId);
+      if (error) throw error;
+      fetchClients();
+    } catch (err) {
+      console.error('Error deleting client:', err);
+      alert('Erro ao excluir cliente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClientName || !newClientEmail || !user) return;
+    if (!clientForm.name || !user) return;
 
     setCreateLoading(true);
     try {
-      const { error } = await supabase.from('clients').insert({
-        name: newClientName,
-        email: newClientEmail,
-        status: 'active',
-        user_id: user.id
-      });
-
-      if (error) throw error;
+      if (modalMode === 'create') {
+        const { error } = await supabase.from('clients').insert({
+          name: clientForm.name,
+          email: clientForm.email,
+          phone: clientForm.phone,
+          observations: clientForm.observations,
+          status: 'active',
+          user_id: user.id
+        });
+        if (error) throw error;
+      } else if (modalMode === 'edit' && editingClient) {
+        const { error } = await supabase.from('clients').update({
+          name: clientForm.name,
+          email: clientForm.email,
+          phone: clientForm.phone,
+          observations: clientForm.observations
+        }).eq('id', editingClient.id);
+        if (error) throw error;
+      }
 
       setIsModalOpen(false);
-      setNewClientName('');
-      setNewClientEmail('');
       fetchClients(); // Refresh list
     } catch (err) {
-      console.error('Error creating client:', err);
-      alert('Erro ao criar cliente.');
+      console.error('Error saving client:', err);
+      alert('Erro ao salvar cliente.');
     } finally {
       setCreateLoading(false);
     }
@@ -87,6 +145,8 @@ const ClientManager: React.FC = () => {
         status: c.status,
         createdAt: c.created_at,
         email: c.email || '',
+        phone: c.phone || '',
+        observations: c.observations || '',
         onlineNumbers: 0, // Placeholder: requires joining or separate count query
         totalNumbers: 0
       }));
@@ -112,7 +172,7 @@ const ClientManager: React.FC = () => {
           <p className="text-slate-500 mt-1">Gerencie múltiplos tenants e seus ambientes isolados.</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenCreate}
           className="flex items-center space-x-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
         >
           <Plus size={20} />
@@ -120,28 +180,52 @@ const ClientManager: React.FC = () => {
         </button>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Cliente">
-        <form onSubmit={createClient} className="space-y-4">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={modalMode === 'create' ? "Novo Cliente" : "Editar Cliente"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Nome da Empresa</label>
+            <label className="text-sm font-bold text-slate-700">Nome da Empresa / Cliente</label>
             <input
               type="text"
               placeholder="Ex: Tech Solutions Ltda"
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-              value={newClientName}
-              onChange={e => setNewClientName(e.target.value)}
+              value={clientForm.name}
+              onChange={e => setClientForm({ ...clientForm, name: e.target.value })}
               required
             />
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Telefone / WhatsApp</label>
+              <input
+                type="text"
+                placeholder="Ex: 11999999999"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                value={clientForm.phone}
+                onChange={e => setClientForm({ ...clientForm, phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Email</label>
+              <input
+                type="email"
+                placeholder="admin@empresa.com"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                value={clientForm.email}
+                onChange={e => setClientForm({ ...clientForm, email: e.target.value })}
+              />
+            </div>
+          </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Email Administrativo</label>
-            <input
-              type="email"
-              placeholder="admin@empresa.com"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-              value={newClientEmail}
-              onChange={e => setNewClientEmail(e.target.value)}
-              required
+            <label className="text-sm font-bold text-slate-700">Observações</label>
+            <textarea
+              placeholder="Notas internas sobre o cliente..."
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 min-h-[100px]"
+              value={clientForm.observations}
+              onChange={e => setClientForm({ ...clientForm, observations: e.target.value })}
             />
           </div>
           <div className="pt-4 flex justify-end space-x-3">
@@ -158,7 +242,7 @@ const ClientManager: React.FC = () => {
               className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl disabled:opacity-50 flex items-center space-x-2"
             >
               {createLoading && <Loader2 size={16} className="animate-spin" />}
-              <span>Criar Cliente</span>
+              <span>{modalMode === 'create' ? 'Criar Cliente' : 'Salvar Alterações'}</span>
             </button>
           </div>
         </form>
@@ -185,49 +269,78 @@ const ClientManager: React.FC = () => {
             <div
               key={client.id}
               onClick={() => navigate(`/clients/${client.id}`)}
-              className="group bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-300 transition-all cursor-pointer relative overflow-hidden"
+              className="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-300 transition-all cursor-pointer relative"
             >
-              <div className="flex justify-between items-start mb-6">
-                <div className="p-3 bg-slate-50 rounded-xl text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-colors">
-                  <Building2 size={24} />
-                </div>
-                <div className="flex flex-col items-end gap-1.5">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${client.status === 'active'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                    : 'bg-slate-100 text-slate-500 border-slate-200'
-                    }`}>
-                    <Circle size={6} className={`mr-1.5 fill-current ${client.status === 'active' ? 'text-emerald-500' : 'text-slate-400'}`} />
-                    {client.status === 'active' ? 'Ativo' : 'Inativo'}
-                  </span>
+              <div className="relative z-10 p-6">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="p-3 bg-slate-50 rounded-xl text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                    <Building2 size={24} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-end gap-1.5">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${client.status === 'active'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                        <Circle size={6} className={`mr-1.5 fill-current ${client.status === 'active' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                        {client.status === 'active' ? 'Ativo' : 'Inativo'}
+                      </span>
 
-                  {client.totalNumbers > 0 && (
-                    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded border ${client.onlineNumbers === client.totalNumbers
-                      ? 'bg-emerald-500 text-white border-emerald-600'
-                      : client.onlineNumbers > 0 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-200 text-slate-600 border-slate-300'
-                      }`}>
-                      <Wifi size={10} />
-                      {client.onlineNumbers}/{client.totalNumbers} Online
-                    </span>
-                  )}
-                </div>
-              </div>
+                      {client.totalNumbers > 0 && (
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded border ${client.onlineNumbers === client.totalNumbers
+                          ? 'bg-emerald-500 text-white border-emerald-600'
+                          : client.onlineNumbers > 0 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-200 text-slate-600 border-slate-300'
+                          }`}>
+                          <Wifi size={10} />
+                          {client.onlineNumbers}/{client.totalNumbers} Online
+                        </span>
+                      )}
+                    </div>
 
-              <h3 className="text-xl font-bold text-slate-900 mb-1">{client.name}</h3>
-              <p className="text-sm text-slate-500 mb-6">{client.email}</p>
-
-              <div className="flex items-center justify-between pt-6 border-t border-slate-50">
-                <div className="flex items-center text-xs text-slate-400">
-                  <Calendar size={14} className="mr-1.5" />
-                  <span>Desde {new Date(client.createdAt).toLocaleDateString('pt-BR')}</span>
+                    {/* Gear Menu */}
+                    <div className="relative group/menu" onClick={(e) => e.stopPropagation()}>
+                      <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors">
+                        <Settings size={18} />
+                      </button>
+                      <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden hidden group-hover/menu:block z-20">
+                        <button
+                          onClick={(e) => handleOpenEdit(e, client)}
+                          className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-slate-50 text-slate-600 text-sm font-medium transition-colors"
+                        >
+                          <Edit2 size={16} />
+                          <span>Editar</span>
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteClient(e, client.id)}
+                          className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-rose-50 text-rose-500 text-sm font-medium transition-colors border-t border-slate-50"
+                        >
+                          <Trash2 size={16} />
+                          <span>Excluir</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-slate-400 group-hover:text-slate-900 group-hover:translate-x-1 transition-all">
-                  <ChevronRight size={20} />
+
+                <h3 className="text-xl font-bold text-slate-900 mb-1">{client.name}</h3>
+                <p className="text-sm text-slate-500 mb-6">{client.email}</p>
+
+                <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                  <div className="flex items-center text-xs text-slate-400">
+                    <Calendar size={14} className="mr-1.5" />
+                    <span>Desde {new Date(client.createdAt).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  <div className="text-slate-400 group-hover:text-slate-900 group-hover:translate-x-1 transition-all">
+                    <ChevronRight size={20} />
+                  </div>
                 </div>
               </div>
 
               {/* Subtle background decoration */}
-              <div className="absolute -right-4 -top-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
-                <Building2 size={120} />
+              <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+                <div className="absolute -right-4 -top-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity">
+                  <Building2 size={120} />
+                </div>
               </div>
             </div>
           ))}

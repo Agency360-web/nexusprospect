@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   Copy,
   Trash2,
+  Edit2,
+  ListPlus,
   Globe,
   MoreVertical,
   Check,
@@ -32,9 +34,11 @@ import {
   WifiOff,
   Target,
   Mail,
-  AtSign
+  AtSign,
+
+  ListTodo
 } from 'lucide-react';
-import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client, EmailSender } from '../types';
+import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client, EmailSender, Task } from '../types';
 import ClientGoals from './ClientGoals';
 import ClientOverviewGoals from './ClientOverviewGoals';
 import { supabase } from '../lib/supabase';
@@ -56,16 +60,49 @@ const ClientDetail: React.FC = () => {
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
 
   // Modal State
-  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'webhook' | 'number' | 'email' | 'success'>('none');
+  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'webhook' | 'number' | 'email' | 'success' | 'client-config' | 'task-create' | 'task-detail'>('none');
   const [modalLoading, setModalLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Webhook Editing State
+  const [editingWebhook, setEditingWebhook] = useState<WebhookConfig | null>(null);
+
+  const [webhookMode, setWebhookMode] = useState<'create' | 'edit'>('create');
+
+  // Client Config State
+  const [clientForm, setClientForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    observations: '',
+    cnpj: '',
+    corporateName: '',
+    address: '',
+    status: 'active' as Client['status']
+  });
+
+  // Task State
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskFilter, setTaskFilter] = useState<'pending' | 'completed'>('pending');
+  const [newTask, setNewTask] = useState({
+    title: '', description: '', startDate: '', dueDate: '',
+    checklist: [] as { text: string, completed: boolean }[]
+  });
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
+
+  // Number Editing State
+  const [editingNumber, setEditingNumber] = useState<WhatsAppNumber | null>(null);
+  const [numberMode, setNumberMode] = useState<'create' | 'edit'>('create');
+
 
   // Bulk Actions State
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
 
   // Form State
   const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', company: '', tags: '' });
-  const [newWebhook, setNewWebhook] = useState({ name: '', url: '', type: 'inbound' as const });
+  const [newWebhook, setNewWebhook] = useState({ name: '', url: '', type: 'outbound' as const, method: 'POST' as const });
   const [newNumber, setNewNumber] = useState({ nickname: '', phone: '' });
   const [newEmail, setNewEmail] = useState({ email: '', provider: 'smtp', fromName: '' });
   const [leadType, setLeadType] = useState<'whatsapp' | 'email'>('whatsapp');
@@ -176,46 +213,295 @@ const ClientDetail: React.FC = () => {
   };
 
 
+  const handleOpenWebhookModal = (mode: 'create' | 'edit', webhook?: WebhookConfig) => {
+    setWebhookMode(mode);
+    if (mode === 'edit' && webhook) {
+      setEditingWebhook(webhook);
+      setNewWebhook({ name: webhook.name, url: webhook.url, type: webhook.type, method: webhook.method || 'POST' });
+    } else {
+      setEditingWebhook(null);
+      setNewWebhook({ name: '', url: '', type: 'outbound', method: 'POST' });
+    }
+    setActiveModal('webhook');
+  };
+
   const handleCreateWebhook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientId) return;
     setModalLoading(true);
     try {
-      const { error } = await supabase.from('webhook_configs').insert({
-        client_id: clientId,
-        name: newWebhook.name,
-        url: newWebhook.url,
-        type: newWebhook.type,
-        method: 'POST',
-        active: true
-      });
-      if (error) throw error;
+      if (webhookMode === 'create') {
+        const { error } = await supabase.from('webhook_configs').insert({
+          client_id: clientId,
+          name: newWebhook.name,
+          url: newWebhook.url,
+          type: 'outbound', // Defaulting to outbound as per user request
+          method: newWebhook.method,
+          active: true
+        });
+        if (error) throw error;
+      } else if (webhookMode === 'edit' && editingWebhook) {
+        const { error } = await supabase.from('webhook_configs').update({
+          name: newWebhook.name,
+          url: newWebhook.url,
+          method: newWebhook.method
+        }).eq('id', editingWebhook.id);
+        if (error) throw error;
+      }
+
       setActiveModal('none');
-      setNewWebhook({ name: '', url: '', type: 'inbound' });
+      setNewWebhook({ name: '', url: '', type: 'outbound', method: 'POST' });
       fetchData();
-    } catch (err) { console.error(err); alert('Erro ao criar webhook'); }
+    } catch (err) { console.error(err); alert('Erro ao salvar webhook'); }
     finally { setModalLoading(false); }
   };
 
-  const handleCreateNumber = async (e: React.FormEvent) => {
+  const handleDeleteWebhook = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este webhook?')) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('webhook_configs').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err) { console.error(err); alert('Erro ao excluir webhook'); }
+    finally { setLoading(false); }
+  };
+
+  const handleDuplicateWebhook = async (webhook: WebhookConfig) => {
+    if (!clientId) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('webhook_configs').insert({
+        client_id: clientId,
+        name: `${webhook.name} (Cópia)`,
+        url: webhook.url,
+        type: webhook.type,
+        method: webhook.method,
+        active: webhook.active,
+        headers: webhook.headers
+      });
+      if (error) throw error;
+      fetchData();
+    } catch (err) { console.error(err); alert('Erro ao duplicar webhook'); }
+    finally { setLoading(false); }
+  };
+
+  const handleOpenClientConfig = () => {
+    if (!client) return;
+    setClientForm({
+      name: client.name || '',
+      email: client.email || '',
+      phone: client.phone || '',
+      observations: client.observations || '',
+      cnpj: client.cnpj || '',
+      corporateName: client.corporateName || '',
+      address: client.address || '',
+      status: client.status || 'active'
+    });
+    setActiveModal('client-config');
+  };
+
+  const handleUpdateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientId) return;
     setModalLoading(true);
     try {
-      const { error } = await supabase.from('whatsapp_numbers').insert({
+      const { error } = await supabase.from('clients').update({
+        name: clientForm.name,
+        email: clientForm.email,
+        phone: clientForm.phone,
+        observations: clientForm.observations,
+        cnpj: clientForm.cnpj,
+        corporate_name: clientForm.corporateName,
+        address: clientForm.address,
+        status: clientForm.status
+      }).eq('id', clientId);
+
+      if (error) throw error;
+      setActiveModal('none');
+      fetchData(); // Refresh all data
+    } catch (err) { console.error(err); alert('Erro ao atualizar cliente'); }
+    finally { setModalLoading(false); }
+  };
+
+  const handleOpenNumberModal = (mode: 'create' | 'edit', number?: WhatsAppNumber) => {
+    setNumberMode(mode);
+    if (mode === 'edit' && number) {
+      setEditingNumber(number);
+      setNewNumber({ nickname: number.nickname, phone: number.phone });
+    } else {
+      setEditingNumber(null);
+      setNewNumber({ nickname: '', phone: '' });
+    }
+    setActiveModal('number');
+  };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientId) return;
+    setModalLoading(true);
+    try {
+      const { error } = await supabase.from('tasks').insert({
         client_id: clientId,
-        nickname: newNumber.nickname,
-        phone: newNumber.phone,
-        status: 'active',
-        daily_limit: 1000,
-        sent_today: 0
+        title: newTask.title,
+        description: newTask.description,
+        start_date: newTask.startDate || null,
+        due_date: newTask.dueDate || null,
+        status: 'pending',
+        checklist: newTask.checklist
       });
       if (error) throw error;
+
+      setActiveModal('none');
+      setNewTask({ title: '', description: '', startDate: '', dueDate: '', checklist: [] });
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erro ao criar tarefa: ${err.message || 'Erro desconhecido'}`);
+    }
+
+    finally { setModalLoading(false); }
+  };
+
+  const handleUpdateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTask) return;
+    setModalLoading(true);
+    try {
+      const { error } = await supabase.from('tasks').update({
+        title: selectedTask.title,
+        description: selectedTask.description,
+        start_date: selectedTask.startDate,
+        due_date: selectedTask.dueDate,
+        status: selectedTask.status,
+        checklist: selectedTask.checklist
+      }).eq('id', selectedTask.id);
+      if (error) throw error;
+
+      setActiveModal('none');
+      setSelectedTask(null);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erro ao atualizar tarefa: ${err.message || 'Erro desconhecido'}`);
+    }
+
+    finally { setModalLoading(false); }
+  };
+
+  const handleDeleteTask = async (id: string) => {
+    if (!confirm('Excluir esta tarefa?')) return;
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+      if (selectedTask?.id === id) { setActiveModal('none'); setSelectedTask(null); }
+      fetchData();
+    } catch (err) { console.error(err); alert('Erro ao excluir tarefa'); }
+  };
+
+  const handleBulkDeleteTasks = async () => {
+    if (!confirm(`Excluir ${selectedTasks.length} tarefas?`)) return;
+    try {
+      const { error } = await supabase.from('tasks').delete().in('id', selectedTasks);
+      if (error) throw error;
+      setSelectedTasks([]);
+      fetchData();
+    } catch (err) { console.error(err); alert('Erro ao excluir tarefas'); }
+  };
+
+  const toggleTaskSelection = (id: string) => {
+    if (selectedTasks.includes(id)) setSelectedTasks(prev => prev.filter(tid => tid !== id));
+    else setSelectedTasks(prev => [...prev, id]);
+  };
+
+  const getTaskStatusColor = (task: Task) => {
+    if (task.status === 'completed') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+    if (task.dueDate && new Date(task.dueDate) < new Date()) return 'bg-rose-100 text-rose-700 border-rose-200';
+    return 'bg-emerald-50 text-emerald-600 border-emerald-100'; // "Em dia" -> Light Green
+  };
+
+  const handleOpenTaskModal = (task?: Task) => {
+    if (task) {
+      setSelectedTask(task);
+      setActiveModal('task-detail');
+    } else {
+      setNewTask({ title: '', description: '', startDate: '', dueDate: '', checklist: [] });
+      setActiveModal('task-create');
+    }
+  };
+
+  const handleAddChecklistItem = () => {
+    if (!newChecklistItem.trim()) return;
+    if (selectedTask) {
+      setSelectedTask({ ...selectedTask, checklist: [...selectedTask.checklist, { text: newChecklistItem, completed: false }] });
+    } else {
+      setNewTask({ ...newTask, checklist: [...newTask.checklist, { text: newChecklistItem, completed: false }] });
+    }
+    setNewChecklistItem('');
+  };
+
+  const toggleChecklistItem = (index: number, isEditMode: boolean) => {
+    if (isEditMode && selectedTask) {
+      const newChecklist = [...selectedTask.checklist];
+      newChecklist[index].completed = !newChecklist[index].completed;
+      setSelectedTask({ ...selectedTask, checklist: newChecklist });
+    } else if (!isEditMode) {
+      const newChecklist = [...newTask.checklist];
+      newChecklist[index].completed = !newChecklist[index].completed;
+      setNewTask({ ...newTask, checklist: newChecklist });
+    }
+  };
+
+  const handleCompleteTask = async () => {
+    if (!selectedTask) return;
+    const newStatus = selectedTask.status === 'completed' ? 'pending' : 'completed';
+    // Optimistic update for UI in modal
+    setSelectedTask({ ...selectedTask, status: newStatus });
+    // Actual DB update will happen on Save, or we can do it immediately? 
+    // User requested "mark as completed" inside modal. It implies an action.
+    // Let's just update state and let "Salvar" persist everything to be safe/consistent.
+  };
+
+
+
+  const handleSaveNumber = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientId) return;
+    setModalLoading(true);
+    try {
+      if (numberMode === 'create') {
+        const { error } = await supabase.from('whatsapp_numbers').insert({
+          client_id: clientId,
+          nickname: newNumber.nickname,
+          phone: newNumber.phone,
+          status: 'active',
+          daily_limit: 1000,
+          sent_today: 0
+        });
+        if (error) throw error;
+      } else if (numberMode === 'edit' && editingNumber) {
+        const { error } = await supabase.from('whatsapp_numbers').update({
+          nickname: newNumber.nickname,
+          phone: newNumber.phone
+        }).eq('id', editingNumber.id);
+        if (error) throw error;
+      }
       setActiveModal('none');
       setNewNumber({ nickname: '', phone: '' });
       fetchData();
-    } catch (err) { console.error(err); alert('Erro ao vincular número'); }
+    } catch (err) { console.error(err); alert('Erro ao salvar número'); }
     finally { setModalLoading(false); }
+  };
+
+  const handleDeleteNumber = async (id: string) => {
+    if (!confirm('Twem certeza que deseja excluir este número?')) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('whatsapp_numbers').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err) { console.error(err); alert('Erro ao excluir número'); }
+    finally { setLoading(false); }
   };
 
   const handleBulkDelete = async () => {
@@ -310,9 +596,36 @@ const ClientDetail: React.FC = () => {
           name: clientData.name,
           status: clientData.status,
           createdAt: clientData.created_at,
-          email: clientData.email
+          email: clientData.email,
+          phone: clientData.phone,
+          observations: clientData.observations,
+          cnpj: clientData.cnpj,
+          corporateName: clientData.corporate_name,
+          address: clientData.address
         });
       }
+
+      // 1.5 Fetch Tasks
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('due_date', { ascending: true });
+
+      if (tasksData) {
+        setTasks(tasksData.map((t: any) => ({
+          id: t.id,
+          clientId: t.client_id,
+          title: t.title,
+          description: t.description,
+          startDate: t.start_date,
+          dueDate: t.due_date,
+          status: t.status,
+          checklist: t.checklist || [],
+          createdAt: t.created_at
+        })));
+      }
+
 
       // 2. Fetch Leads
       const { data: leadsData } = await supabase
@@ -464,7 +777,7 @@ const ClientDetail: React.FC = () => {
         </div>
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => alert('Configurações em breve')}
+            onClick={handleOpenClientConfig}
             className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors text-sm font-bold shadow-sm"
           >
             <Settings size={16} />
@@ -516,50 +829,64 @@ const ClientDetail: React.FC = () => {
                 </div>
               </div>
 
-              <ClientOverviewGoals clientId={clientId!} />
-
               <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-900 mb-6 flex items-center space-x-2">
-                  <Zap size={18} className="text-slate-400" />
-                  <span>Ações Rápidas de Growth</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <button className="flex items-center space-x-4 p-5 bg-slate-50 rounded-2xl border border-slate-200 hover:bg-slate-100 transition-all text-left group">
-                    <div className="p-3 bg-white rounded-xl border border-slate-200 group-hover:bg-slate-900 group-hover:text-white transition-colors"><FileUp size={20} /></div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">Importar Lista CSV</div>
-                      <div className="text-xs text-slate-500">Mapeamento dinâmico de campos</div>
-                    </div>
-                  </button>
-                  <button className="flex items-center space-x-4 p-5 bg-slate-50 rounded-2xl border border-slate-200 hover:bg-slate-100 transition-all text-left group">
-                    <div className="p-3 bg-white rounded-xl border border-slate-200 group-hover:bg-slate-900 group-hover:text-white transition-colors"><TagIcon size={20} /></div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">Segmentação Avançada</div>
-                      <div className="text-xs text-slate-500">Criar réguas por etiquetas</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
-                <div className="relative z-10">
-                  <h4 className="text-lg font-bold mb-1">Endpoint Token</h4>
-                  <p className="text-slate-400 text-xs mb-6 leading-relaxed">Use este segredo para autenticar requisições via webhook externas para este tenant.</p>
-                  <div className="bg-white/10 p-4 rounded-2xl flex items-center justify-between backdrop-blur-sm border border-white/10">
-                    <code className="text-xs font-mono truncate mr-4">
-                      sk_live_{clientId?.replace(/-/g, '').substring(0, 8)}...
-                    </code>
-                    <button onClick={() => copyToClipboard(`sk_live_${clientId?.replace(/-/g, '')}`, 'cid')} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
-                      {copied === 'cid' ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-bold text-slate-900 flex items-center space-x-2">
+                    <ListTodo size={18} className="text-slate-400" />
+                    <span>Gestão de Tarefas</span>
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    {selectedTasks.length > 0 && (
+                      <button onClick={handleBulkDeleteTasks} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir selecionadas">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                    <button onClick={() => handleOpenTaskModal()} className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors">
+                      <Plus size={16} />
                     </button>
                   </div>
                 </div>
-                <div className="absolute -right-8 -bottom-8 opacity-10">
-                  <Lock size={120} />
+
+                <div className="flex space-x-4 border-b border-slate-100 mb-4">
+                  <button onClick={() => setTaskFilter('pending')} className={`pb-2 text-sm font-bold ${taskFilter === 'pending' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400'}`}>Pendentes</button>
+                  <button onClick={() => setTaskFilter('completed')} className={`pb-2 text-sm font-bold ${taskFilter === 'completed' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400'}`}>Concluídas</button>
+                </div>
+
+                <div className="space-y-3">
+                  {tasks.filter(t => t.status === taskFilter).length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-sm">Nenhuma tarefa {taskFilter === 'pending' ? 'pendente' : 'concluída'}</div>
+                  ) : (
+                    tasks.filter(t => t.status === taskFilter).map(task => (
+                      <div key={task.id} onClick={() => handleOpenTaskModal(task)} className="group flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer">
+                        <div className="flex items-center space-x-3">
+                          <div onClick={(e) => { e.stopPropagation(); toggleTaskSelection(task.id); }} className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer ${selectedTasks.includes(task.id) ? 'bg-slate-900 border-slate-900 text-white' : 'border-slate-300 hover:border-slate-400'}`}>
+                            {selectedTasks.includes(task.id) && <Check size={12} />}
+                          </div>
+                          <div>
+                            <div className={`font-bold text-slate-900 ${task.status === 'completed' ? 'line-through text-slate-400' : ''}`}>{task.title}</div>
+                            <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
+                              {task.dueDate && (
+                                <span className="flex items-center"><Clock size={10} className="mr-1" /> {new Date(task.dueDate).toLocaleDateString('pt-BR')}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getTaskStatusColor(task)}`}>
+                          {task.status === 'completed' ? 'Concluída' : task.dueDate && new Date(task.dueDate) < new Date() ? 'Atrasada' : 'Em dia'}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
+
+              <ClientOverviewGoals clientId={clientId!} />
+
+              {/* Removed Actions for Growth Section */}
+            </div>
+
+            <div className="space-y-6">
+              {/* Removed Endpoint Token Section */}
 
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                 <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -567,22 +894,24 @@ const ClientDetail: React.FC = () => {
                   Status da Instância
                 </h4>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-2 h-2 rounded-full ${numbers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
-                      <span className="text-xs font-medium text-slate-600">Primary Instance</span>
+                  {numbers.filter(n => n.status === 'active' || n.status === 'connected').length > 0 ? (
+                    numbers.filter(n => n.status === 'active' || n.status === 'connected').map(num => (
+                      <div key={num.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                          <span className="text-xs font-medium text-slate-600 truncate max-w-[150px]">{num.nickname}</span>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+                          Online
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-4 text-center">
+                      <WifiOff size={24} className="text-slate-300 mb-2" />
+                      <p className="text-xs text-slate-400">Nenhum canal ativo</p>
                     </div>
-                    <span className={`text-[10px] font-bold uppercase tracking-widest ${numbers.length > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {numbers.length > 0 ? 'Online' : 'Offline'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
-                      <span className="text-xs font-medium text-slate-400">Secondary Gateway</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Idle</span>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -602,7 +931,7 @@ const ClientDetail: React.FC = () => {
                   <span>Vincular Novo E-mail</span>
                 </button>
                 <button
-                  onClick={() => setActiveModal('number')}
+                  onClick={() => handleOpenNumberModal('create')}
                   className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
                 >
                   <Plus size={14} />
@@ -658,8 +987,18 @@ const ClientDetail: React.FC = () => {
                         <div className="w-5 h-5 rounded-full bg-slate-100 border border-white flex items-center justify-center text-[8px] font-bold text-slate-400">+</div>
                       </div>
                       <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg"><RefreshCw size={16} /></button>
-                        <button className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={16} /></button>
+                        <button
+                          onClick={() => handleOpenNumberModal('edit', num)}
+                          className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteNumber(num.id)}
+                          className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -675,7 +1014,7 @@ const ClientDetail: React.FC = () => {
               <div className="flex justify-between items-center mb-8">
                 <h3 className="font-bold text-slate-900">Integrações de Entrada/Saída</h3>
                 <button
-                  onClick={() => setActiveModal('webhook')}
+                  onClick={() => handleOpenWebhookModal('create')}
                   className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
                 >
                   <Plus size={14} />
@@ -699,9 +1038,27 @@ const ClientDetail: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <button className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">Testar</button>
-                      <button className="p-2 text-slate-400 hover:text-slate-900"><Copy size={16} /></button>
-                      <button className="p-2 text-slate-400 hover:text-rose-500"><Trash2 size={16} /></button>
+                      <button
+                        onClick={() => handleOpenWebhookModal('edit', wh)}
+                        className="p-2 text-slate-400 hover:text-slate-900"
+                        title="Editar"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDuplicateWebhook(wh)}
+                        className="p-2 text-slate-400 hover:text-slate-900"
+                        title="Duplicar"
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteWebhook(wh.id)}
+                        className="p-2 text-slate-400 hover:text-rose-500"
+                        title="Excluir"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -899,25 +1256,85 @@ const ClientDetail: React.FC = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'webhook'} onClose={() => setActiveModal('none')} title="Configurar Webhook">
+      <Modal isOpen={activeModal === 'webhook'} onClose={() => setActiveModal('none')} title={webhookMode === 'create' ? "Configurar Webhook" : "Editar Webhook"}>
         <form onSubmit={handleCreateWebhook} className="space-y-4">
           <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Nome do Webhook" value={newWebhook.name} onChange={e => setNewWebhook({ ...newWebhook, name: e.target.value })} required />
           <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="URL de Destino" value={newWebhook.url} onChange={e => setNewWebhook({ ...newWebhook, url: e.target.value })} required />
-          <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" value={newWebhook.type} onChange={e => setNewWebhook({ ...newWebhook, type: e.target.value as any })}>
-            <option value="inbound">Inbound (Recebimento)</option>
-            <option value="outbound">Outbound (Envio)</option>
-            <option value="status">Status (Entregas)</option>
-          </select>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Método de Envio</label>
+              <select
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none appearance-none font-mono text-sm"
+                value={newWebhook.method}
+                onChange={e => setNewWebhook({ ...newWebhook, method: e.target.value as any })}
+              >
+                <option value="POST">POST</option>
+                <option value="GET">GET</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+                <option value="HEAD">HEAD</option>
+              </select>
+            </div>
+            {/* Hidden Input for Type - Defaulting to Outbound */}
+            <input type="hidden" value="outbound" />
+          </div>
           <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Salvar'}</button></div>
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'number'} onClose={() => setActiveModal('none')} title="Vincular WhatsApp">
-        <form onSubmit={handleCreateNumber} className="space-y-4">
+      <Modal isOpen={activeModal === 'number'} onClose={() => setActiveModal('none')} title={numberMode === 'create' ? "Vincular WhatsApp" : "Editar Número"}>
+        <form onSubmit={handleSaveNumber} className="space-y-4">
           <div className="p-4 bg-amber-50 text-amber-800 text-xs rounded-xl mb-4">Para conectar, você precisará escanear o QR Code após o cadastro.</div>
           <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Apelido do Número" value={newNumber.nickname} onChange={e => setNewNumber({ ...newNumber, nickname: e.target.value })} required />
           <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Número (Ex: 5511999999999)" value={newNumber.phone} onChange={e => setNewNumber({ ...newNumber, phone: e.target.value })} required />
           <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Vincular'}</button></div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'client-config'} onClose={() => setActiveModal('none')} title="Configurações do Cliente">
+        <form onSubmit={handleUpdateClient} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Informações Básicas</label>
+                <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none mb-3" placeholder="Nome do Cliente" value={clientForm.name} onChange={e => setClientForm({ ...clientForm, name: e.target.value })} required />
+                <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Razão Social" value={clientForm.corporateName} onChange={e => setClientForm({ ...clientForm, corporateName: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Contato</label>
+                <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none mb-3" placeholder="E-mail" type="email" value={clientForm.email} onChange={e => setClientForm({ ...clientForm, email: e.target.value })} />
+                <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Telefone / WhatsApp" value={clientForm.phone} onChange={e => setClientForm({ ...clientForm, phone: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Dados Fiscais / Localização</label>
+                <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none mb-3" placeholder="CNPJ" value={clientForm.cnpj} onChange={e => setClientForm({ ...clientForm, cnpj: e.target.value })} />
+                <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none h-24 resize-none" placeholder="Endereço Completo" value={clientForm.address} onChange={e => setClientForm({ ...clientForm, address: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Status do Contrato</label>
+                <select
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none appearance-none"
+                  value={clientForm.status}
+                  onChange={e => setClientForm({ ...clientForm, status: e.target.value as any })}
+                >
+                  <option value="active">Ativo (Em dia)</option>
+                  <option value="inactive">Inativo (Pausado)</option>
+                  <option value="overdue">Inadimplente</option>
+                  <option value="terminated">Contrato Encerrado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Observações Internas</label>
+            <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none h-20" placeholder="Observações sobre o cliente..." value={clientForm.observations} onChange={e => setClientForm({ ...clientForm, observations: e.target.value })} />
+          </div>
+          <div className="flex justify-end pt-4 border-t border-slate-100">
+            <button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors">{modalLoading ? <Loader2 className="animate-spin" /> : 'Salvar Alterações'}</button>
+          </div>
         </form>
       </Modal>
 

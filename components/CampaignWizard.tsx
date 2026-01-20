@@ -18,7 +18,7 @@ import {
   Link as LinkIcon,
   ChevronDown
 } from 'lucide-react';
-import { Client, Tag, WhatsAppNumber, MediaType, Lead } from '../types';
+import { Client, Tag, WhatsAppNumber, MediaType, Lead, WebhookConfig } from '../types';
 import { supabase } from '../lib/supabase';
 
 const CampaignWizard: React.FC = () => {
@@ -38,7 +38,10 @@ const CampaignWizard: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [currentTags, setCurrentTags] = useState<Tag[]>([]);
   const [currentNumbers, setCurrentNumbers] = useState<WhatsAppNumber[]>([]);
+  const [clientWebhooks, setClientWebhooks] = useState<WebhookConfig[]>([]);
   const [recipientCount, setRecipientCount] = useState(0);
+
+  const hasOutboundWebhook = clientWebhooks.some(w => w.type === 'outbound' && w.active);
 
   useEffect(() => {
     fetchClients();
@@ -50,6 +53,7 @@ const CampaignWizard: React.FC = () => {
     } else {
       setCurrentTags([]);
       setCurrentNumbers([]);
+      setClientWebhooks([]);
       setRecipientCount(0);
     }
   }, [selectedClientId]);
@@ -106,6 +110,21 @@ const CampaignWizard: React.FC = () => {
           sentToday: n.sent_today
         })));
       }
+
+      // Fetch Webhooks
+      const { data: webhooksData } = await supabase.from('webhook_configs').select('*').eq('client_id', clientId);
+      if (webhooksData) {
+        setClientWebhooks(webhooksData.map((w: any) => ({
+          id: w.id,
+          clientId: w.client_id,
+          name: w.name,
+          url: w.url,
+          type: w.type,
+          method: w.method,
+          active: w.active,
+          headers: w.headers || {}
+        })));
+      }
     } catch (error) {
       console.error('Error fetching details:', error);
     }
@@ -152,26 +171,97 @@ const CampaignWizard: React.FC = () => {
     setIsSending(true);
 
     try {
-      // Record transmission
-      const { error } = await supabase.from('transmissions').insert({
-        client_id: selectedClientId,
-        channel: 'whatsapp',
-        status: 'sending',
-        recipient: 'Batch: ' + recipientCount + ' leads',
-      });
-
-      if (error) throw error;
-
-      // Simulate sending delay
-      setTimeout(() => {
+      // 1. Get the Outbound Webhook
+      const webhook = clientWebhooks.find(w => w.type === 'outbound' && w.active);
+      if (!webhook) {
+        alert('Erro Crítico: Nenhum webhook de disparo (outbound) configurado para este cliente.');
         setIsSending(false);
-        setIsSuccess(true);
-      }, 2000);
+        return;
+      }
+
+      // 2. Create Campaign Record in DB
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('campaigns')
+        .insert({
+          client_id: selectedClientId,
+          name: campaignName,
+          message: message,
+          status: 'sending',
+          metadata: {
+            target_tags: selectedTagIds,
+            number_id: selectedNumberId,
+            media_type: mediaType
+          }
+        })
+        .select()
+        .single();
+
+      if (campaignError) throw campaignError;
+      const campaignId = campaignData.id;
+
+      // 3. Construct Payload
+      const payload = {
+        event: 'campaign.dispatch',
+        timestamp: new Date().toISOString(),
+        client_id: selectedClientId,
+        campaign_id: campaignId,
+        display_name: campaignName,
+        channel: 'whatsapp',
+        sender_number: currentNumbers.find(n => n.id === selectedNumberId)?.phone,
+        message_template: message,
+        media: mediaType !== 'none' ? { type: mediaType, url: mediaUrl || null } : null,
+        audience: {
+          tag_ids: selectedTagIds,
+          total_contacts: recipientCount
+        },
+        metadata: {
+          requested_by: (await supabase.auth.getUser()).data.user?.id
+        }
+      };
+
+      // 4. Fire Webhook
+      try {
+        const response = await fetch(webhook.url, {
+          method: webhook.method || 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(webhook.headers || {})
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Webhook Error: ${response.status} ${response.statusText}`);
+        }
+
+        // 5. Update Campaign Status to 'completed' (or 'queued' depending on logic)
+        await supabase
+          .from('campaigns')
+          .update({ status: 'completed' })
+          .eq('id', campaignId);
+
+        // Optional: Keep creating 'transmissions' record if that's still relevant for legacy or detailed logs,
+        // but the main requirement is the webhook.
+        // We'll skip detailed transmissions rows for now or leave existing logic if needed, 
+        // but user asked for "None campaign can exist without webhook", implying the webhook is the engine.
+
+      } catch (webhookErr) {
+        console.error('Webhook execution failed:', webhookErr);
+        await supabase
+          .from('campaigns')
+          .update({ status: 'failed', metadata: { error: String(webhookErr) } })
+          .eq('id', campaignId);
+
+        throw new Error('Falha ao comunicar com webhook do cliente.');
+      }
+
+      setIsSending(false);
+      setIsSuccess(true);
 
     } catch (error) {
       console.error('Error sending campaign:', error);
       setIsSending(false);
-      alert('Failed to start campaign.');
+      alert(`Falha no disparo: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -271,8 +361,28 @@ const CampaignWizard: React.FC = () => {
               </div>
 
               {selectedClientId && (
-                <div className="pt-4 animate-in fade-in slide-in-from-top-4">
-                  <button onClick={() => setStep(2)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl shadow-slate-200 hover:shadow-slate-300 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2">
+                <div className="pt-4 animate-in fade-in slide-in-from-top-4 space-y-3">
+                  {!hasOutboundWebhook ? (
+                    <div className="p-4 bg-amber-50 text-amber-800 rounded-xl text-sm border border-amber-200 flex items-start space-x-3">
+                      <Zap size={18} className="shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block text-amber-900">Webhook Obrigatório ausente</span>
+                        Este cliente não possui um webhook de disparo (outbound) configurado.
+                        Para segurança e integridade, você deve configurar um endpoint para processar os envios.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold border border-emerald-100 flex items-center space-x-2">
+                      <CheckCircle2 size={14} />
+                      <span>Webhook de disparo conectado e pronto.</span>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setStep(2)}
+                    disabled={!hasOutboundWebhook}
+                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl shadow-slate-200 hover:shadow-slate-300 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+                  >
                     <span>Continuar Configuração</span>
                     <ArrowRight size={18} />
                   </button>

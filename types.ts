@@ -2,9 +2,14 @@
 export interface Client {
   id: string;
   name: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'overdue' | 'terminated';
   createdAt: string;
   email: string;
+  phone?: string;
+  observations?: string;
+  cnpj?: string;
+  corporateName?: string;
+  address?: string;
 }
 
 export type WebhookType = 'inbound' | 'outbound' | 'status';
@@ -15,7 +20,7 @@ export interface WebhookConfig {
   name: string;
   url: string;
   type: WebhookType;
-  method: 'POST';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD';
   active: boolean;
   headers: Record<string, string>;
 }
@@ -97,4 +102,16 @@ export interface GoalsMetric {
   percentage: number;
   remaining: number;
   status: 'pending' | 'on_track' | 'completed' | 'exceeded';
+}
+
+export interface Task {
+  id: string;
+  clientId: string;
+  title: string;
+  description?: string;
+  startDate?: string;
+  dueDate?: string;
+  status: 'pending' | 'completed';
+  checklist: { text: string; completed: boolean }[];
+  createdAt: string;
 }
