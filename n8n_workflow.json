@@ -1,0 +1,262 @@
+{
+    "name": "Disparador WhatsApp - Nexus",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "nexus",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ],
+            "id": "webhook-trigger",
+            "name": "Webhook Nexus"
+        },
+        {
+            "parameters": {
+                "operation": "lookup",
+                "sheetId": {
+                    "__rl": true,
+                    "mode": "id",
+                    "value": "INSIRA_ID_DA_SUA_PLANILHA_AQUI"
+                },
+                "range": "Página1!A:Z",
+                "lookupColumn": "Tags",
+                "lookupValue": "={{ $json.body.audience.tag_names[0] }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [
+                220,
+                0
+            ],
+            "id": "get-contacts",
+            "name": "Buscar Contatos (Google Sheets)"
+        },
+        {
+            "parameters": {
+                "batchSize": 1,
+                "options": {}
+            },
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 2,
+            "position": [
+                440,
+                0
+            ],
+            "id": "loop-contacts",
+            "name": "Loop de Contatos"
+        },
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "phone",
+                            "value": "={{ $json.telefone || $json['Telefone do Cliente'] || $json.Telefone || $json.phone }}"
+                        },
+                        {
+                            "name": "name",
+                            "value": "={{ $json.nome || $json['Nome do Cliente'] || $json.Nome || $json.name }}"
+                        },
+                        {
+                            "name": "media_url",
+                            "value": "={{ $('Webhook Nexus').item.json.body.funnel[0].content }}"
+                        },
+                        {
+                            "name": "message_text",
+                            "value": "={{ $('Webhook Nexus').item.json.body.funnel[1].content.replace('{{nome}}', $json.Nome).replace('{{empresa}}', $json.Empresa) }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 2,
+            "position": [
+                660,
+                0
+            ],
+            "id": "prepare-data",
+            "name": "Preparar Dados"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{ $('Webhook Nexus').item.json.body.funnel[0].type }}",
+                            "operation": "notEqual",
+                            "value2": "text"
+                        }
+                    ]
+                }
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                880,
+                0
+            ],
+            "id": "has-media",
+            "name": "Tem Mídia?"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://seu-evolution-api.com/message/sendMedia/INSTANCE_NAME",
+                "headers": {
+                    "apikey": "4d2f6412-8ce9-43df-a8aa-fc00646d36f4"
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({\n  \"number\": String($json.phone),\n  \"mediaMessage\": {\n    \"mediatype\": \"image\",\n    \"mimetype\": \"image/jpeg\",\n    \"caption\": \"\",\n    \"media\": $json.media_url\n  }\n}) }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1100,
+                -100
+            ],
+            "id": "send-media",
+            "name": "Enviar Mídia (Evolution)"
+        },
+        {
+            "parameters": {
+                "amount": 5,
+                "unit": "seconds"
+            },
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1,
+            "position": [
+                1320,
+                -100
+            ],
+            "id": "wait-5s",
+            "name": "Esperar 5s"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://seu-evolution-api.com/message/sendText/INSTANCE_NAME",
+                "headers": {
+                    "apikey": "4d2f6412-8ce9-43df-a8aa-fc00646d36f4"
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "={{ $json.phone }}"
+                        },
+                        {
+                            "name": "text",
+                            "value": "={{ $json.message_text }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1540,
+                0
+            ],
+            "id": "send-text",
+            "name": "Enviar Texto (Evolution)"
+        }
+    ],
+    "connections": {
+        "Webhook Nexus": {
+            "main": [
+                [
+                    {
+                        "node": "Buscar Contatos (Google Sheets)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Buscar Contatos (Google Sheets)": {
+            "main": [
+                [
+                    {
+                        "node": "Loop de Contatos",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop de Contatos": {
+            "main": [
+                [
+                    {
+                        "node": "Preparar Dados",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Preparar Dados": {
+            "main": [
+                [
+                    {
+                        "node": "Tem Mídia?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Tem Mídia?": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Mídia (Evolution)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Enviar Texto (Evolution)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enviar Mídia (Evolution)": {
+            "main": [
+                [
+                    {
+                        "node": "Esperar 5s",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Esperar 5s": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Texto (Evolution)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

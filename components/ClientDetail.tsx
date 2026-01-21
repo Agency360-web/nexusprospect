@@ -199,7 +199,8 @@ const ClientDetail: React.FC = () => {
             name: lead.name,
             phone: lead.phone,
             company: lead.customFields?.['empresa'] || '',
-            tags: tagsStr
+            tags: tagsStr,
+            Status: 'Aguardando'
           };
         })
       };

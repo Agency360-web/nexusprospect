@@ -243,7 +243,28 @@ const CampaignWizard: React.FC = () => {
         }
       }
 
-      // 3. Construct Payload
+      // 3. Construct Funnel Payload
+      const funnel = [];
+      let position = 1;
+
+      // 3.1 Media First (Priority)
+      if (mediaType !== 'none' && finalMediaUrl) {
+        funnel.push({
+          type: mediaType,
+          content: finalMediaUrl,
+          position: position++
+        });
+      }
+
+      // 3.2 Text Second
+      if (message) {
+        funnel.push({
+          type: 'text',
+          content: message,
+          position: position++
+        });
+      }
+
       const payload = {
         event: 'campaign.dispatch',
         timestamp: new Date().toISOString(),
@@ -252,8 +273,10 @@ const CampaignWizard: React.FC = () => {
         display_name: campaignName,
         channel: 'whatsapp',
         sender_number: currentNumbers.find(n => n.id === selectedNumberId)?.phone,
-        message_template: message,
-        media: mediaType !== 'none' ? { type: mediaType, url: finalMediaUrl || null } : null,
+
+        // Funnel Structure
+        funnel: funnel,
+
         audience: {
           tag_ids: selectedTagIds,
           // CRITICAL for N8N: Send names so it can filter the Google Sheet
@@ -304,10 +327,22 @@ const CampaignWizard: React.FC = () => {
       setIsSending(false);
       setIsSuccess(true);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending campaign:', error);
       setIsSending(false);
-      alert(`Falha no disparo: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      
+      let errorMessage = 'Erro desconhecido';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        // Handle Supabase error object
+        errorMessage = error.message || error.error_description || JSON.stringify(error);
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
+      alert(`Falha no disparo: ${errorMessage}`);
     }
   };
 
