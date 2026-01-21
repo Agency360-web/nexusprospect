@@ -26,6 +26,13 @@ export interface Client {
   defaultValue?: string;
   defaultPaymentMethod?: string;
   defaultPaymentConditions?: string;
+
+  // Integrations
+  google_sheets_config?: {
+    url?: string;
+    auto_sync?: boolean;
+    last_sync?: string;
+  };
 }
 
 export type WebhookType = 'inbound' | 'outbound' | 'status';
@@ -46,7 +53,7 @@ export interface WhatsAppNumber {
   clientId: string;
   nickname: string;
   phone: string;
-  status: 'active' | 'inactive' | 'blocked';
+  status: 'active' | 'inactive' | 'blocked' | 'connected';
   dailyLimit: number;
   sentToday: number;
 }
@@ -78,6 +85,7 @@ export interface Lead {
   tags: string[];
   customFields: Record<string, string>;
   status: 'valid' | 'invalid' | 'pending';
+  createdAt?: string;
 }
 
 export type MediaType = 'none' | 'image' | 'video' | 'audio' | 'pdf';

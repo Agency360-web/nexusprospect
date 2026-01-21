@@ -16,8 +16,16 @@ import {
   Smartphone,
   Type as TypeIcon,
   Link as LinkIcon,
-  ChevronDown
+  ChevronDown,
+  UploadCloud,
+  X,
+  Loader2,
+  Bold,
+  Italic,
+  Strikethrough,
+  Smile
 } from 'lucide-react';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Client, Tag, WhatsAppNumber, MediaType, Lead, WebhookConfig } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -30,6 +38,12 @@ const CampaignWizard: React.FC = () => {
   const [selectedNumberId, setSelectedNumberId] = useState<string>('');
   const [mediaType, setMediaType] = useState<MediaType>('none');
   const [mediaUrl, setMediaUrl] = useState<string>('');
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const [isSending, setIsSending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -147,6 +161,12 @@ const CampaignWizard: React.FC = () => {
     // Constructing query for array overlap is tricky in simple JS client sometimes.
     // text[] && text[] (overlap).
 
+    // Assume tag_ids are UUIDs now (fixed in previous step).
+
+    // Actually, let's fetch leads for client and filter in memory if list is small, 
+    // or use contains if selecting one tag. If multiple, it's harder.
+    // Let's rely on overlap filter.
+
     // Actually, let's fetch leads for client and filter in memory if list is small, 
     // or use contains if selecting one tag. If multiple, it's harder.
     // Let's rely on overlap filter.
@@ -199,6 +219,30 @@ const CampaignWizard: React.FC = () => {
       if (campaignError) throw campaignError;
       const campaignId = campaignData.id;
 
+      // 2.5 Upload Media if exists
+      let finalMediaUrl = mediaUrl;
+      if (mediaFile) {
+        try {
+          const fileExt = mediaFile.name.split('.').pop();
+          const fileName = `${selectedClientId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('campaign-media')
+            .upload(fileName, mediaFile);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('campaign-media')
+            .getPublicUrl(fileName);
+
+          finalMediaUrl = publicUrl;
+        } catch (uploadErr) {
+          console.error('Upload failed:', uploadErr);
+          throw new Error('Falha ao fazer upload da mídia. Verifique se o arquivo é válido.');
+        }
+      }
+
       // 3. Construct Payload
       const payload = {
         event: 'campaign.dispatch',
@@ -209,9 +253,11 @@ const CampaignWizard: React.FC = () => {
         channel: 'whatsapp',
         sender_number: currentNumbers.find(n => n.id === selectedNumberId)?.phone,
         message_template: message,
-        media: mediaType !== 'none' ? { type: mediaType, url: mediaUrl || null } : null,
+        media: mediaType !== 'none' ? { type: mediaType, url: finalMediaUrl || null } : null,
         audience: {
           tag_ids: selectedTagIds,
+          // CRITICAL for N8N: Send names so it can filter the Google Sheet
+          tag_names: selectedTagIds.map(id => currentTags.find(t => t.id === id)?.name || id),
           total_contacts: recipientCount
         },
         metadata: {
@@ -270,7 +316,61 @@ const CampaignWizard: React.FC = () => {
   };
 
   const insertVariable = (variable: string) => {
-    setMessage(prev => prev + ` {{${variable}}}`);
+    insertAtCursor(` {{${variable}}} `);
+  };
+
+  const insertAtCursor = (textToInsert: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setMessage(prev => prev + textToInsert);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = message;
+
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+
+    const newText = `${before}${textToInsert}${after}`;
+    setMessage(newText);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
+    }, 0);
+  };
+
+  const insertFormat = (symbol: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = message;
+
+    const before = text.substring(0, start);
+    const selected = text.substring(start, end);
+    const after = text.substring(end);
+
+    const newText = `${before}${symbol}${selected}${symbol}${after}`;
+    setMessage(newText);
+
+    setTimeout(() => {
+      textarea.focus();
+      // If text was selected, keep selection inside symbols. If not, place cursor inside.
+      if (selected) {
+        textarea.setSelectionRange(start + symbol.length, end + symbol.length);
+      } else {
+        textarea.setSelectionRange(start + symbol.length, start + symbol.length);
+      }
+    }, 0);
+  };
+
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    insertAtCursor(emojiData.emoji);
+    setShowEmojiPicker(false);
   };
 
   const previewMessage = message
@@ -289,7 +389,7 @@ const CampaignWizard: React.FC = () => {
         <button
           key={item.id}
           type="button"
-          onClick={() => setMediaType(item.id as MediaType)}
+          onClick={() => { setMediaType(item.id as MediaType); if (item.id === 'none') clearMedia(); }}
           className={`flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all ${mediaType === item.id
             ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
             : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'
@@ -301,6 +401,24 @@ const CampaignWizard: React.FC = () => {
       ))}
     </div>
   );
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setMediaFile(file);
+
+      // Create local preview URL
+      const objectUrl = URL.createObjectURL(file);
+      setMediaUrl(objectUrl);
+    }
+  };
+
+  const clearMedia = () => {
+    setMediaFile(null);
+    setMediaUrl('');
+    setMediaType('none');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   if (isSuccess) {
     return (
@@ -449,9 +567,31 @@ const CampaignWizard: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2">Conteúdo da Mensagem</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Conteúdo da Mensagem</label>
+
+                    {/* Toolbar */}
+                    <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg">
+                      <button onClick={() => insertFormat('*')} className="p-1.5 hover:bg-white rounded-md text-slate-600 transition-colors" title="Negrito"><Bold size={14} /></button>
+                      <button onClick={() => insertFormat('_')} className="p-1.5 hover:bg-white rounded-md text-slate-600 transition-colors" title="Itálico"><Italic size={14} /></button>
+                      <button onClick={() => insertFormat('~')} className="p-1.5 hover:bg-white rounded-md text-slate-600 transition-colors" title="Tachado"><Strikethrough size={14} /></button>
+                      <div className="w-[1px] h-4 bg-slate-300 mx-1"></div>
+                      <div className="relative">
+                        <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-1.5 hover:bg-white rounded-md text-slate-600 transition-colors" title="Emoji"><Smile size={14} /></button>
+                        {showEmojiPicker && (
+                          <div className="absolute right-0 top-8 z-50 shadow-2xl rounded-2xl">
+                            <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)}></div>
+                            <div className="relative z-50">
+                              <EmojiPicker onEmojiClick={handleEmojiClick} width={300} height={400} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-2 focus-within:ring-2 focus-within:ring-slate-900/10 focus-within:border-slate-900 transition-all">
                     <textarea
+                      ref={textareaRef}
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       rows={4}
@@ -469,8 +609,60 @@ const CampaignWizard: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2">Anexo de Mídia</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Anexo de Mídia</label>
+                    {mediaType !== 'none' && (
+                      <button onClick={clearMedia} className="text-[10px] text-red-500 font-bold hover:underline bg-red-50 px-2 py-0.5 rounded">Remover Mídia</button>
+                    )}
+                  </div>
                   <MediaSelector />
+
+                  {/* File Upload Area */}
+                  {mediaType !== 'none' && (
+                    <div className="mt-3 animate-in fade-in slide-in-from-top-2">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept={
+                          mediaType === 'image' ? 'image/*' :
+                            mediaType === 'video' ? 'video/*' :
+                              mediaType === 'audio' ? 'audio/*' :
+                                mediaType === 'pdf' ? '.pdf' : '*/*'
+                        }
+                        onChange={handleFileSelect}
+                      />
+
+                      {!mediaFile ? (
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-all group"
+                        >
+                          <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-slate-200 transition-colors">
+                            <UploadCloud size={20} />
+                          </div>
+                          <span className="text-xs font-bold">Clique para selecionar {mediaType === 'pdf' ? 'o arquivo PDF' : `o ${mediaType}`}</span>
+                        </button>
+                      ) : (
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                          <div className="flex items-center space-x-3 overflow-hidden">
+                            <div className="w-10 h-10 bg-slate-200 rounded-lg flex-shrink-0 flex items-center justify-center text-slate-500">
+                              {mediaType === 'image' ? (
+                                <img src={mediaUrl} alt="Preview" className="w-full h-full object-cover rounded-lg" />
+                              ) : (
+                                <FileText size={20} />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-700 truncate">{mediaFile.name}</p>
+                              <p className="text-[10px] text-slate-400">{(mediaFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                          </div>
+                          <button onClick={() => fileInputRef.current?.click()} className="text-xs font-bold text-blue-600 hover:underline px-2">Trocar</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-4">
@@ -524,14 +716,33 @@ const CampaignWizard: React.FC = () => {
               <div className="flex justify-end">
                 <div className="bg-[#dcf8c6] p-3 rounded-lg rounded-tr-none shadow-sm max-w-[85%] relative group">
                   {mediaType !== 'none' && (
-                    <div className="mb-2 bg-slate-200 h-32 rounded-lg flex items-center justify-center text-slate-400">
-                      {mediaType === 'image' && <ImageIcon size={24} />}
-                      {mediaType === 'video' && <Play size={24} />}
-                      {mediaType === 'audio' && <Volume2 size={24} />}
-                      {mediaType === 'pdf' && <FileText size={24} />}
+                    <div className="mb-2 bg-slate-200 h-32 rounded-lg flex items-center justify-center text-slate-400 overflow-hidden">
+                      {mediaType === 'image' && mediaUrl ? (
+                        <img src={mediaUrl} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          {mediaType === 'image' && <ImageIcon size={24} />}
+                          {mediaType === 'video' && <Play size={24} />}
+                          {mediaType === 'audio' && <Volume2 size={24} />}
+                          {mediaType === 'pdf' && <FileText size={24} />}
+                        </>
+                      )}
                     </div>
                   )}
-                  <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">{previewMessage}</p>
+                  <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
+                    {previewMessage.split(/(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~)/g).map((part, index) => {
+                      if (part.startsWith('*') && part.endsWith('*')) {
+                        return <strong key={index}>{part.slice(1, -1)}</strong>;
+                      }
+                      if (part.startsWith('_') && part.endsWith('_')) {
+                        return <em key={index}>{part.slice(1, -1)}</em>;
+                      }
+                      if (part.startsWith('~') && part.endsWith('~')) {
+                        return <s key={index}>{part.slice(1, -1)}</s>;
+                      }
+                      return part;
+                    })}
+                  </p>
                   <div className="flex items-center justify-end space-x-1 mt-1">
                     <span className="text-[9px] text-slate-500">10:42</span>
                     <CheckCircle2 size={10} className="text-blue-500" />

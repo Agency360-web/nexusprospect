@@ -37,7 +37,9 @@ import {
   AtSign,
 
   ListTodo,
-  X
+  X,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client, EmailSender, Task } from '../types';
 import ClientGoals from './ClientGoals';
@@ -61,7 +63,7 @@ const ClientDetail: React.FC = () => {
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
 
   // Modal State
-  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'webhook' | 'number' | 'email' | 'success' | 'client-config' | 'task-create' | 'task-detail'>('none');
+  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'webhook' | 'number' | 'email' | 'success' | 'client-config' | 'task-create' | 'task-detail' | 'backup'>('none');
   const [modalLoading, setModalLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -97,6 +99,161 @@ const ClientDetail: React.FC = () => {
   const [editingNumber, setEditingNumber] = useState<WhatsAppNumber | null>(null);
   const [numberMode, setNumberMode] = useState<'create' | 'edit'>('create');
 
+  // Backup / Sync State
+  const [backupConfig, setBackupConfig] = useState({ url: '', auto_sync: false });
+
+  const handleDownloadCSV = () => {
+    if (leads.length === 0) return;
+
+    // CSV Headers
+    const headers = ['ID', 'Nome', 'Telefone', 'Email', 'Empresa', 'Status', 'Tags', 'Data Criação'];
+
+    // CSV Rows
+    const rows = leads.map(lead => [
+      lead.id,
+      lead.name,
+      lead.phone,
+      lead.email || '',
+      lead.customFields?.empresa || '',
+      lead.status,
+      (lead.tags || []).map(t => {
+        const tag = tags.find(tag => tag.id === t);
+        return tag ? tag.name : t;
+      }).join('; '),
+      new Date(lead.createdAt || new Date().toISOString()).toLocaleDateString('pt-BR')
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `leads_${client?.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSaveBackupConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalLoading(true);
+    try {
+      if (!clientId) return;
+
+      const newConfig = {
+        url: backupConfig.url,
+        auto_sync: backupConfig.auto_sync,
+        last_sync: client?.google_sheets_config?.last_sync || null
+      };
+
+      const { error } = await supabase
+        .from('clients')
+        .update({ google_sheets_config: newConfig })
+        .eq('id', clientId);
+
+      if (error) throw error;
+
+      // Update local state
+      if (client) {
+        setClient({ ...client, google_sheets_config: newConfig });
+      }
+
+      setSuccessMessage('Configuração salva com sucesso!');
+      setActiveModal('success');
+      setTimeout(() => setActiveModal('none'), 2000);
+    } catch (error) {
+      console.error('Error saving config:', error);
+      alert('Erro ao salvar configuração.');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleSyncToSheets = async (leadsToSync?: Lead[]) => {
+    if (!client?.google_sheets_config?.url) {
+      // If called automatically, maybe don't alert? But better safe to have config checked before calling.
+      if (!leadsToSync) alert('Configure a URL do Webhook primeiro.');
+      return;
+    }
+
+    setModalLoading(true);
+    try {
+      // 1. Prepare data
+      const targetLeads = leadsToSync || leads;
+      const payload = {
+        client_id: client.id,
+        client_name: client.name,
+        // Send simplified leads structure matching the columns requested: 
+        // 1. Name, 2. Phone, 3. Company, 4. Tags
+        leads: targetLeads.map(lead => {
+          const tagsStr = (lead.tags || []).map(t => {
+            const tag = tags.find(tag => tag.id === t);
+            return tag ? tag.name : t;
+          }).join(', ');
+
+          return {
+            name: lead.name,
+            phone: lead.phone,
+            company: lead.customFields?.['empresa'] || '',
+            tags: tagsStr
+          };
+        })
+      };
+
+      // 2. Send to Webhook (Google Sheets)
+      // Using no-cors mode since Google Scripts often have CORS issues, 
+      // but ideally we want to know if it succeeded. 
+      // Note: extensive data might fail with GET, POST is better.
+      // fetch with no-cors implies we can't read response.
+      await fetch(client.google_sheets_config.url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // 3. Update last_sync in DB
+      const newConfig = {
+        ...client.google_sheets_config,
+        last_sync: new Date().toISOString()
+      };
+
+      await supabase
+        .from('clients')
+        .update({ google_sheets_config: newConfig })
+        .eq('id', clientId);
+
+      if (client) {
+        setClient({ ...client, google_sheets_config: newConfig });
+      }
+
+      setSuccessMessage('Sincronização enviada com sucesso!');
+      setActiveModal('success');
+      setTimeout(() => setActiveModal('none'), 2000);
+
+    } catch (error) {
+      console.error('Sync error:', error);
+      if (!leadsToSync) alert('Erro ao sincronizar. Verifique o console.');
+    } finally {
+      if (!leadsToSync) setModalLoading(false); // Don't block UI if auto-sync
+    }
+  };
+
+  useEffect(() => {
+    if (activeModal === 'backup' && client?.google_sheets_config) {
+      setBackupConfig({
+        url: client.google_sheets_config.url || '',
+        auto_sync: client.google_sheets_config.auto_sync || false
+      });
+    }
+  }, [activeModal, client]);
+
 
   // Bulk Actions State
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -117,16 +274,64 @@ const ClientDetail: React.FC = () => {
     bounces: 0
   });
 
+  // Helper to ensure tags exist in the DB and return their IDs
+  const ensureTagsExist = async (tagNames: string[]): Promise<string[]> => {
+    if (!tagNames || tagNames.length === 0) return [];
+    if (!clientId) return [];
+
+    const uniqueNames = [...new Set(tagNames.map(t => t.trim()).filter(t => t))];
+    if (uniqueNames.length === 0) return [];
+
+    // 1. Find existing tags
+    const { data: existingTags } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('client_id', clientId)
+      .in('name', uniqueNames);
+
+    const existingNames = existingTags?.map(t => t.name) || [];
+    const missingNames = uniqueNames.filter(name => !existingNames.includes(name));
+
+    const finalTagIds: string[] = existingTags?.map(t => t.id) || [];
+
+    // 2. Create missing tags
+    if (missingNames.length > 0) {
+      const newTagsPayload = missingNames.map(name => ({
+        client_id: clientId,
+        name: name,
+        color: `bg-${['red', 'blue', 'green', 'yellow', 'purple', 'pink', 'indigo'][Math.floor(Math.random() * 7)]}-100 text-slate-700` // Random color
+      }));
+
+      const { data: createdTags, error } = await supabase
+        .from('tags')
+        .insert(newTagsPayload)
+        .select('id');
+
+      if (!error && createdTags) {
+        createdTags.forEach(t => finalTagIds.push(t.id));
+      } else {
+        console.error('Error creating tags:', error);
+      }
+    }
+
+    return finalTagIds;
+  };
+
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientId) return;
     setModalLoading(true);
+    setModalLoading(true);
     try {
+      // Process tags first
+      const rawTags = newLead.tags ? newLead.tags.split(',').map(t => t.trim()).filter(t => t) : [];
+      const tagIds = await ensureTagsExist(rawTags);
+
       const payload: any = {
         client_id: clientId,
         name: newLead.name,
         status: 'valid',
-        tags: newLead.tags ? newLead.tags.split(',').map(t => t.trim()).filter(t => t) : [],
+        tags: tagIds, // Save UUIDs
         custom_fields: { empresa: newLead.company }
       };
 
@@ -134,15 +339,22 @@ const ClientDetail: React.FC = () => {
         payload.phone = newLead.phone;
       } else {
         payload.email = newLead.email;
-        // Ensure we explicitly send phone as null if it's an email lead, 
-        // though Supabase might handle it.
         payload.phone = null;
       }
 
-      const { error } = await supabase.from('leads').insert(payload);
+      const { data: insertedLead, error } = await supabase.from('leads').insert(payload).select().single();
+
       if (error) throw error;
       setActiveModal('none');
       setNewLead({ name: '', phone: '', email: '', company: '', tags: '' });
+
+      // Auto Sync Check
+      if (client?.google_sheets_config?.auto_sync && client.google_sheets_config.url && insertedLead) {
+        // We do this in background
+        const updatedLeads = [...leads, insertedLead as Lead];
+        handleSyncToSheets(updatedLeads);
+      }
+
       fetchData();
     } catch (err) { console.error(err); alert('Erro ao criar lead'); }
     finally { setModalLoading(false); }
@@ -171,6 +383,21 @@ const ClientDetail: React.FC = () => {
           return;
         }
 
+        // Pre-process all unique tags from the file
+        const allTags = new Set<string>();
+        rows.slice(1).forEach(row => {
+          const cols = row.split(';').length > 1 ? row.split(';') : row.split(',');
+          const tagsRaw = tagsIdx !== -1 ? cols[tagsIdx]?.trim() : '';
+          if (tagsRaw) {
+            tagsRaw.split('|').forEach(t => allTags.add(t.trim()));
+          }
+        });
+
+        // Ensure all tags exist in bulk
+        await ensureTagsExist(Array.from(allTags));
+        // Re-fetch tags to get latest IDs map (or we could return map from ensureTagsExist, but fetching is safer for sync)
+        const { data: latestTags } = await supabase.from('tags').select('id, name').eq('client_id', clientId);
+
         const leadsToInsert = rows.slice(1).map(row => {
           const cols = row.split(';').length > 1 ? row.split(';') : row.split(',');
           const name = cols[nameIdx]?.trim();
@@ -179,17 +406,17 @@ const ClientDetail: React.FC = () => {
 
           if (!name || !contact) return null;
 
-          // Parse tags if needed, assuming comma separated inside the column? 
-          // For now, let's simple string split
-          const tagsList = tagsRaw ? tagsRaw.split('|').map(t => t.trim()) : [];
+          const rowTags = tagsRaw ? tagsRaw.split('|').map(t => t.trim()).filter(t => t) : [];
+          const rowTagIds = rowTags.map(tagName => {
+            const found = latestTags?.find(lt => lt.name === tagName);
+            return found ? found.id : null;
+          }).filter(id => id !== null);
 
           return {
             client_id: clientId,
             name,
             [isEmail ? 'email' : 'phone']: contact,
-            tags: tagsList, // We need to handle tag ID creation or text tags. 
-            // The DB expects tags text[], but frontend logic often uses IDs. 
-            // The user prompt implies text labels. I will save text for now.
+            tags: rowTagIds,
             status: 'valid'
           };
         }).filter(l => l !== null);
@@ -218,7 +445,12 @@ const ClientDetail: React.FC = () => {
     setWebhookMode(mode);
     if (mode === 'edit' && webhook) {
       setEditingWebhook(webhook);
-      setNewWebhook({ name: webhook.name, url: webhook.url, type: webhook.type, method: webhook.method || 'POST' });
+      setNewWebhook({
+        name: webhook.name,
+        url: webhook.url,
+        type: webhook.type as any,
+        method: (webhook.method || 'POST') as any // Cast to avoid literal type mismatch
+      });
     } else {
       setEditingWebhook(null);
       setNewWebhook({ name: '', url: '', type: 'outbound', method: 'POST' });
@@ -1103,6 +1335,13 @@ const ClientDetail: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <button
+                  onClick={() => setActiveModal('backup')}
+                  className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  <FileSpreadsheet size={16} className="text-emerald-600" />
+                  <span>Backup / Dados</span>
+                </button>
+                <button
                   onClick={() => setActiveModal('lead-type-selection' as any)}
                   className="flex items-center space-x-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-md shadow-slate-900/10"
                 >
@@ -1565,9 +1804,91 @@ const ClientDetail: React.FC = () => {
               <button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">
                 {modalLoading ? <Loader2 className="animate-spin" /> : 'Salvar Alterações'}
               </button>
+
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* Backup Modal */}
+      <Modal isOpen={activeModal === 'backup'} onClose={() => setActiveModal('none')} title="Backup e Sincronização">
+        <div className="space-y-6">
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <h4 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
+              <Download size={16} />
+              Exportação Manual
+            </h4>
+            <p className="text-xs text-slate-500 mb-4">Baixe todos os leads cadastrados neste cliente em formato CSV.</p>
+            <button
+              onClick={handleDownloadCSV}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg text-sm font-bold hover:bg-slate-100 transition-colors"
+            >
+              <Download size={16} />
+              <span>Baixar CSV</span>
+            </button>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-slate-200"></div>
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-2 text-xs text-slate-400 font-bold uppercase">Integração Google Sheets</span>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveBackupConfig} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">URL do Webhook (Google Apps Script)</label>
+              <input
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-mono"
+                placeholder="https://script.google.com/macros/s/..."
+                value={backupConfig.url}
+                onChange={e => setBackupConfig({ ...backupConfig, url: e.target.value })}
+              />
+              <p className="text-[10px] text-slate-400 mt-1 ml-1">Crie um script no Google Sheets para receber requisições POST com os dados.</p>
+            </div>
+
+            <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <input
+                type="checkbox"
+                id="auto_sync"
+                checked={backupConfig.auto_sync}
+                onChange={e => setBackupConfig({ ...backupConfig, auto_sync: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+              />
+              <label htmlFor="auto_sync" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+                Sincronizar automaticamente novos leads
+              </label>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <div className="text-xs text-slate-400">
+                {client?.google_sheets_config?.last_sync && (
+                  <span>Última sinc: {new Date(client.google_sheets_config.last_sync).toLocaleString('pt-BR')}</span>
+                )}
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => handleSyncToSheets()}
+                  disabled={modalLoading || !backupConfig.url}
+                  className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl font-bold hover:bg-emerald-100 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw size={14} className={modalLoading ? "animate-spin" : ""} />
+                  <span>Sincronizar Agora</span>
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalLoading}
+                  className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50"
+                >
+                  {modalLoading ? <Loader2 className="animate-spin" size={18} /> : 'Salvar Config'}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </Modal>
 
       <Modal isOpen={activeModal === 'success'} onClose={() => setActiveModal('none')} title="">
