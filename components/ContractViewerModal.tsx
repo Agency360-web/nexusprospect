@@ -62,7 +62,7 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                     <style>
                         body {
                             font-family: 'Courier New', Courier, monospace;
-                            padding: 20mm; /* Use mm for print consistency */
+                            padding: 20mm;
                             max-width: 100%;
                             margin: 0;
                             line-height: 1.6;
@@ -71,6 +71,11 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                         .prose {
                             width: 100%;
                         }
+                        img {
+                            max-width: 100%;
+                            height: auto;
+                            display: block;
+                        }
                         @media print {
                             @page { 
                                 margin: 0; 
@@ -78,25 +83,41 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                             }
                             body { 
                                 -webkit-print-color-adjust: exact;
+                                print-color-adjust: exact;
                                 margin: 0;
                                 padding: 20mm;
+                            }
+                            img {
+                                -webkit-print-color-adjust: exact;
+                                print-color-adjust: exact;
                             }
                         }
                     </style>
                 </head>
                 <body>
                     ${content}
+                    <script>
+                        // Wait for all images to load before printing
+                        Promise.all(Array.from(document.images).map(img => {
+                            if (img.complete) return Promise.resolve();
+                            return new Promise(resolve => {
+                                img.onload = resolve;
+                                img.onerror = resolve; // Continue even if error
+                            });
+                        })).then(() => {
+                            // Small buffer time
+                            setTimeout(() => {
+                                window.print();
+                                window.close();
+                            }, 500);
+                        });
+                    </script>
                 </body>
             </html>
         `);
 
         printWindow.document.close();
         printWindow.focus();
-        // Small delay to ensure content is loaded
-        setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-        }, 500);
     };
 
     return (

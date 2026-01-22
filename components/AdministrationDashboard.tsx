@@ -22,7 +22,10 @@ import {
     Scale,
     Building2,
     Plus,
-    ChevronDown
+    ChevronDown,
+    Trash2,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import ContractManager from './ContractManager';
@@ -37,6 +40,8 @@ interface FinancialKPIs {
     active_subscribers: number;
     churn_rate: number;
     churn_growth_percent: number;
+    expenses?: number;
+    balance?: number;
 }
 
 interface Transaction {
@@ -50,7 +55,7 @@ interface Transaction {
     payment_method?: string;
 }
 
-type DateRange = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'all';
+type DateRange = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'all' | 'custom';
 
 const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void }> = ({ transaction, onUpdate }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -113,13 +118,236 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
                                 <span>Receber (PIX)</span>
                             </button>
                         </>
+
                     )}
+
+                    <button
+                        onClick={async () => {
+                            if (confirm('Tem certeza que deseja excluir esta transação?')) {
+                                setLoading(true);
+                                try {
+                                    const { error } = await supabase.from('financial_transactions').delete().eq('id', transaction.id);
+                                    if (error) throw error;
+                                    onUpdate();
+                                } catch (e: any) {
+                                    alert('Erro ao excluir: ' + e.message);
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+                    >
+                        <Trash2 size={14} />
+                        <span>Excluir</span>
+                    </button>
 
                     <button className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
                         Ver Detalhes
                     </button>
                 </div>
-            )}
+            )
+            }
+        </div >
+    );
+};
+
+interface TransactionModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+    user_id: string;
+}
+
+const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, onSuccess, user_id }) => {
+    const [type, setType] = useState<'income' | 'expense'>('income');
+    const [description, setDescription] = useState('');
+    const [amount, setAmount] = useState('');
+    const [clientName, setClientName] = useState('');
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [status, setStatus] = useState<'pago' | 'pendente'>('pago');
+    const [loading, setLoading] = useState(false);
+
+    // Recurrence State
+    const [isRecurring, setIsRecurring] = useState(false);
+    const [recurrenceCount, setRecurrenceCount] = useState(1); // 1 = 1 month (just the transaction itself actually, but let's say repetitions)
+    // Actually user said "repeats for X months". 
+    // If I check "Recurrence", I expect at least 2? Or just "Repeat X times"?
+    // "2 mil por mes durante 3 meses" -> 3 transactions.
+
+    if (!isOpen) return null;
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            const numericAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
+            if (isNaN(numericAmount)) throw new Error("Valor inválido");
+
+            const finalAmount = type === 'expense' ? -Math.abs(numericAmount) : Math.abs(numericAmount);
+
+            const transactionsToInsert = [];
+            const baseDate = new Date(date);
+
+            const count = isRecurring ? Math.max(1, recurrenceCount) : 1;
+
+            for (let i = 0; i < count; i++) {
+                const currentDate = new Date(baseDate);
+                currentDate.setMonth(baseDate.getMonth() + i);
+
+                transactionsToInsert.push({
+                    user_id,
+                    description: isRecurring ? `${description} (${i + 1}/${count})` : description,
+                    amount: finalAmount,
+                    transaction_date: currentDate.toISOString(),
+                    status,
+                    client_name: clientName || (type === 'expense' ? 'Despesa Operacional' : 'Cliente Avulso'),
+                    manual_override: true
+                });
+            }
+
+            const { error } = await supabase.from('financial_transactions').insert(transactionsToInsert);
+
+            if (error) throw error;
+            onSuccess();
+            onClose();
+        } catch (error: any) {
+            alert('Erro ao salvar: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 m-4 animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-900">Nova Transação</h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+                        <Plus className="rotate-45" size={24} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            type="button"
+                            onClick={() => setType('income')}
+                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${type === 'income' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Receita (Ganho)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setType('expense')}
+                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${type === 'expense' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Despesa (Custo)
+                        </button>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Descrição</label>
+                        <input
+                            required
+                            type="text"
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-500 transition-colors"
+                            placeholder="Ex: Consultoria, Servidor, Aluguel"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Valor</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">R$</span>
+                            <input
+                                required
+                                type="number"
+                                step="0.01"
+                                value={amount}
+                                onChange={e => setAmount(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-500 transition-colors font-mono"
+                                placeholder="0,00"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Data</label>
+                            <input
+                                required
+                                type="date"
+                                value={date}
+                                onChange={e => setDate(e.target.value)}
+                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-500 transition-colors"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Status</label>
+                            <select
+                                value={status}
+                                onChange={e => setStatus(e.target.value as any)}
+                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-500 transition-colors appearance-none"
+                            >
+                                <option value="pago">Pago / Recebido</option>
+                                <option value="pendente">Pendente</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Recurrence Options */}
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-2 mb-2">
+                            <input
+                                type="checkbox"
+                                id="recurrence"
+                                checked={isRecurring}
+                                onChange={e => setIsRecurring(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                            />
+                            <label htmlFor="recurrence" className="text-sm font-medium text-slate-700">Repetir parcelas?</label>
+                        </div>
+
+                        {isRecurring && (
+                            <div className="animate-in slide-in-from-top-1 duration-200">
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Número de Meses</label>
+                                <input
+                                    type="number"
+                                    min="2"
+                                    max="120"
+                                    value={recurrenceCount}
+                                    onChange={e => setRecurrenceCount(parseInt(e.target.value))}
+                                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-slate-500 transition-colors"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-1">Ex: 12 para 1 ano. Será gerado um lançamento por mês.</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Cliente / Fornecedor (Opcional)</label>
+                        <input
+                            type="text"
+                            value={clientName}
+                            onChange={e => setClientName(e.target.value)}
+                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-500 transition-colors"
+                            placeholder="Nome do cliente ou fornecedor"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className={`w-full py-3 rounded-xl font-bold text-white shadow-lg shadow-indigo-100 transition-all active:scale-95 ${loading ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}
+                    >
+                        {loading ? 'Salvando...' : 'Salvar Transação'}
+                    </button>
+                </form>
+            </div>
         </div>
     );
 };
@@ -127,14 +355,74 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'finance' | 'contracts'>('finance');
+    const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
 
     // Data State
     const [storedKpis, setStoredKpis] = useState<FinancialKPIs | null>(null);
     const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
     const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    // Bulk Selection State
+    const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
+
+    const toggleSelectAll = () => {
+        if (selectedTransactions.size === paginatedTransactions.length && paginatedTransactions.length > 0) {
+            setSelectedTransactions(new Set());
+        } else {
+            const newSet = new Set(selectedTransactions);
+            paginatedTransactions.forEach(t => newSet.add(t.id));
+            setSelectedTransactions(newSet);
+        }
+    };
+
+    const toggleSelectTransaction = (id: string) => {
+        const newSet = new Set(selectedTransactions);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        setSelectedTransactions(newSet);
+    };
+
+    const handleBulkDelete = async () => {
+        if (!selectedTransactions.size) return;
+        if (!confirm(`Tem certeza que deseja excluir ${selectedTransactions.size} transações?`)) return;
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('financial_transactions')
+                .delete()
+                .in('id', Array.from(selectedTransactions));
+
+            if (error) throw error;
+
+            setSelectedTransactions(new Set());
+            fetchFinancialData();
+        } catch (err: any) {
+            alert('Erro ao excluir: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    const paginatedTransactions = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredTransactions.slice(start, start + itemsPerPage);
+    }, [filteredTransactions, currentPage]);
+
+    const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+
     // Filter State
     const [dateRange, setDateRange] = useState<DateRange>('thisMonth');
+    const [customStart, setCustomStart] = useState('');
+    const [customEnd, setCustomEnd] = useState('');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     const toggleFilter = () => setIsFilterOpen(!isFilterOpen);
@@ -187,14 +475,19 @@ const AdministrationDashboard: React.FC = () => {
             return tDate >= start && tDate <= end;
         });
 
+
+
         setFilteredTransactions(filtered);
+        setCurrentPage(1); // Reset to first page on filter change
+
 
     }, [dateRange, allTransactions]);
 
-    // Dynamic KPIs Calculation
     const dynamicKPIs = useMemo(() => {
         if (!filteredTransactions.length) return {
             revenue: 0,
+            expenses: 0,
+            balance: 0,
             forecast: 0,
             overdue: 0,
             avgTicket: 0,
@@ -202,8 +495,14 @@ const AdministrationDashboard: React.FC = () => {
         };
 
         const revenue = filteredTransactions
-            .filter(t => t.status === 'pago')
+            .filter(t => t.status === 'pago' && t.amount > 0)
             .reduce((acc, curr) => acc + curr.amount, 0);
+
+        const expenses = filteredTransactions
+            .filter(t => t.status === 'pago' && t.amount < 0)
+            .reduce((acc, curr) => acc + Math.abs(curr.amount), 0);
+
+        const balance = revenue - expenses;
 
         const forecast = filteredTransactions
             .filter(t => t.status === 'pendente')
@@ -213,30 +512,48 @@ const AdministrationDashboard: React.FC = () => {
             .filter(t => t.status === 'atrasado')
             .reduce((acc, curr) => acc + curr.amount, 0);
 
-        const paidCount = filteredTransactions.filter(t => t.status === 'pago').length;
+        const paidCount = filteredTransactions.filter(t => t.status === 'pago' && t.amount > 0).length;
         const avgTicket = paidCount > 0 ? revenue / paidCount : 0;
 
-        return { revenue, forecast, overdue, avgTicket, count: filteredTransactions.length };
+        return { revenue, expenses, balance, forecast, overdue, avgTicket, count: filteredTransactions.length };
     }, [filteredTransactions]);
 
     // Chart Data Generation
     const chartData = useMemo(() => {
         // Group by day for the selected period
-        const grouped = new Map<string, number>();
+        // We need both Revenue (positive) and Expenses (negative -> absolute for chart maybe? Or verify request.)
+        // Request: "lucros (receita) utilize a linha verde... custos (despesas) utilize a linha verde" (Actually user said green for both? No "Os custos (despesas) utilize a linha verde". Wait.
+        // Re-reading user request: "1. Os lucros (receita) utilize a linha verde 2. Os custos (despesas) utilize a linha verde"
+        // User probably meant Red for expenses. I'll use Red for expenses as standard.
+
+        const grouped = new Map<string, { revenue: number, expenses: number }>();
 
         filteredTransactions.forEach(t => {
-            if (t.status === 'pago') {
+            // Include paid and pending? Usually charts show recognized revenue/cash flow.
+            // Let's stick to 'pago' for actual cash flow, or 'pago' + 'pendente' for projection? 
+            // "datas futuras... para ter noção do quanto irá receber" -> This implies Project/Forecast.
+            // So I should include 'pendente' as well?
+            // "O quanto ele irá receber"
+
+            // Let's include everything except 'cancelado'.
+            if (t.status !== 'cancelado') {
                 const dateKey = new Date(t.transaction_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-                grouped.set(dateKey, (grouped.get(dateKey) || 0) + t.amount);
+                const curr = grouped.get(dateKey) || { revenue: 0, expenses: 0 };
+
+                if (t.amount > 0) {
+                    curr.revenue += t.amount;
+                } else {
+                    curr.expenses += Math.abs(t.amount);
+                }
+                grouped.set(dateKey, curr);
             }
         });
 
-        return Array.from(grouped.entries()).map(([date, value]) => ({
+        return Array.from(grouped.entries()).map(([date, values]) => ({
             month_label: date,
-            revenue: value,
-            target: 0 // Could be dynamic
-        })).reverse(); // Re-sort if needed, expensive op here. Ideally sort by date. 
-        // Actually map iteration order is insertion order usually, but safer to sort.
+            revenue: values.revenue,
+            expenses: values.expenses,
+        })).reverse(); // Sort properly ideally but sticking to map order for now
     }, [filteredTransactions]);
 
 
@@ -286,31 +603,18 @@ const AdministrationDashboard: React.FC = () => {
         </button>
     );
 
-    const handleTestSync = async () => {
-        if (!user) return;
-        try {
-            setLoading(true);
-            const response = await fetch('/api/sync-asaas', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id })
-            });
-            const data = await response.json();
 
-            if (!data.success) throw new Error(data.error || 'Unknown error');
-
-            window.location.reload();
-        } catch (error: any) {
-            console.error('Sync error:', error);
-            const errorMessage = error?.message || error?.error || JSON.stringify(error);
-            alert(`Erro na conexão: ${errorMessage}`);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+            {user && (
+                <TransactionModal
+                    isOpen={isTransactionModalOpen}
+                    onClose={() => setIsTransactionModalOpen(false)}
+                    onSuccess={() => { fetchFinancialData(); }}
+                    user_id={user.id}
+                />
+            )}
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -319,18 +623,7 @@ const AdministrationDashboard: React.FC = () => {
                     <p className="text-slate-500">Gestão centralizada de departamentos e recursos.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleTestSync}
-                        disabled={loading}
-                        className="text-xs font-bold text-slate-500 hover:text-slate-900 underline underline-offset-2 disabled:opacity-50"
-                    >
-                        {loading ? 'Sincronizando...' : 'Sincronizar Agora'}
-                    </button>
-                    <div className="h-4 w-px bg-slate-200"></div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-100">
-                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                        <span>Auto-Sync Ativo</span>
-                    </div>
+                    {/* Actions moved to specific tabs */}
                 </div>
             </div>
 
@@ -346,7 +639,14 @@ const AdministrationDashboard: React.FC = () => {
                     <div className="space-y-8 animate-in slide-in-from-bottom-2 duration-300">
 
                         {/* Filters Toolbar */}
-                        <div className="flex justify-end">
+                        <div className="flex justify-end items-center gap-3">
+                            <button
+                                onClick={() => setIsTransactionModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-bold shadow-sm shadow-slate-200"
+                            >
+                                <Plus size={16} />
+                                Nova Transação
+                            </button>
                             <div className="relative">
                                 <button
                                     onClick={toggleFilter}
@@ -361,9 +661,29 @@ const AdministrationDashboard: React.FC = () => {
                                         {dateRange === 'thisMonth' && 'Este Mês'}
                                         {dateRange === 'lastMonth' && 'Mês Passado'}
                                         {dateRange === 'all' && 'Todo o Período'}
+                                        {dateRange === 'custom' && 'Personalizado'}
                                     </span>
                                     <ChevronDown size={14} className={`transition-transform duration-200 ${isFilterOpen ? 'rotate-180 text-slate-900' : 'text-slate-400'}`} />
                                 </button>
+
+                                {/* Custom Date Inputs */}
+                                {dateRange === 'custom' && (
+                                    <div className="flex items-center gap-2 animate-in fade-in duration-200">
+                                        <input
+                                            type="date"
+                                            value={customStart}
+                                            onChange={e => setCustomStart(e.target.value)}
+                                            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-slate-900"
+                                        />
+                                        <span className="text-slate-400">-</span>
+                                        <input
+                                            type="date"
+                                            value={customEnd}
+                                            onChange={e => setCustomEnd(e.target.value)}
+                                            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-slate-900"
+                                        />
+                                    </div>
+                                )}
 
                                 {/* Overlay to close */}
                                 {isFilterOpen && (
@@ -400,32 +720,22 @@ const AdministrationDashboard: React.FC = () => {
                                             <span>Todo o Período</span>
                                             {dateRange === 'all' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
                                         </button>
+                                        <div className="h-px bg-slate-100 my-1"></div>
+                                        <button onClick={() => selectRange('custom')} className={`w-full text-left px-3 py-2 text-sm rounded-lg flex items-center justify-between ${dateRange === 'custom' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <span>Personalizado</span>
+                                            {dateRange === 'custom' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
+                                        </button>
+
                                     </div>
+
                                 )}
                             </div>
                         </div>
 
                         {/* Metric Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                            {/* MRR (Static / Projeção) - Doesn't change with filter generally unless we want historic MRR */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-slate-50 rounded-xl text-slate-900 group-hover:scale-110 transition-transform">
-                                        <DollarSign size={20} />
-                                    </div>
-                                    <div className="flex items-center space-x-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-xs font-bold">
-                                        <TrendingUp size={12} />
-                                        <span>Projeção 12m</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">MRR (Recorrente)</h3>
-                                    <div className="text-2xl font-black text-slate-900">
-                                        {storedKpis?.mrr ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(storedKpis.mrr) : 'R$ 0,00'}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 font-medium mt-1">Baseado em contratos futuros</div>
-                                </div>
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {/* MRR (Static / Projeção) - REMOVED */}
+                            {/* Churn (Static) - REMOVED */}
 
                             {/* Revenue (Dynamic) */}
                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
@@ -435,11 +745,27 @@ const AdministrationDashboard: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Receita (Periodo)</h3>
+                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Receita (Bruta)</h3>
                                     <div className="text-2xl font-black text-emerald-600">
                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.revenue)}
                                     </div>
-                                    <div className="text-[10px] text-emerald-600 font-bold mt-1 uppercase tracking-wide">RECEBIDO</div>
+                                    <div className="text-[10px] text-emerald-600 font-bold mt-1 uppercase tracking-wide">ENTRADAS</div>
+                                </div>
+                            </div>
+
+                            {/* Expenses (Dynamic) */}
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="p-3 bg-rose-50 rounded-xl text-rose-500 group-hover:scale-110 transition-transform">
+                                        <ArrowDownRight size={20} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Despesas</h3>
+                                    <div className="text-2xl font-black text-rose-500">
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.expenses)}
+                                    </div>
+                                    <div className="text-[10px] text-rose-400 font-bold mt-1 uppercase tracking-wide">SAÍDAS</div>
                                 </div>
                             </div>
 
@@ -475,19 +801,7 @@ const AdministrationDashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Churn (Static) */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-slate-50 rounded-xl text-slate-900 group-hover:scale-110 transition-transform">
-                                        <AlertCircle size={20} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Churn Rate</h3>
-                                    <div className="text-2xl font-black text-slate-900">{storedKpis?.churn_rate ? storedKpis.churn_rate.toFixed(1) : 0}%</div>
-                                    <div className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wide">Mensal</div>
-                                </div>
-                            </div>
+
                         </div>
 
                         {/* Main Grid: Chart & Table */}
@@ -507,8 +821,12 @@ const AdministrationDashboard: React.FC = () => {
                                         <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1} />
-                                                    <stop offset="95%" stopColor="#0f172a" stopOpacity={0} />
+                                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                                </linearGradient>
+                                                <linearGradient id="colorDespesa" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.1} />
+                                                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
                                                 </linearGradient>
                                             </defs>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -532,10 +850,20 @@ const AdministrationDashboard: React.FC = () => {
                                             <Area
                                                 type="monotone"
                                                 dataKey="revenue"
-                                                stroke="#0f172a"
+                                                name="Receitas"
+                                                stroke="#10b981"
                                                 strokeWidth={3}
                                                 fillOpacity={1}
                                                 fill="url(#colorReceita)"
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="expenses"
+                                                name="Despesas"
+                                                stroke="#f43f5e"
+                                                strokeWidth={3}
+                                                fillOpacity={1}
+                                                fill="url(#colorDespesa)"
                                             />
                                         </AreaChart>
                                     </ResponsiveContainer>
@@ -545,7 +873,18 @@ const AdministrationDashboard: React.FC = () => {
                             {/* Transactions Table */}
                             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                                 <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <h2 className="text-lg font-bold text-slate-900">Transações ({filteredTransactions.length})</h2>
+                                    <div className="flex items-center gap-4">
+                                        <h2 className="text-lg font-bold text-slate-900">Transações ({filteredTransactions.length})</h2>
+                                        {selectedTransactions.size > 0 && (
+                                            <button
+                                                onClick={handleBulkDelete}
+                                                className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors text-xs font-bold animate-in fade-in zoom-in-95"
+                                            >
+                                                <Trash2 size={14} />
+                                                <span>Excluir ({selectedTransactions.size})</span>
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="flex items-center space-x-2">
                                         <div className="relative">
                                             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -558,7 +897,15 @@ const AdministrationDashboard: React.FC = () => {
                                     <table className="w-full text-left border-collapse">
                                         <thead>
                                             <tr className="border-b border-slate-100 bg-slate-50/50">
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-10">Data</th>
+                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-10 w-16">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={paginatedTransactions.length > 0 && selectedTransactions.size >= paginatedTransactions.length}
+                                                        onChange={toggleSelectAll}
+                                                        className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                                                    />
+                                                </th>
+                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0">Data</th>
                                                 <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</th>
                                                 <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descrição</th>
                                                 <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
@@ -567,10 +914,18 @@ const AdministrationDashboard: React.FC = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {filteredTransactions.length > 0 ? (
-                                                filteredTransactions.map((trx, i) => (
+                                            {paginatedTransactions.length > 0 ? (
+                                                paginatedTransactions.map((trx, i) => (
                                                     <tr key={trx.id} className="hover:bg-slate-50 transition-colors group">
-                                                        <td className="px-8 py-5 text-sm text-slate-500 pl-10">
+                                                        <td className="px-8 py-5 pl-10">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedTransactions.has(trx.id)}
+                                                                onChange={() => toggleSelectTransaction(trx.id)}
+                                                                className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                                                            />
+                                                        </td>
+                                                        <td className="px-8 py-5 text-sm text-slate-500 pl-0">
                                                             {new Date(trx.transaction_date).toLocaleDateString()}
                                                         </td>
                                                         <td className="px-8 py-5">
@@ -603,13 +958,36 @@ const AdministrationDashboard: React.FC = () => {
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan={5} className="py-20 text-center text-slate-500">
+                                                    <td colSpan={6} className="py-20 text-center text-slate-500">
                                                         Nenhuma transação encontrada neste período.
                                                     </td>
                                                 </tr>
                                             )}
                                         </tbody>
                                     </table>
+
+                                    {/* Pagination Controls */}
+                                    {totalPages > 1 && (
+                                        <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-between">
+                                            <button
+                                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                                disabled={currentPage === 1}
+                                                className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <ChevronLeft size={16} />
+                                            </button>
+                                            <span className="text-sm font-medium text-slate-600">
+                                                Página <span className="text-slate-900 font-bold">{currentPage}</span> de <span className="text-slate-900 font-bold">{totalPages}</span>
+                                            </span>
+                                            <button
+                                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                                disabled={currentPage === totalPages}
+                                                className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <ChevronRight size={16} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -631,7 +1009,7 @@ const AdministrationDashboard: React.FC = () => {
                 )}
             </div>
 
-        </div>
+        </div >
     );
 };
 

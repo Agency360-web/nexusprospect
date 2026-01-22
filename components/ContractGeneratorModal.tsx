@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ContractTemplate, Contract, Client } from '../types';
-import { X, Save, FileText, ChevronRight, UserCheck, ArrowLeft, Type, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Highlighter, Palette, Plus } from 'lucide-react';
+import { X, Save, FileText, ChevronRight, UserCheck, ArrowLeft, Type, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Highlighter, Palette, Plus, Trash2, Edit2, Image as ImageIcon, Minus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { EditorContent, useEditor, ReactNodeViewRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+// import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
 import UnderlineExtension from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import FontFamily from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
+import Image from '@tiptap/extension-image';
+import { ResizableImage } from './ResizableImage';
 
 // Simple Error Boundary to catch crashes
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -112,6 +115,56 @@ const MenuBar = ({ editor }: { editor: any }) => {
             >
                 <Type size={16} />
             </button>
+            <div className="w-px h-6 bg-slate-300 mx-1"></div>
+            <button
+                onClick={() => document.getElementById('logo-upload')?.click()}
+                className="p-2 rounded hover:bg-slate-200 transition-colors text-slate-500"
+                title="Inserir Logo / Imagem"
+            >
+                <ImageIcon size={16} />
+            </button>
+            <button
+                onClick={() => editor.chain().focus().setHorizontalRule().run()}
+                className="p-2 rounded hover:bg-slate-200 transition-colors text-slate-500"
+                title="Linha Horizontal"
+            >
+                <Minus size={16} />
+            </button>
+
+            {editor.isActive('image') && (
+                <>
+                    <div className="w-px h-6 bg-slate-300 mx-1"></div>
+                    <button
+                        onClick={() => editor.chain().focus().updateAttributes('image', { align: 'left' }).run()}
+                        className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.getAttributes('image').align === 'left' ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                        title="Alinhar à Esquerda"
+                    >
+                        <AlignLeft size={16} />
+                    </button>
+                    <button
+                        onClick={() => editor.chain().focus().updateAttributes('image', { align: 'center' }).run()}
+                        className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.getAttributes('image').align === 'center' ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                        title="Centralizar"
+                    >
+                        <AlignCenter size={16} />
+                    </button>
+                    <button
+                        onClick={() => editor.chain().focus().updateAttributes('image', { align: 'right' }).run()}
+                        className={`p-2 rounded hover:bg-slate-200 transition-colors ${editor.getAttributes('image').align === 'right' ? 'bg-slate-200 text-slate-900' : 'text-slate-500'}`}
+                        title="Alinhar à Direita"
+                    >
+                        <AlignRight size={16} />
+                    </button>
+                    <div className="w-px h-6 bg-slate-300 mx-1"></div>
+                    <button
+                        onClick={() => editor.chain().focus().deleteSelection().run()}
+                        className="p-2 rounded hover:bg-rose-100 transition-colors text-rose-500"
+                        title="Remover Imagem"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </>
+            )}
         </div>
     );
 };
@@ -147,6 +200,7 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
     const editor = useEditor({
         extensions: [
             StarterKit,
+            // BubbleMenuExtension,
             UnderlineExtension,
             TextAlign.configure({
                 types: ['heading', 'paragraph'],
@@ -155,6 +209,32 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
             FontFamily,
             Color,
             Highlight,
+            Image.extend({
+                addAttributes() {
+                    return {
+                        ...this.parent?.(),
+                        width: {
+                            default: '100%',
+                            renderHTML: attributes => ({
+                                width: attributes.width,
+                                style: `width: ${attributes.width}`,
+                            }),
+                        },
+                        align: {
+                            default: 'left',
+                            renderHTML: attributes => ({
+                                align: attributes.align,
+                            }),
+                        },
+                    };
+                },
+                addNodeView() {
+                    return ReactNodeViewRenderer(ResizableImage);
+                },
+            }).configure({
+                inline: true,
+                allowBase64: true,
+            }),
         ],
         content: '<p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</strong></p><p><br></p><p>CONTRATANTE: {{razao_social}}, CNPJ: {{cnpj}}...</p>',
         editorProps: {
@@ -325,17 +405,37 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
         setLoading(true);
 
         try {
-            const { data, error } = await supabase.from('contract_templates').insert({
-                user_id: user?.id,
-                name: newTemplateName,
-                content: content
-            }).select().single();
+            if (selectedTemplate) {
+                // Update existing
+                const { data, error } = await supabase.from('contract_templates')
+                    .update({
+                        name: newTemplateName,
+                        content: content
+                    })
+                    .eq('id', selectedTemplate.id)
+                    .select().single();
 
-            if (error) throw error;
+                if (error) throw error;
 
-            setTemplates([data, ...templates]);
-            setIsCreatingTemplate(false);
-            setSelectedTemplate(data);
+                // Update in list
+                setTemplates(templates.map(t => t.id === selectedTemplate.id ? data : t));
+                setSelectedTemplate(data);
+                setIsCreatingTemplate(false);
+
+            } else {
+                // Create new
+                const { data, error } = await supabase.from('contract_templates').insert({
+                    user_id: user?.id,
+                    name: newTemplateName,
+                    content: content
+                }).select().single();
+
+                if (error) throw error;
+
+                setTemplates([data, ...templates]);
+                setIsCreatingTemplate(false);
+                setSelectedTemplate(data);
+            }
         } catch (error) {
             console.error('Error saving template:', error);
         } finally {
@@ -346,6 +446,44 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
     const insertVariable = (key: string) => {
         if (editor) {
             editor.chain().focus().insertContent(`{{${key}}}`).run();
+        }
+    };
+
+    const imgInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !e.target.files[0] || !editor) return;
+        const file = e.target.files[0];
+
+        try {
+            setLoading(true);
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user?.id}/${Date.now()}.${fileExt}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('contract-assets')
+                .upload(fileName, file);
+
+            if (uploadError) {
+                // Try to see if it's a bucket doesn't exist error (sometimes 404)
+                if (uploadError.message.includes('bucket')) {
+                    alert('Erro: Bucket de armazenamento "contract-assets" não encontrado. Contate o administrador.');
+                }
+                throw uploadError;
+            }
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('contract-assets')
+                .getPublicUrl(fileName);
+
+            editor.chain().focus().setImage({ src: publicUrl }).run();
+
+        } catch (error) {
+            console.error('Error uploading logo:', error);
+            alert('Falha ao fazer upload da logo.');
+        } finally {
+            setLoading(false);
+            if (imgInputRef.current) imgInputRef.current.value = '';
         }
     };
 
@@ -399,8 +537,58 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                                         ))}
                                     </select>
 
+                                    {selectedTemplate && (
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setNewTemplateName(selectedTemplate.name);
+                                                    if (editor) {
+                                                        editor.commands.setContent(selectedTemplate.content);
+                                                    }
+                                                    setIsCreatingTemplate(true);
+                                                    // We implicitly track we are editing 'selectedTemplate' because it's set
+                                                }}
+                                                className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <Edit2 size={14} />
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    if (!confirm('Tem certeza que deseja excluir este modelo?')) return;
+                                                    setLoading(true);
+                                                    try {
+                                                        const { error } = await supabase.from('contract_templates').delete().eq('id', selectedTemplate.id);
+                                                        if (error) throw error;
+
+                                                        // Update list
+                                                        setTemplates(templates.filter(t => t.id !== selectedTemplate.id));
+                                                        setSelectedTemplate(null);
+                                                    } catch (err) {
+                                                        console.error('Error deleting template:', err);
+                                                        alert('Erro ao excluir modelo');
+                                                    } finally {
+                                                        setLoading(false);
+                                                    }
+                                                }}
+                                                className="flex-1 py-2 bg-rose-50 text-rose-500 rounded-lg text-xs font-bold hover:bg-rose-100 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <Trash2 size={14} />
+                                                Excluir
+                                            </button>
+                                        </div>
+                                    )}
+
                                     <button
-                                        onClick={() => setIsCreatingTemplate(true)}
+                                        onClick={() => {
+                                            setSelectedTemplate(null);
+                                            // Reset editor content for new clean slate
+                                            if (editor) {
+                                                editor.commands.setContent('<p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</strong></p><p><br></p><p>CONTRATANTE: {{razao_social}}, CNPJ: {{cnpj}}...</p>');
+                                            }
+                                            setNewTemplateName('');
+                                            setIsCreatingTemplate(true);
+                                        }}
                                         className="w-full py-2 bg-white border border-dashed border-slate-300 rounded-xl text-slate-500 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-xs font-bold flex items-center justify-center gap-2"
                                     >
                                         <Plus size={14} />
@@ -547,6 +735,15 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                     </div>
                 </div>
             </div>
+
+            <input
+                type="file"
+                id="logo-upload"
+                className="hidden"
+                accept="image/*"
+                ref={imgInputRef}
+                onChange={handleLogoUpload}
+            />
         </div>
     );
 };
