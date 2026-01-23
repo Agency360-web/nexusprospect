@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -53,9 +54,10 @@ interface Transaction {
     status: 'pago' | 'pendente' | 'atrasado' | 'cancelado';
     manual_override?: boolean;
     payment_method?: string;
+    category?: 'pessoal' | 'profissional';
 }
 
-type DateRange = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'all' | 'custom';
+type DateRange = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'nextMonth' | 'all' | 'custom';
 
 const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void }> = ({ transaction, onUpdate }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -83,71 +85,152 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
         }
     };
 
+    const handleMoveCategory = async (newCategory: 'pessoal' | 'profissional') => {
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('financial_transactions')
+                .update({ category: newCategory })
+                .eq('id', transaction.id);
+
+            if (error) throw error;
+            onUpdate();
+        } catch (err: any) {
+            alert('Erro: ' + err.message);
+        } finally {
+            setLoading(false);
+            setIsOpen(false);
+        }
+    };
+
+    const [menuStyle, setMenuStyle] = useState<{ top?: number, bottom?: number, left?: number, right?: number }>({});
+    const buttonRef = useRef<HTMLButtonElement>(null);
+
+    const toggleMenu = () => {
+        if (!isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const menuHeight = 200; // Approx height
+
+            const newStyle: any = {
+                // Align right edge of menu with right edge of button
+                // right prop is distance from right edge of viewport
+                right: window.innerWidth - rect.right,
+            };
+
+            // Vertical collision detection
+            if (spaceBelow < menuHeight) {
+                // Open upwards
+                newStyle.bottom = window.innerHeight - rect.top + 4;
+            } else {
+                // Open downwards
+                newStyle.top = rect.bottom + 4;
+            }
+
+            setMenuStyle(newStyle);
+        }
+        setIsOpen(!isOpen);
+    };
+
+    // Close on scroll or resize to prevent floating menu issues
+    useEffect(() => {
+        const handleScroll = () => { if (isOpen) setIsOpen(false); };
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('resize', handleScroll);
+        return () => {
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', handleScroll);
+        };
+    }, [isOpen]);
+
     return (
         <div className="relative">
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                ref={buttonRef}
+                onClick={toggleMenu}
                 className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                 disabled={loading}
             >
                 <MoreHorizontal size={18} />
             </button>
 
-            {/* Backdrop */}
-            {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>}
-
-            {/* Menu */}
-            {isOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                    <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Ações</div>
-
-                    {transaction.status !== 'pago' && (
-                        <>
-                            <button
-                                onClick={() => handleMarkPaid('dinheiro')}
-                                className="w-full text-left px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 rounded-lg flex items-center gap-2"
-                            >
-                                <DollarSign size={14} />
-                                <span>Receber (Dinheiro)</span>
-                            </button>
-                            <button
-                                onClick={() => handleMarkPaid('pix')}
-                                className="w-full text-left px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 rounded-lg flex items-center gap-2"
-                            >
-                                <ArrowDownRight size={14} />
-                                <span>Receber (PIX)</span>
-                            </button>
-                        </>
-
-                    )}
-
-                    <button
-                        onClick={async () => {
-                            if (confirm('Tem certeza que deseja excluir esta transação?')) {
-                                setLoading(true);
-                                try {
-                                    const { error } = await supabase.from('financial_transactions').delete().eq('id', transaction.id);
-                                    if (error) throw error;
-                                    onUpdate();
-                                } catch (e: any) {
-                                    alert('Erro ao excluir: ' + e.message);
-                                } finally {
-                                    setLoading(false);
-                                }
-                            }
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+            {/* Menu via Portal */}
+            {isOpen && createPortal(
+                <>
+                    <div className="fixed inset-0 z-[60]" onClick={() => setIsOpen(false)}></div>
+                    <div
+                        style={menuStyle}
+                        className="fixed w-48 bg-white border border-slate-200 rounded-xl shadow-xl p-1 z-[70] animate-in fade-in zoom-in-95 duration-100 origin-top-right"
                     >
-                        <Trash2 size={14} />
-                        <span>Excluir</span>
-                    </button>
+                        <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Ações</div>
 
-                    <button className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
-                        Ver Detalhes
-                    </button>
-                </div>
-            )
-            }
+                        {transaction.status !== 'pago' && (
+                            <>
+                                <button
+                                    onClick={() => handleMarkPaid('dinheiro')}
+                                    className="w-full text-left px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 rounded-lg flex items-center gap-2"
+                                >
+                                    <DollarSign size={14} />
+                                    <span>Receber (Dinheiro)</span>
+                                </button>
+                                <button
+                                    onClick={() => handleMarkPaid('pix')}
+                                    className="w-full text-left px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 rounded-lg flex items-center gap-2"
+                                >
+                                    <ArrowDownRight size={14} />
+                                    <span>Receber (PIX)</span>
+                                </button>
+                            </>
+                        )}
+
+                        <button
+                            onClick={async () => {
+                                if (confirm('Tem certeza que deseja excluir esta transação?')) {
+                                    setLoading(true);
+                                    try {
+                                        const { error } = await supabase.from('financial_transactions').delete().eq('id', transaction.id);
+                                        if (error) throw error;
+                                        onUpdate();
+                                    } catch (e: any) {
+                                        alert('Erro ao excluir: ' + e.message);
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2"
+                        >
+                            <Trash2 size={14} />
+                            <span>Excluir</span>
+                        </button>
+
+                        <button className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                            Ver Detalhes
+                        </button>
+
+                        <div className="h-px bg-slate-100 my-1"></div>
+
+                        {(transaction.category || 'profissional') === 'profissional' ? (
+                            <button
+                                onClick={() => handleMoveCategory('pessoal')}
+                                className="w-full text-left px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-2"
+                            >
+                                <Briefcase size={14} />
+                                <span>Mover para Pessoal</span>
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => handleMoveCategory('profissional')}
+                                className="w-full text-left px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-2"
+                            >
+                                <Building2 size={14} />
+                                <span>Mover para Profissional</span>
+                            </button>
+                        )}
+                    </div>
+                </>,
+                document.body
+            )}
         </div >
     );
 };
@@ -157,10 +240,12 @@ interface TransactionModalProps {
     onClose: () => void;
     onSuccess: () => void;
     user_id: string;
+    defaultCategory: 'pessoal' | 'profissional';
 }
 
-const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, onSuccess, user_id }) => {
+const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, onSuccess, user_id, defaultCategory }) => {
     const [type, setType] = useState<'income' | 'expense'>('income');
+    const [category, setCategory] = useState<'pessoal' | 'profissional'>(defaultCategory);
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [clientName, setClientName] = useState('');
@@ -202,8 +287,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
                     amount: finalAmount,
                     transaction_date: currentDate.toISOString(),
                     status,
+
                     client_name: clientName || (type === 'expense' ? 'Despesa Operacional' : 'Cliente Avulso'),
-                    manual_override: true
+                    manual_override: true,
+                    category
                 });
             }
 
@@ -244,6 +331,23 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
                             className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${type === 'expense' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             Despesa (Custo)
+                        </button>
+                    </div>
+
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            type="button"
+                            onClick={() => setCategory('profissional')}
+                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${category === 'profissional' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Profissional
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setCategory('pessoal')}
+                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${category === 'pessoal' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Pessoal
                         </button>
                     </div>
 
@@ -356,6 +460,7 @@ const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'finance' | 'contracts'>('finance');
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+    const [dashboardScope, setDashboardScope] = useState<'pessoal' | 'profissional'>('profissional');
 
     // Data State
     const [storedKpis, setStoredKpis] = useState<FinancialKPIs | null>(null);
@@ -423,6 +528,10 @@ const AdministrationDashboard: React.FC = () => {
     const [dateRange, setDateRange] = useState<DateRange>('thisMonth');
     const [customStart, setCustomStart] = useState('');
     const [customEnd, setCustomEnd] = useState('');
+    // Applied state for manual search trigger
+    const [appliedCustomStart, setAppliedCustomStart] = useState('');
+    const [appliedCustomEnd, setAppliedCustomEnd] = useState('');
+
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     const toggleFilter = () => setIsFilterOpen(!isFilterOpen);
@@ -465,8 +574,19 @@ const AdministrationDashboard: React.FC = () => {
                 start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                 end = new Date(now.getFullYear(), now.getMonth(), 0);
                 break;
+            case 'nextMonth':
+                start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+                break;
             case 'all':
                 // Default start
+                break;
+            case 'custom':
+                // Custom range - Use APPLIED values
+                if (appliedCustomStart) start = new Date(appliedCustomStart);
+                if (appliedCustomEnd) end = new Date(appliedCustomEnd);
+                // Need to ensure end date includes end of day if it's just a date string
+                if (appliedCustomEnd) end.setHours(23, 59, 59, 999);
                 break;
         }
 
@@ -475,13 +595,18 @@ const AdministrationDashboard: React.FC = () => {
             return tDate >= start && tDate <= end;
         });
 
+        // Apply Dashboard Scope Filter
+        const scopedFiltered = filtered.filter(t => (t.category || 'profissional') === dashboardScope); // Default to professional for backwards compatibility
+
+        setFilteredTransactions(scopedFiltered);
 
 
-        setFilteredTransactions(filtered);
+
+
         setCurrentPage(1); // Reset to first page on filter change
 
 
-    }, [dateRange, allTransactions]);
+    }, [dateRange, allTransactions, appliedCustomStart, appliedCustomEnd, dashboardScope]);
 
     const dynamicKPIs = useMemo(() => {
         if (!filteredTransactions.length) return {
@@ -613,6 +738,7 @@ const AdministrationDashboard: React.FC = () => {
                     onClose={() => setIsTransactionModalOpen(false)}
                     onSuccess={() => { fetchFinancialData(); }}
                     user_id={user.id}
+                    defaultCategory={dashboardScope}
                 />
             )}
 
@@ -647,6 +773,23 @@ const AdministrationDashboard: React.FC = () => {
                                 <Plus size={16} />
                                 Nova Transação
                             </button>
+
+                            {/* Scope Toggle */}
+                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => setDashboardScope('profissional')}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${dashboardScope === 'profissional' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Profissional
+                                </button>
+                                <button
+                                    onClick={() => setDashboardScope('pessoal')}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${dashboardScope === 'pessoal' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Pessoal
+                                </button>
+                            </div>
+
                             <div className="relative">
                                 <button
                                     onClick={toggleFilter}
@@ -660,6 +803,7 @@ const AdministrationDashboard: React.FC = () => {
                                         {dateRange === 'last30' && 'Últimos 30 dias'}
                                         {dateRange === 'thisMonth' && 'Este Mês'}
                                         {dateRange === 'lastMonth' && 'Mês Passado'}
+                                        {dateRange === 'nextMonth' && 'Próximo Mês'}
                                         {dateRange === 'all' && 'Todo o Período'}
                                         {dateRange === 'custom' && 'Personalizado'}
                                     </span>
@@ -682,6 +826,16 @@ const AdministrationDashboard: React.FC = () => {
                                             onChange={e => setCustomEnd(e.target.value)}
                                             className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-slate-900"
                                         />
+                                        <button
+                                            onClick={() => {
+                                                setAppliedCustomStart(customStart);
+                                                setAppliedCustomEnd(customEnd);
+                                            }}
+                                            className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors shadow-sm"
+                                            title="Pesquisar"
+                                        >
+                                            <Search size={14} />
+                                        </button>
                                     </div>
                                 )}
 
@@ -714,6 +868,10 @@ const AdministrationDashboard: React.FC = () => {
                                         <button onClick={() => selectRange('lastMonth')} className={`w-full text-left px-3 py-2 text-sm rounded-lg mb-1 flex items-center justify-between ${dateRange === 'lastMonth' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
                                             <span>Mês Passado</span>
                                             {dateRange === 'lastMonth' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
+                                        </button>
+                                        <button onClick={() => selectRange('nextMonth')} className={`w-full text-left px-3 py-2 text-sm rounded-lg mb-1 flex items-center justify-between ${dateRange === 'nextMonth' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                            <span>Próximo Mês</span>
+                                            {dateRange === 'nextMonth' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>}
                                         </button>
                                         <div className="h-px bg-slate-100 my-1"></div>
                                         <button onClick={() => selectRange('all')} className={`w-full text-left px-3 py-2 text-sm rounded-lg flex items-center justify-between ${dateRange === 'all' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
@@ -842,7 +1000,10 @@ const AdministrationDashboard: React.FC = () => {
                                                 axisLine={false}
                                                 tickLine={false}
                                                 tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                                tickFormatter={(value) => `k ${(value / 1000).toFixed(0)}`}
+                                                tickFormatter={(value) => {
+                                                    if (value >= 1000) return `R$ ${(value / 1000).toFixed(0)}k`;
+                                                    return `R$ ${value}`;
+                                                }}
                                             />
                                             <Tooltip
                                                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
