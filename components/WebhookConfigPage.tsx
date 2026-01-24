@@ -60,7 +60,7 @@ const WebhookConfigPage: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Configurações de Webhook</h1>
-        <p className="text-slate-500 mt-2">Integre o NexusDispatch diretamente com o seu sistema ou ERP.</p>
+        <p className="text-slate-500 mt-2">Integre o Conecta Marketing diretamente com o seu sistema ou ERP.</p>
       </div>
 
       {/* Main Settings Card */}
@@ -75,12 +75,12 @@ const WebhookConfigPage: React.FC = () => {
               <div className="relative">
                 <input
                   type="text"
-                  defaultValue="https://api.nexusdispatch.com/v1/webhook/receive"
+                  defaultValue="https://api.conectamarketing.com/v1/webhook/receive"
                   readOnly
                   className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 font-mono text-xs text-slate-600 outline-none"
                 />
                 <button
-                  onClick={() => copyToClipboard('https://api.nexusdispatch.com/v1/webhook/receive', 'inbound')}
+                  onClick={() => copyToClipboard('https://api.conectamarketing.com/v1/webhook/receive', 'inbound')}
                   className="absolute right-3 top-2.5 p-1.5 text-slate-400 hover:text-slate-600"
                 >
                   {copied === 'inbound' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}

@@ -33,7 +33,7 @@ const SettingsPage: React.FC = () => {
   const [saveLoading, setSaveLoading] = useState(false);
 
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
-  const [platformName, setPlatformName] = useState(user?.user_metadata?.platform_name || 'NexusDispatch');
+  const [platformName, setPlatformName] = useState(user?.user_metadata?.platform_name || 'Conecta Marketing');
 
   // Real Data States
   const [profiles, setProfiles] = useState<Profile[]>([]);

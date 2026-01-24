@@ -1,6 +1,5 @@
-
 {
-  "name": "NexusDispatch - WhatsApp Automation",
+  "name": "Conecta Marketing - WhatsApp Automation",
   "description": "Uma plataforma corporativa minimalista para disparo de mensagens em massa via WhatsApp com integração robusta via Webhooks.",
   "requestFramePermissions": [
     "camera",

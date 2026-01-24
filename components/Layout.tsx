@@ -69,7 +69,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                     <img src="/logo-icon.jpg" alt="Nexus" className="w-9 h-9 object-contain rounded-lg" />
                                 </div>
                             ) : (
-                                <img src="/logo.png" alt="NexusDispatch" className="h-28 w-auto object-contain animate-in fade-in duration-200" />
+                                <img src="/logo.png" alt="Conecta Marketing" className="h-28 w-auto object-contain animate-in fade-in duration-200" />
                             )}
                         </div>
                         <button
