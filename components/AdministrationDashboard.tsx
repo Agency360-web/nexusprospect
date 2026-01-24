@@ -27,9 +27,11 @@ import {
     Trash2,
     ChevronLeft,
     ChevronRight,
+    QrCode
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import ContractManager from './ContractManager';
+import WhatsAppConnectGenerator from './WhatsAppConnectGenerator';
 
 // Interfaces
 interface FinancialKPIs {
@@ -458,7 +460,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
 
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'finance' | 'contracts'>('finance');
+    const [activeTab, setActiveTab] = useState<'finance' | 'contracts' | 'whatsapp'>('finance');
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
     const [dashboardScope, setDashboardScope] = useState<'pessoal' | 'profissional'>('profissional');
 
@@ -757,6 +759,7 @@ const AdministrationDashboard: React.FC = () => {
             <div className="bg-white border-b border-slate-200 sticky top-16 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
                 <TabButton id="finance" label="Financeiro" icon={Activity} />
                 <TabButton id="contracts" label="Gestão de Contratos" icon={FileText} />
+                <TabButton id="whatsapp" label="Conexão WhatsApp" icon={QrCode} />
             </div>
 
             <div className="pt-6">
@@ -1167,6 +1170,10 @@ const AdministrationDashboard: React.FC = () => {
                     <div className="animate-in slide-in-from-bottom-2 duration-300">
                         <ContractManager />
                     </div>
+                )}
+
+                {activeTab === 'whatsapp' && (
+                    <WhatsAppConnectGenerator />
                 )}
             </div>
 

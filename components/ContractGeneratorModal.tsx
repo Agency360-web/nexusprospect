@@ -5,7 +5,7 @@ import { X, Save, FileText, ChevronRight, UserCheck, ArrowLeft, Type, Bold, Ital
 import { useAuth } from '../contexts/AuthContext';
 import { EditorContent, useEditor, ReactNodeViewRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-// import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
+
 import UnderlineExtension from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -200,7 +200,7 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
     const editor = useEditor({
         extensions: [
             StarterKit,
-            // BubbleMenuExtension,
+
             UnderlineExtension,
             TextAlign.configure({
                 types: ['heading', 'paragraph'],
@@ -244,7 +244,7 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
             },
         },
     });
-    // const editor = null; // Debugging: Disable editor initialization
+
 
     useEffect(() => {
         if (isOpen) {
@@ -281,8 +281,6 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
     // Update editor content when switching to create mode
     useEffect(() => {
         if (isCreatingTemplate && editor) {
-            // Reset to default or keep current if valid? 
-            // Ideally we start fresh or with a basic template
             if (!newTemplateName) {
                 editor.commands.setContent('<p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</strong></p><p><br></p><p>CONTRATANTE: {{razao_social}}, CNPJ: {{cnpj}}...</p>');
             }

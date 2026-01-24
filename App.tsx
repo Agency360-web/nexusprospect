@@ -11,7 +11,9 @@ import HistoryLogs from './components/HistoryLogs';
 import ClientManager from './components/ClientManager';
 import ClientDetail from './components/ClientDetail';
 import SettingsPage from './components/SettingsPage';
+
 import AdministrationDashboard from './components/AdministrationDashboard';
+import WhatsAppConnectPage from './components/WhatsAppConnectPage';
 
 const App: React.FC = () => {
   return (
@@ -20,6 +22,7 @@ const App: React.FC = () => {
         <Routes>
           {/* Public Route */}
           <Route path="/login" element={<Login />} />
+          <Route path="/connect-whatsapp" element={<WhatsAppConnectPage />} />
 
           {/* Protected Routes */}
           <Route path="/" element={
