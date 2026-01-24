@@ -15,6 +15,7 @@ import {
     Building2,
     ChevronLeft
 } from 'lucide-react';
+import { useRBAC } from '../hooks/useRBAC';
 
 const SidebarItem: React.FC<{
     to: string;
@@ -44,6 +45,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Mobile drawer state
     const [isCollapsed, setIsCollapsed] = useState(false); // Desktop collapse state
     const location = useLocation();
+    const { canAccess } = useRBAC();
 
     return (
         <div className="flex min-h-screen bg-slate-50">
@@ -80,66 +82,75 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
 
                     <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                        <SidebarItem
-                            to="/"
-                            icon={<LayoutDashboard size={20} />}
-                            label="Dashboard"
-                            active={location.pathname === '/'}
-                            isCollapsed={isCollapsed}
-                        />
-                        <SidebarItem
-                            to="/admin"
-                            icon={<Building2 size={20} />}
-                            label="Administração"
-                            active={location.pathname.startsWith('/admin')}
-                            isCollapsed={isCollapsed}
-                        />
-                        <SidebarItem
-                            to="/clients"
-                            icon={<Users size={20} />}
-                            label="Clientes"
-                            active={location.pathname.startsWith('/clients')}
-                            isCollapsed={isCollapsed}
-                        />
-                        <SidebarItem
-                            to="/history"
-                            icon={<History size={20} />}
-                            label="Relatórios"
-                            active={location.pathname === '/history'}
-                            isCollapsed={isCollapsed}
-                        />
-                        <SidebarItem
-                            to="/new-campaign"
-                            icon={<PlusCircle size={20} />}
-                            label="Transmissão"
-                            active={location.pathname === '/new-campaign'}
-                            isCollapsed={isCollapsed}
-                        />
+                        {canAccess('dashboard') && (
+                            <SidebarItem
+                                to="/"
+                                icon={<LayoutDashboard size={20} />}
+                                label="Dashboard"
+                                active={location.pathname === '/'}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
+                        {canAccess('admin') && (
+                            <SidebarItem
+                                to="/admin"
+                                icon={<Building2 size={20} />}
+                                label="Administração"
+                                active={location.pathname.startsWith('/admin')}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
+                        {canAccess('clients') && (
+                            <SidebarItem
+                                to="/clients"
+                                icon={<Users size={20} />}
+                                label="Clientes"
+                                active={location.pathname.startsWith('/clients')}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
+                        {canAccess('reports') && (
+                            <SidebarItem
+                                to="/history"
+                                icon={<History size={20} />}
+                                label="Relatórios"
+                                active={location.pathname === '/history'}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
+                        {canAccess('transmission') && (
+                            <SidebarItem
+                                to="/new-campaign"
+                                icon={<PlusCircle size={20} />}
+                                label="Transmissão"
+                                active={location.pathname === '/new-campaign'}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
                     </nav>
 
                     <div className="p-4 border-t border-slate-100 space-y-2">
-                        {!isCollapsed && (
+                        {!isCollapsed && canAccess('admin') && (
                             <div className="px-4 py-2 flex items-center space-x-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-in fade-in duration-200">
                                 <ShieldCheck size={12} />
                                 <span>Admin Hub</span>
                             </div>
                         )}
-                        <SidebarItem
-                            to="/settings"
-                            icon={<Settings size={20} />}
-                            label="Configurações"
-                            active={location.pathname.startsWith('/settings')}
-                            isCollapsed={isCollapsed}
-                        />
 
-
+                        {canAccess('settings') && (
+                            <SidebarItem
+                                to="/settings"
+                                icon={<Settings size={20} />}
+                                label="Configurações"
+                                active={location.pathname.startsWith('/settings')}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
                     </div>
                 </div>
             </aside>
 
             <main className="flex-1 overflow-x-hidden">
-
-
                 <div className="p-8 pt-16 max-w-7xl mx-auto">
                     {children}
                 </div>

@@ -1,57 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings,
   Users,
-  Building2,
-  Webhook,
-  Smartphone,
-  Tag as TagIcon,
-  Zap,
-  ShieldCheck,
-  ScrollText,
-  Clock,
   Plus,
   Save,
-  Trash2,
-  AlertTriangle,
-  CheckCircle2,
-  Lock,
-  RefreshCw,
-  Terminal,
-  Activity,
   MoreVertical,
-  ChevronRight,
-  Database,
-  Key,
-  Bell,
-  Eye,
-  EyeOff,
   LogOut,
-  User
+  User,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from './ui/Modal';
 import { supabase } from '../lib/supabase';
 
-type SettingsTab = 'general' | 'users' | 'clients' | 'webhooks' | 'whatsapp' | 'leads' | 'campaigns' | 'security' | 'audit';
+type SettingsTab = 'general' | 'users';
+
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  status: string;
+}
 
 const SettingsPage: React.FC = () => {
   const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [saveLoading, setSaveLoading] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
   const [platformName, setPlatformName] = useState(user?.user_metadata?.platform_name || 'NexusDispatch');
 
+  // Real Data States
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
+
   // Interactive States
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [globalRateLimit, setGlobalRateLimit] = useState(60);
-  const [autoBlock, setAutoBlock] = useState(5);
   const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
+
+  // New User Form
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserRole, setNewUserRole] = useState('user');
+  const [newUserPermissions, setNewUserPermissions] = useState<string[]>(['dashboard', 'reports']);
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      fetchProfiles();
+    }
+  }, [activeTab]);
+
+  const fetchProfiles = async () => {
+    setLoadingProfiles(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setProfiles(data || []);
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+    } finally {
+      setLoadingProfiles(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaveLoading(true);
     try {
+      // Update Auth User Metadata
       const { error } = await supabase.auth.updateUser({
         data: {
           full_name: displayName,
@@ -59,6 +76,15 @@ const SettingsPage: React.FC = () => {
         }
       });
       if (error) throw error;
+
+      // Update Profile Table as well
+      if (user) {
+        await supabase
+          .from('profiles')
+          .update({ full_name: displayName })
+          .eq('id', user.id);
+      }
+
       alert('Alterações salvas com sucesso!');
       window.location.reload(); // Reload to refresh context
     } catch (error) {
@@ -69,21 +95,43 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveLoading(true);
-    setTimeout(() => {
-      setSaveLoading(false);
+    try {
+      // Call the Edge Function to send real invitation
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: newUserEmail,
+          role: newUserRole,
+          allowed_pages: newUserPermissions
+        }
+      });
+
+      if (error) {
+        // Handle specific error messages from the function if possible
+        const errorMessage = error.context?.json?.error || error.message || 'Erro desconhecido';
+        throw new Error(errorMessage);
+      }
+
+      alert('Convite enviado com sucesso! O usuário receberá um e-mail para definir a senha.');
       setIsNewUserModalOpen(false);
-      alert('Usuário convidado com sucesso!');
-    }, 1000);
+      setNewUserEmail('');
+      setNewUserPermissions(['dashboard', 'reports']); // Reset defaults
+      setNewUserRole('user');
+    } catch (error: any) {
+      console.error('Error inviting user:', error);
+      alert(`Erro ao enviar convite: ${error.message}`);
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   const TabItem = ({ id, label, icon: Icon }: { id: SettingsTab, label: string, icon: any }) => (
     <button
       onClick={() => setActiveTab(id)}
       className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === id
-        ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+        ? 'bg-red-600 text-white shadow-lg shadow-red-200'
         : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
         }`}
     >
@@ -117,7 +165,7 @@ const SettingsPage: React.FC = () => {
                 <User size={16} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-slate-900 truncate">Conta Atual</div>
+                <div className="text-xs font-bold text-slate-900 truncate">{displayName || 'Usuário'}</div>
                 <div className="text-[10px] text-slate-500 truncate" title={user?.email}>{user?.email}</div>
               </div>
             </div>
@@ -125,13 +173,6 @@ const SettingsPage: React.FC = () => {
           <nav className="space-y-1">
             <TabItem id="general" label="Geral" icon={Settings} />
             <TabItem id="users" label="Usuários & Acessos" icon={Users} />
-            <TabItem id="clients" label="Clientes (Tenants)" icon={Building2} />
-            <TabItem id="webhooks" label="Webhooks Globais" icon={Webhook} />
-            <TabItem id="whatsapp" label="Provedores WhatsApp" icon={Smartphone} />
-            <TabItem id="leads" label="Campos de Leads" icon={TagIcon} />
-            <TabItem id="campaigns" label="Padrões de Campanha" icon={Zap} />
-            <TabItem id="security" label="Segurança & Limites" icon={ShieldCheck} />
-            <TabItem id="audit" label="Logs & Auditoria" icon={ScrollText} />
 
             <div className="pt-4 border-t border-slate-200 mt-4">
               <button
@@ -161,7 +202,7 @@ const SettingsPage: React.FC = () => {
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
                       placeholder="Ex: Lucas Renato"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 transition-all font-bold text-slate-900"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-600 transition-all font-bold text-slate-900"
                     />
                     <p className="text-xs text-slate-400">Este nome aparecerá na saudação do Dashboard.</p>
                   </div>
@@ -172,7 +213,7 @@ const SettingsPage: React.FC = () => {
                       type="text"
                       value={platformName}
                       onChange={(e) => setPlatformName(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 transition-all"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-600 transition-all"
                     />
                   </div>
 
@@ -184,19 +225,6 @@ const SettingsPage: React.FC = () => {
                       </div>
                       <p className="text-xs text-slate-400">Recomendado: SVG ou PNG (512x512px)</p>
                     </div>
-                  </div>
-
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">Modo Manutenção</div>
-                      <div className="text-xs text-slate-500">Bloqueia o acesso a todos os usuários exceto Super Admins.</div>
-                    </div>
-                    <button
-                      onClick={() => setMaintenanceMode(!maintenanceMode)}
-                      className={`w-12 h-6 rounded-full relative p-1 transition-colors ${maintenanceMode ? 'bg-slate-900' : 'bg-slate-200'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${maintenanceMode ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -210,7 +238,7 @@ const SettingsPage: React.FC = () => {
                   action={
                     <button
                       onClick={() => setIsNewUserModalOpen(true)}
-                      className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-900/10"
+                      className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-200 hover:bg-red-500 transition-colors"
                     >
                       <Plus size={16} />
                       <span>Novo Usuário</span>
@@ -219,214 +247,32 @@ const SettingsPage: React.FC = () => {
                 />
 
                 <div className="space-y-3">
-                  {[
-                    { name: 'Admin Principal', email: 'admin@nexus.io', role: 'Super Admin', status: 'Ativo' },
-                    { name: 'Ana Operadora', email: 'ana@nexus.io', role: 'Operador', status: 'Ativo' },
-                    { name: 'Suporte Nexus', email: 'help@nexus.io', role: 'Suporte', status: 'Inativo' },
-                  ].map((user, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-slate-200">
-                          <Users size={20} className="text-slate-400" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-slate-900">{user.name}</div>
-                          <div className="text-xs text-slate-500">{user.email}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-6">
-                        <div className="text-right">
-                          <div className="text-xs font-bold text-slate-900 uppercase tracking-tight">{user.role}</div>
-                          <div className={`text-[10px] font-bold uppercase ${user.status === 'Ativo' ? 'text-emerald-500' : 'text-slate-400'}`}>{user.status}</div>
-                        </div>
-                        <button className="p-2 text-slate-300 hover:text-slate-600"><MoreVertical size={18} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'webhooks' && (
-              <div className="space-y-8 max-w-2xl animate-in slide-in-from-right-2 duration-300">
-                <SectionHeader title="Webhooks Globais" subtitle="Endpoints de monitoramento do sistema em tempo real." />
-
-                <div className="space-y-6">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase">Webhook de Monitoramento Global</label>
-                      <div className="flex space-x-2">
-                        <input type="text" readOnly defaultValue="https://monitor.nexusdispatch.com/v1/health" className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono" />
-                        <button className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-slate-600"><RefreshCw size={16} /></button>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between pt-2">
-                      <span className="text-sm font-bold text-slate-700">Notificar falhas de entrega críticas</span>
-                      <div className="w-12 h-6 bg-slate-900 rounded-full relative p-1">
-                        <div className="w-4 h-4 bg-white rounded-full shadow-sm ml-auto"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-                      <Key size={16} />
-                      <span>Assinatura de Segurança</span>
-                    </h4>
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        readOnly
-                        defaultValue="sk_global_live_51M89B0L"
-                        className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
-                      />
-                      <button
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="p-3 bg-white border border-slate-200 rounded-xl text-slate-500"
-                      >
-                        {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'whatsapp' && (
-              <div className="space-y-8 animate-in slide-in-from-right-2 duration-300">
-                <SectionHeader
-                  title="Provedores de WhatsApp"
-                  subtitle="Configure os backends de conexão para os disparos."
-                  action={
-                    <button className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-900/10">
-                      <Plus size={16} />
-                      <span>Adicionar Gateway</span>
-                    </button>
-                  }
-                />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-6 bg-slate-50 rounded-2xl border-2 border-slate-900 relative">
-                    <div className="absolute top-4 right-4 bg-slate-900 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest">Default</div>
-                    <div className="flex items-center space-x-4 mb-4">
-                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-200">
-                        <Terminal size={24} className="text-slate-600" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900">Nexus-Core-API</div>
-                        <div className="text-xs text-slate-500">Gateway Nativo (Instance v3)</div>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold uppercase text-slate-400">
-                      <span>Status: Online</span>
-                      <span className="text-emerald-500">Latency: 42ms</span>
-                    </div>
-                  </div>
-
-                  <div className="p-6 bg-white rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer group">
-                    <div className="flex items-center space-x-4 mb-4">
-                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 group-hover:bg-slate-100 transition-colors">
-                        <Database size={24} className="text-slate-400" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900">Twilio API</div>
-                        <div className="text-xs text-slate-500">Integration v1.2</div>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold uppercase text-slate-400">
-                      <span>Status: Offline</span>
-                      <span className="text-slate-300">Não configurado</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'security' && (
-              <div className="space-y-8 max-w-2xl animate-in slide-in-from-right-2 duration-300">
-                <SectionHeader title="Segurança & Limites" subtitle="Políticas globais para evitar bloqueios e abusos." />
-
-                <div className="space-y-6">
-                  <div className="p-6 bg-amber-50 rounded-2xl border border-amber-100 flex items-start space-x-4">
-                    <AlertTriangle className="text-amber-600 shrink-0" size={24} />
-                    <div>
-                      <h4 className="text-sm font-bold text-amber-900">Atenção com Políticas Anti-Spam</h4>
-                      <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-                        Configurações mal dimensionadas podem levar ao banimento imediato dos números de WhatsApp associados. Recomendamos intervalos de pelo menos 15 segundos entre disparos.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div className="text-sm font-bold text-slate-900">Rate Limit Global (Mensagens/Minuto)</div>
-                        <input type="number" defaultValue="60" className="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-center font-bold" />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <div className="text-sm font-bold text-slate-900">Bloqueio Automático por Erros</div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs text-slate-400">Após</span>
-                          <input
-                            type="number"
-                            value={autoBlock}
-                            onChange={(e) => setAutoBlock(parseInt(e.target.value))}
-                            className="w-16 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-center font-bold"
-                          />
-                          <span className="text-xs text-slate-400">falhas seguidas</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-                      <div className="text-sm font-bold text-slate-900">Política de Consentimento Opt-In</div>
-                      <div className="w-12 h-6 bg-slate-900 rounded-full relative p-1">
-                        <div className="w-4 h-4 bg-white rounded-full shadow-sm ml-auto"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'audit' && (
-              <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
-                <SectionHeader title="Logs & Auditoria" subtitle="Rastro completo de atividades críticas na plataforma." />
-
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden text-sm">
-                  <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Histórico de Ações Administrativas</span>
-                  </div>
-                  <div className="divide-y divide-slate-100">
-                    {[
-                      { user: 'Admin', action: 'Criação de Campaign', target: 'cli_1', time: 'Há 5 minutos' },
-                      { user: 'Admin', action: 'Alteração de Provedor', target: 'System', time: 'Há 22 minutos' },
-                      { user: 'Ana', action: 'Exportação de Leads', target: 'cli_2', time: 'Há 1 hora' },
-                    ].map((log, i) => (
-                      <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                  {loadingProfiles ? (
+                    <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-300" /></div>
+                  ) : profiles.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400">Nenhum usuário encontrado (além de você).</div>
+                  ) : (
+                    profiles.map((profile, i) => (
+                      <div key={profile.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         <div className="flex items-center space-x-4">
-                          <Activity size={16} className="text-slate-300" />
+                          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-slate-200">
+                            <User size={20} className="text-slate-400" />
+                          </div>
                           <div>
-                            <span className="font-bold text-slate-900">{log.user}</span>
-                            <span className="mx-2 text-slate-400">•</span>
-                            <span className="text-slate-600">{log.action}</span>
+                            <div className="text-sm font-bold text-slate-900">{profile.full_name || 'Sem nome'}</div>
+                            <div className="text-xs text-slate-500">{profile.email}</div>
                           </div>
                         </div>
-                        <span className="text-xs text-slate-400 font-mono tracking-tighter">{log.time}</span>
+                        <div className="flex items-center space-x-6">
+                          <div className="text-right">
+                            <div className="text-xs font-bold text-slate-900 uppercase tracking-tight">{profile.role || 'User'}</div>
+                            <div className={`text-[10px] font-bold uppercase ${profile.status === 'active' ? 'text-emerald-500' : 'text-slate-400'}`}>{profile.status || 'Active'}</div>
+                          </div>
+                          <button className="p-2 text-slate-300 hover:text-slate-600"><MoreVertical size={18} /></button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Other detailed tabs */}
-            {['leads', 'campaigns', 'clients'].includes(activeTab) && (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-4 animate-in fade-in">
-                <Database size={48} className="opacity-10" />
-                <div className="text-center">
-                  <h3 className="font-bold text-slate-900">Módulo Administrativo em Escala</h3>
-                  <p className="text-sm max-w-xs mx-auto">Estas configurações gerenciam comportamentos globais de processamento de leads e campanhas.</p>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -440,7 +286,7 @@ const SettingsPage: React.FC = () => {
             <button
               onClick={handleSave}
               disabled={saveLoading}
-              className={`flex items-center space-x-2 px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-xl shadow-slate-900/10 transition-all ${saveLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-800 active:scale-95'
+              className={`flex items-center space-x-2 px-8 py-3 bg-red-600 text-white rounded-2xl font-bold shadow-xl shadow-red-200 transition-all ${saveLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-500 active:scale-95'
                 }`}
             >
               {saveLoading ? (
@@ -452,6 +298,84 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* New User Modal */}
+      {isNewUserModalOpen && (
+        <Modal
+          isOpen={isNewUserModalOpen}
+          onClose={() => setIsNewUserModalOpen(false)}
+          title="Convidar Novo Usuário"
+        >
+          <form onSubmit={handleCreateUser} className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email do Usuário</label>
+                <input
+                  required
+                  type="email"
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
+                  value={newUserEmail}
+                  onChange={e => setNewUserEmail(e.target.value)}
+                  placeholder="colaborador@nexus.io"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Função</label>
+                <select
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
+                  value={newUserRole}
+                  onChange={e => setNewUserRole(e.target.value)}
+                >
+                  <option value="user">Usuário Básico</option>
+                  <option value="operator">Operador</option>
+                  <option value="admin">Administrador</option>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  * Admins têm acesso total automático. Outros cargos dependem das permissões abaixo.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Permissões de Acesso (Páginas)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'dashboard', label: 'Dashboard' },
+                    { id: 'admin', label: 'Admin Hub' },
+                    { id: 'clients', label: 'Clientes' },
+                    { id: 'reports', label: 'Relatórios' },
+                    { id: 'transmission', label: 'Transmissão' },
+                    { id: 'settings', label: 'Configurações' },
+                  ].map((page) => (
+                    <label key={page.id} className="flex items-center space-x-2 p-2 border border-slate-100 rounded-lg cursor-pointer hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={newUserPermissions.includes(page.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewUserPermissions([...newUserPermissions, page.id]);
+                          } else {
+                            setNewUserPermissions(newUserPermissions.filter(p => p !== page.id));
+                          }
+                        }}
+                        className="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-gray-300"
+                      />
+                      <span className="text-xs font-medium text-slate-700">{page.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-slate-50">
+              <button type="button" onClick={() => setIsNewUserModalOpen(false)} className="flex-1 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-sm">Cancelar</button>
+              <button type="submit" disabled={saveLoading} className="flex-1 py-2 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-500 shadow-lg shadow-red-200">
+                {saveLoading ? 'Enviando...' : 'Enviar Convite'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 };
