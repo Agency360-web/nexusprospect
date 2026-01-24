@@ -138,18 +138,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </aside>
 
             <main className="flex-1 overflow-x-hidden">
-                <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
-                    <div className="flex items-center text-sm text-slate-500">
-                        <span>Nexus Hub</span>
-                        <ChevronRight size={14} className="mx-2" />
-                        <span className="text-slate-900 font-medium capitalize">
-                            {location.pathname === '/' ? 'Home' : location.pathname.split('/')[1].replace('-', ' ')}
-                        </span>
-                    </div>
 
-                </header>
 
-                <div className="p-8 max-w-7xl mx-auto">
+                <div className="p-8 pt-16 max-w-7xl mx-auto">
                     {children}
                 </div>
             </main>

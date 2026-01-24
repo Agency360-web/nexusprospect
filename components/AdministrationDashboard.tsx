@@ -32,6 +32,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import ContractManager from './ContractManager';
 import WhatsAppConnectGenerator from './WhatsAppConnectGenerator';
+import OperationalProcesses from './OperationalProcesses';
 
 // Interfaces
 interface FinancialKPIs {
@@ -215,7 +216,7 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
                         {(transaction.category || 'profissional') === 'profissional' ? (
                             <button
                                 onClick={() => handleMoveCategory('pessoal')}
-                                className="w-full text-left px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-sm text-brand-600 hover:bg-brand-50 rounded-lg flex items-center gap-2"
                             >
                                 <Briefcase size={14} />
                                 <span>Mover para Pessoal</span>
@@ -223,7 +224,7 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
                         ) : (
                             <button
                                 onClick={() => handleMoveCategory('profissional')}
-                                className="w-full text-left px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-sm text-brand-600 hover:bg-brand-50 rounded-lg flex items-center gap-2"
                             >
                                 <Building2 size={14} />
                                 <span>Mover para Profissional</span>
@@ -448,7 +449,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
                     <button
                         type="submit"
                         disabled={loading}
-                        className={`w-full py-3 rounded-xl font-bold text-white shadow-lg shadow-indigo-100 transition-all active:scale-95 ${loading ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}
+                        className={`w-full py-3 rounded-xl font-bold text-white shadow-lg shadow-brand-100 transition-all active:scale-95 ${loading ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}
                     >
                         {loading ? 'Salvando...' : 'Salvar Transação'}
                     </button>
@@ -460,7 +461,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
 
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'finance' | 'contracts' | 'whatsapp'>('finance');
+    const [activeTab, setActiveTab] = useState<'finance' | 'contracts' | 'whatsapp' | 'processes'>('finance');
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
     const [dashboardScope, setDashboardScope] = useState<'pessoal' | 'profissional'>('profissional');
 
@@ -720,12 +721,12 @@ const AdministrationDashboard: React.FC = () => {
     const TabButton = ({ id, label, icon: Icon }: { id: typeof activeTab, label: string, icon: any }) => (
         <button
             onClick={() => setActiveTab(id)}
-            className={`flex items-center space-x-2 px-6 py-4 border-b-2 transition-all shrink-0 ${activeTab === id
-                ? 'border-slate-900 text-slate-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200'
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-300 font-bold text-sm ${activeTab === id
+                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 scale-105'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
         >
-            <Icon size={18} />
+            <Icon size={18} className={activeTab === id ? 'text-brand-400' : ''} />
             <span>{label}</span>
         </button>
     );
@@ -744,21 +745,28 @@ const AdministrationDashboard: React.FC = () => {
                 />
             )}
 
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Administração</h1>
-                    <p className="text-slate-500">Gestão centralizada de departamentos e recursos.</p>
+            {/* Header - Premium Dark Hero */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative shadow-2xl shadow-slate-900/10">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-red-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+
+                <div className="relative z-10">
+                    <h1 className="text-3xl font-black mb-2 tracking-tight flex items-center gap-3">
+                        <Building2 className="text-red-500" size={32} />
+                        Administração
+                    </h1>
+                    <p className="text-slate-300 font-medium w-full">Gestão centralizada de departamentos, contratos e recursos da plataforma.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    {/* Actions moved to specific tabs */}
+
+                <div className="relative z-10 flex gap-3">
+                    {/* Actions specific to context could go here */}
                 </div>
             </div>
 
-            {/* Tabs Nav */}
-            <div className="bg-white border-b border-slate-200 sticky top-16 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
+            {/* Tabs Nav - Premium Pills */}
+            <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl w-fit sticky top-4 z-20 shadow-sm mx-auto md:mx-0">
                 <TabButton id="finance" label="Financeiro" icon={Activity} />
                 <TabButton id="contracts" label="Gestão de Contratos" icon={FileText} />
+                <TabButton id="processes" label="Processos Operacionais" icon={Briefcase} />
                 <TabButton id="whatsapp" label="Conexão WhatsApp" icon={QrCode} />
             </div>
 
@@ -894,75 +902,101 @@ const AdministrationDashboard: React.FC = () => {
                         </div>
 
                         {/* Metric Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {/* MRR (Static / Projeção) - REMOVED */}
-                            {/* Churn (Static) - REMOVED */}
-
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                             {/* Revenue (Dynamic) */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600 group-hover:scale-110 transition-transform">
-                                        <CheckCircle2 size={20} />
+                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform">
+                                        <TrendingUp size={20} />
                                     </div>
+                                    <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Receita</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Receita (Bruta)</h3>
-                                    <div className="text-2xl font-black text-emerald-600">
+                                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Entradas (Pago)</h3>
+                                    <div className="text-2xl font-black text-slate-900 tracking-tight">
                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.revenue)}
                                     </div>
-                                    <div className="text-[10px] text-emerald-600 font-bold mt-1 uppercase tracking-wide">ENTRADAS</div>
+                                </div>
+                                <div className="h-1 w-full bg-emerald-100 mt-4 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 w-full animate-pulse"></div>
                                 </div>
                             </div>
 
                             {/* Expenses (Dynamic) */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-rose-50 rounded-xl text-rose-500 group-hover:scale-110 transition-transform">
+                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform">
                                         <ArrowDownRight size={20} />
                                     </div>
+                                    <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 px-2 py-1 rounded-full">Despesas</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Despesas</h3>
-                                    <div className="text-2xl font-black text-rose-500">
+                                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Saídas (Pago)</h3>
+                                    <div className="text-2xl font-black text-slate-900 tracking-tight">
                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.expenses)}
                                     </div>
-                                    <div className="text-[10px] text-rose-400 font-bold mt-1 uppercase tracking-wide">SAÍDAS</div>
+                                </div>
+                                <div className="h-1 w-full bg-rose-100 mt-4 rounded-full overflow-hidden">
+                                    <div className="h-full bg-rose-500 w-3/4"></div>
+                                </div>
+                            </div>
+
+                            {/* Balance (Dynamic) */}
+                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                                        <DollarSign size={20} />
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase text-blue-600 bg-blue-50 px-2 py-1 rounded-full">Saldo</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Caixa Líquido</h3>
+                                    <div className={`text-2xl font-black tracking-tight ${dynamicKPIs.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.balance)}
+                                    </div>
+                                </div>
+                                <div className="h-1 w-full bg-blue-100 mt-4 rounded-full overflow-hidden">
+                                    <div className={`h-full bg-blue-500 w-1/2`}></div>
                                 </div>
                             </div>
 
                             {/* Forecast (Dynamic) */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-amber-50 rounded-xl text-amber-500 group-hover:scale-110 transition-transform">
+                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform">
                                         <Clock size={20} />
                                     </div>
+                                    <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-1 rounded-full">Futuro</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">A Receber</h3>
-                                    <div className="text-2xl font-black text-slate-900">
+                                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">A Receber</h3>
+                                    <div className="text-2xl font-black text-slate-900 tracking-tight">
                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.forecast)}
                                     </div>
-                                    <div className="text-[10px] text-amber-500 font-bold mt-1 uppercase tracking-wide">PENDENTE</div>
+                                </div>
+                                <div className="h-1 w-full bg-amber-100 mt-4 rounded-full overflow-hidden">
+                                    <div className="h-full bg-amber-500 w-1/3"></div>
                                 </div>
                             </div>
 
                             {/* Overdue (Dynamic) */}
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-rose-50 rounded-xl text-rose-500 group-hover:scale-110 transition-transform">
+                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-110 transition-transform">
                                         <AlertTriangle size={20} />
                                     </div>
+                                    <span className="text-[10px] font-black uppercase text-purple-600 bg-purple-50 px-2 py-1 rounded-full">Atenção</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Em Atraso</h3>
-                                    <div className="text-2xl font-black text-rose-500">
+                                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Em Atraso</h3>
+                                    <div className="text-2xl font-black text-rose-500 tracking-tight">
                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.overdue)}
                                     </div>
-                                    <div className="text-[10px] text-rose-400 font-bold mt-1 uppercase tracking-wide">AÇÃO NECESSÁRIA</div>
+                                </div>
+                                <div className="h-1 w-full bg-purple-100 mt-4 rounded-full overflow-hidden">
+                                    <div className="h-full bg-purple-500 w-1/4"></div>
                                 </div>
                             </div>
-
-
                         </div>
 
                         {/* Main Grid: Chart & Table */}
@@ -1038,7 +1072,10 @@ const AdministrationDashboard: React.FC = () => {
                             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                                 <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div className="flex items-center gap-4">
-                                        <h2 className="text-lg font-bold text-slate-900">Transações ({filteredTransactions.length})</h2>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-slate-900">Transações Recentes</h2>
+                                            <p className="text-xs text-slate-500 mt-1">Histórico completo de movimentações</p>
+                                        </div>
                                         {selectedTransactions.size > 0 && (
                                             <button
                                                 onClick={handleBulkDelete}
@@ -1050,9 +1087,13 @@ const AdministrationDashboard: React.FC = () => {
                                         )}
                                     </div>
                                     <div className="flex items-center space-x-2">
-                                        <div className="relative">
-                                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input type="text" placeholder="Buscar..." className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-slate-900 transition-all w-64" />
+                                        <div className="relative group">
+                                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar transações..."
+                                                className="pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all w-64"
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -1060,57 +1101,64 @@ const AdministrationDashboard: React.FC = () => {
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="border-b border-slate-100 bg-slate-50/50">
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-10 w-16">
+                                            <tr className="border-b border-slate-100">
+                                                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-10 w-16">
                                                     <input
                                                         type="checkbox"
                                                         checked={paginatedTransactions.length > 0 && selectedTransactions.size >= paginatedTransactions.length}
                                                         onChange={toggleSelectAll}
-                                                        className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                                                        className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                                                     />
                                                 </th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0">Data</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descrição</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                                                <th className="px-8 py-4"></th>
+                                                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0">Data</th>
+                                                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente / Descrição</th>
+                                                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categoria</th>
+                                                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
+                                                <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                                <th className="px-8 py-5"></th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100">
+                                        <tbody className="divide-y divide-slate-50">
                                             {paginatedTransactions.length > 0 ? (
                                                 paginatedTransactions.map((trx, i) => (
-                                                    <tr key={trx.id} className="hover:bg-slate-50 transition-colors group">
+                                                    <tr key={trx.id} className="hover:bg-slate-50/80 transition-colors group">
                                                         <td className="px-8 py-5 pl-10">
                                                             <input
                                                                 type="checkbox"
                                                                 checked={selectedTransactions.has(trx.id)}
                                                                 onChange={() => toggleSelectTransaction(trx.id)}
-                                                                className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                                                                className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                                                             />
                                                         </td>
-                                                        <td className="px-8 py-5 text-sm text-slate-500 pl-0">
+                                                        <td className="px-8 py-5 text-sm text-slate-500 pl-0 font-medium">
                                                             {new Date(trx.transaction_date).toLocaleDateString()}
                                                         </td>
                                                         <td className="px-8 py-5">
                                                             <div className="font-bold text-slate-900 text-sm">{trx.client_name}</div>
+                                                            <div className="text-xs text-slate-400 mt-0.5">{trx.description}</div>
                                                         </td>
-                                                        <td className="px-8 py-5 text-sm text-slate-500 max-w-[200px] truncate" title={trx.description}>
-                                                            {trx.description}
+                                                        <td className="px-8 py-5">
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${(trx.category || 'profissional') === 'pessoal'
+                                                                ? 'bg-purple-50 text-purple-700 border-purple-100'
+                                                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                                }`}>
+                                                                {trx.category || 'Profissional'}
+                                                            </span>
                                                         </td>
                                                         <td className="px-8 py-5 text-sm font-black text-slate-900">
                                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trx.amount)}
                                                         </td>
                                                         <td className="px-8 py-5">
-                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${trx.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                                trx.status === 'pendente' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                                    trx.status === 'atrasado' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                                                                        'bg-slate-50 text-slate-700 border-slate-100'
+                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${trx.status === 'pago' ? 'bg-emerald-100 text-emerald-700' :
+                                                                trx.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
+                                                                    trx.status === 'atrasado' ? 'bg-rose-100 text-rose-700' :
+                                                                        'bg-slate-100 text-slate-700'
                                                                 }`}>
+                                                                {trx.status === 'pago' && <CheckCircle2 size={12} className="mr-1" />}
                                                                 {trx.status}
                                                             </span>
                                                         </td>
-                                                        <td className="px-8 py-5 text-right pr-8">
+                                                        <td className="px-8 py-5 text-right pr-8 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <TransactionMenu
                                                                 transaction={trx}
                                                                 onUpdate={() => {
@@ -1122,8 +1170,13 @@ const AdministrationDashboard: React.FC = () => {
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan={6} className="py-20 text-center text-slate-500">
-                                                        Nenhuma transação encontrada neste período.
+                                                    <td colSpan={7} className="py-20 text-center">
+                                                        <div className="flex flex-col items-center justify-center text-slate-400 gap-4">
+                                                            <div className="p-4 bg-slate-50 rounded-full">
+                                                                <Search size={32} />
+                                                            </div>
+                                                            <p>Nenhuma transação encontrada neste período.</p>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )}
@@ -1132,21 +1185,21 @@ const AdministrationDashboard: React.FC = () => {
 
                                     {/* Pagination Controls */}
                                     {totalPages > 1 && (
-                                        <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-between">
+                                        <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
                                             <button
                                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                                 disabled={currentPage === 1}
-                                                className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                                             >
                                                 <ChevronLeft size={16} />
                                             </button>
-                                            <span className="text-sm font-medium text-slate-600">
-                                                Página <span className="text-slate-900 font-bold">{currentPage}</span> de <span className="text-slate-900 font-bold">{totalPages}</span>
+                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                Página <span className="text-slate-900">{currentPage}</span> de <span className="text-slate-900">{totalPages}</span>
                                             </span>
                                             <button
                                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                                 disabled={currentPage === totalPages}
-                                                className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                                             >
                                                 <ChevronRight size={16} />
                                             </button>
@@ -1154,6 +1207,7 @@ const AdministrationDashboard: React.FC = () => {
                                     )}
                                 </div>
                             </div>
+
                         </div>
 
                         {/* Financial Health - Simplified or Removed? Moved to side or keep? 
@@ -1169,6 +1223,13 @@ const AdministrationDashboard: React.FC = () => {
                 {activeTab === 'contracts' && (
                     <div className="animate-in slide-in-from-bottom-2 duration-300">
                         <ContractManager />
+                    </div>
+                )}
+
+                {/* Operational Processes Tab */}
+                {activeTab === 'processes' && (
+                    <div className="animate-in slide-in-from-bottom-2 duration-300">
+                        <OperationalProcesses />
                     </div>
                 )}
 

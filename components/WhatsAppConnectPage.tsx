@@ -50,30 +50,33 @@ const WhatsAppConnectPage: React.FC = () => {
 
         try {
             const cleanUrl = instanceUrl.replace(/\/$/, '');
-            // According to request: POST /instance/connect header: token
+            console.log('Initiating connection to:', cleanUrl);
+
+            // According to UAZAPI docs: POST /instance/connect
             const response = await fetch(`${cleanUrl}/instance/connect`, {
                 method: 'POST',
                 headers: {
+                    'Accept': 'application/json',
                     'Content-Type': 'application/json',
                     'token': token
                 },
-                body: JSON.stringify({}) // Empty body for QR Code
+                body: JSON.stringify({}) // Empty body to trigger QR Code generation
             });
 
             const data = await response.json().catch(() => ({}));
+            console.log('Connect response:', data);
 
             if (!response.ok) {
-
                 const msg = data?.message || data?.error || '';
 
-                // Special handling for "Connection still in progress"
-                if (typeof msg === 'string' && msg.includes('Connection still in progress')) {
-
+                // Handle specific UAZAPI states
+                if (typeof msg === 'string' && (msg.includes('Connection still in progress') || msg.includes('QR Code not ready'))) {
+                    console.log('Connection in progress, starting polling...');
                     setStatus('loading');
                     startPolling();
-                    return; // Exit connectInstance, let polling handle it
+                    return;
                 } else if (typeof msg === 'string' && msg.includes('Instance already connected')) {
-                    // If already connected
+                    console.log('Instance already connected');
                     setStatus('connected');
                     setConnectionStatus('connected');
                     return;
@@ -82,28 +85,34 @@ const WhatsAppConnectPage: React.FC = () => {
                 throw new Error(msg || 'Erro na requisição de conexão');
             }
 
-            // Safe check for QR Code
-            let qrValue: string | null = null;
-            if (data.base64 && typeof data.base64 === 'string') {
-                qrValue = data.base64;
-            } else if (data.qrcode && typeof data.qrcode === 'string') {
-                qrValue = data.qrcode;
-            } else if (typeof data === 'string' && data.length > 20) {
-                // Sometimes raw string? unlikley but possible
-                qrValue = data;
-            }
-
-            if (qrValue) {
-                setQrCode(qrValue);
-                setStatus('qr_ready');
-            } else {
-                // If success but no QR, maybe polling will catch it?
-                // or maybe it's already connected.
-
-            }
+            // Immediately check status to get the freshest QR code
+            // The connect endpoint might return one, but /status is the source of truth for updates
+            handleQrCodeData(data);
+            startPolling();
 
         } catch (error: any) {
+            console.error('Connection initialization error:', error);
             throw new Error('Falha ao contactar servidor: ' + error.message);
+        }
+    };
+
+    const handleQrCodeData = (data: any) => {
+        // Safe extraction of QR Code from various common API formats
+        let qrValue: string | null = null;
+
+        if (data?.base64 && typeof data.base64 === 'string') {
+            qrValue = data.base64;
+        } else if (data?.qrcode && typeof data.qrcode === 'string') {
+            qrValue = data.qrcode;
+        } else if (data?.qr && typeof data.qr === 'string') {
+            qrValue = data.qr;
+        } else if (typeof data === 'string' && data.length > 50 && data.includes('data:image')) {
+            qrValue = data;
+        }
+
+        if (qrValue) {
+            setQrCode(qrValue);
+            setStatus('qr_ready');
         }
     };
 
@@ -115,32 +124,26 @@ const WhatsAppConnectPage: React.FC = () => {
             const response = await fetch(`${cleanUrl}/instance/status`, {
                 method: 'GET',
                 headers: {
+                    'Accept': 'application/json',
                     'token': token
                 }
             });
 
             if (response.ok) {
                 const data = await response.json();
+                // console.log('Status poll:', data); // Uncomment for debugging if needed
+
                 const currentStatus = data.status || 'disconnected';
                 setConnectionStatus(currentStatus);
 
-                // If QR Code comes in polling response
-                let qrValue: string | null = null;
-                if (data.base64 && typeof data.base64 === 'string') {
-                    qrValue = data.base64;
-                } else if (data.qrcode && typeof data.qrcode === 'string') {
-                    qrValue = data.qrcode;
-                }
-
-                if (qrValue && status !== 'connected') {
-                    setQrCode(qrValue);
-                    setStatus('qr_ready');
-                }
+                // Update QR if available in status response
+                handleQrCodeData(data);
 
                 if (currentStatus === 'connected') {
                     setStatus('connected');
                     if (pollInterval.current) clearInterval(pollInterval.current);
                 } else if (currentStatus === 'disconnected' && status === 'connected') {
+                    // Start over if disconnected
                     setStatus('idle');
                 }
             }
@@ -152,7 +155,7 @@ const WhatsAppConnectPage: React.FC = () => {
     const startPolling = () => {
         if (pollInterval.current) clearInterval(pollInterval.current);
         checkStatus(); // Initial check
-        pollInterval.current = setInterval(checkStatus, 5000); // Poll every 5s
+        pollInterval.current = setInterval(checkStatus, 2000); // Poll every 2s for faster feedback
     };
 
     // Explicit refresh logic
