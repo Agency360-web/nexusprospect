@@ -7,9 +7,11 @@ import {
   MoreVertical,
   LogOut,
   User,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useRBAC } from '../hooks/useRBAC';
 import Modal from './ui/Modal';
 import { supabase } from '../lib/supabase';
 
@@ -25,8 +27,11 @@ interface Profile {
 
 const SettingsPage: React.FC = () => {
   const { user, signOut } = useAuth();
+  const { hasRole } = useRBAC();
+
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [saveLoading, setSaveLoading] = useState(false);
+
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
   const [platformName, setPlatformName] = useState(user?.user_metadata?.platform_name || 'NexusDispatch');
 
@@ -122,6 +127,27 @@ const SettingsPage: React.FC = () => {
     } catch (error: any) {
       console.error('Error inviting user:', error);
       alert(`Erro ao enviar convite: ${error.message}`);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Tem certeza? Essa ação excluirá o usuário permanentemente.')) return;
+
+    setSaveLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke('delete-user', {
+        body: { user_id: userId }
+      });
+
+      if (error) throw error;
+
+      setProfiles(profiles.filter(p => p.id !== userId));
+      alert('Usuário removido com sucesso.');
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      alert(`Erro ao remover: ${error.message}`);
     } finally {
       setSaveLoading(false);
     }
@@ -268,7 +294,17 @@ const SettingsPage: React.FC = () => {
                             <div className="text-xs font-bold text-slate-900 uppercase tracking-tight">{profile.role || 'User'}</div>
                             <div className={`text-[10px] font-bold uppercase ${profile.status === 'active' ? 'text-emerald-500' : 'text-slate-400'}`}>{profile.status || 'Active'}</div>
                           </div>
-                          <button className="p-2 text-slate-300 hover:text-slate-600"><MoreVertical size={18} /></button>
+
+                          {/* Only Admins can delete, and cannot delete themselves */}
+                          {hasRole('admin') && user?.id !== profile.id && (
+                            <button
+                              onClick={() => handleDeleteUser(profile.id)}
+                              title="Remover Usuário"
+                              className="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))
