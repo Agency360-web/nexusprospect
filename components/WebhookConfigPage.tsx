@@ -1,19 +1,34 @@
 
 import React, { useState } from 'react';
-import { 
-  Globe, 
-  Lock, 
-  Copy, 
-  Check, 
-  RefreshCw, 
-  Code2, 
+import {
+  Globe,
+  Lock,
+  Copy,
+  Check,
+  RefreshCw,
+  Code2,
   ArrowRightLeft,
   Terminal
 } from 'lucide-react';
 
 const WebhookConfigPage: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
-  const [secret, setSecret] = useState('nx_live_8v2a1z9m7w6q4p5r3x');
+  const [secret, setSecret] = useState('');
+
+  React.useEffect(() => {
+    // Generate a random secret on mount if not exists
+    generateSecret();
+  }, []);
+
+  const generateSecret = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const prefix = 'nx_live_';
+    let result = '';
+    for (let i = 0; i < 24; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setSecret(prefix + result);
+  };
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -28,7 +43,7 @@ const WebhookConfigPage: React.FC = () => {
           <Terminal size={14} className="text-slate-400" />
           <span className="text-xs font-mono text-slate-300">{title}</span>
         </div>
-        <button 
+        <button
           onClick={() => copyToClipboard(code, title)}
           className="text-slate-400 hover:text-white transition-colors"
         >
@@ -58,13 +73,13 @@ const WebhookConfigPage: React.FC = () => {
                 <span>Endpoint de Entrada (Inbound)</span>
               </label>
               <div className="relative">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   defaultValue="https://api.nexusdispatch.com/v1/webhook/receive"
                   readOnly
                   className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 font-mono text-xs text-slate-600 outline-none"
                 />
-                <button 
+                <button
                   onClick={() => copyToClipboard('https://api.nexusdispatch.com/v1/webhook/receive', 'inbound')}
                   className="absolute right-3 top-2.5 p-1.5 text-slate-400 hover:text-slate-600"
                 >
@@ -79,8 +94,8 @@ const WebhookConfigPage: React.FC = () => {
                 <ArrowRightLeft size={16} className="text-slate-400" />
                 <span>URL de Retorno (Outbound)</span>
               </label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="https://seu-sistema.com/webhook/callback"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 transition-all font-mono text-xs"
               />
@@ -95,20 +110,23 @@ const WebhookConfigPage: React.FC = () => {
             </label>
             <div className="flex space-x-3">
               <div className="relative flex-1">
-                <input 
-                  type="password" 
+                <input
+                  type="password"
                   value={secret}
                   readOnly
                   className="w-full bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 font-mono text-xs text-slate-600 outline-none"
                 />
-                <button 
+                <button
                   onClick={() => copyToClipboard(secret, 'secret')}
                   className="absolute right-3 top-2.5 p-1.5 text-slate-400 hover:text-slate-600"
                 >
                   {copied === 'secret' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
                 </button>
               </div>
-              <button className="px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors flex items-center space-x-2 text-sm font-medium">
+              <button
+                onClick={generateSecret}
+                className="px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors flex items-center space-x-2 text-sm font-medium"
+              >
                 <RefreshCw size={16} />
                 <span>Regerar</span>
               </button>
@@ -132,31 +150,31 @@ const WebhookConfigPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wider">Request (Seu Sistema → Nexus)</h3>
-            <CodeBlock 
+            <CodeBlock
               title="POST /v1/webhook/receive"
               code={JSON.stringify({
-  campaign_name: "Promoção Outono",
-  message: "Olá {{nome}}, confira nossa oferta!",
-  contacts: [
-    { name: "Carlos", phone: "5511988887777" },
-    { name: "Ana", phone: "5521977776666" }
-  ]
-}, null, 2)}
+                campaign_name: "Promoção Outono",
+                message: "Olá {{nome}}, confira nossa oferta!",
+                contacts: [
+                  { name: "Carlos", phone: "5511988887777" },
+                  { name: "Ana", phone: "5521977776666" }
+                ]
+              }, null, 2)}
             />
           </div>
 
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wider">Callback (Nexus → Seu Sistema)</h3>
-            <CodeBlock 
+            <CodeBlock
               title="POST /seu-callback-url"
               code={JSON.stringify({
-  campaign_id: "nx_camp_abc123",
-  timestamp: "2023-10-27T15:30:00Z",
-  updates: [
-    { phone: "5511988887777", status: "delivered" },
-    { phone: "5521977776666", status: "error", error: "Invalid number" }
-  ]
-}, null, 2)}
+                campaign_id: "nx_camp_abc123",
+                timestamp: "2023-10-27T15:30:00Z",
+                updates: [
+                  { phone: "5511988887777", status: "delivered" },
+                  { phone: "5521977776666", status: "error", error: "Invalid number" }
+                ]
+              }, null, 2)}
             />
           </div>
         </div>
