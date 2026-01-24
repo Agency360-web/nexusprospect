@@ -14,7 +14,17 @@ import {
   Settings,
   MoreVertical,
   Edit2,
-  Trash2
+  Trash2,
+  Mail,
+  Phone,
+  User,
+  MapPin,
+  FileText,
+  Clock,
+  DollarSign,
+  CreditCard,
+  ClipboardList,
+  ShieldCheck
 } from 'lucide-react';
 import { Client } from '../types';
 import { supabase } from '../lib/supabase';
@@ -278,133 +288,186 @@ const ClientManager: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={modalMode === 'create' ? "Novo Cliente" : "Editar Cliente"}
+        size="xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-8">
 
           {/* Section 1: Company Info */}
-          <div className="space-y-4 pt-2">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Dados da Empresa</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                <Building2 size={18} />
+              </div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Dados da Empresa</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Nome Fantasia (Interno)</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Tech Solutions"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.name}
-                  onChange={e => setClientForm({ ...clientForm, name: e.target.value })}
-                  required
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Nome Fantasia (Interno)</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                    <Building2 size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: Tech Solutions"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    value={clientForm.name}
+                    onChange={e => setClientForm({ ...clientForm, name: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Razão Social</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Tech Solutions Ltda"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.corporateName}
-                  onChange={e => setClientForm({ ...clientForm, corporateName: e.target.value })}
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Razão Social</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                    <Building2 size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: Tech Solutions Ltda"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    value={clientForm.corporateName}
+                    onChange={e => setClientForm({ ...clientForm, corporateName: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">CNPJ</label>
-                <input
-                  type="text"
-                  placeholder="00.000.000/0001-00"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.cnpj}
-                  onChange={e => setClientForm({ ...clientForm, cnpj: e.target.value })}
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">CNPJ</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                    <ShieldCheck size={16} className="lucide-building-2" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="00.000.000/0001-00"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    value={clientForm.cnpj}
+                    onChange={e => setClientForm({ ...clientForm, cnpj: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">E-mail</label>
-                <input
-                  type="email"
-                  placeholder="contato@empresa.com"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.email}
-                  onChange={e => setClientForm({ ...clientForm, email: e.target.value })}
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">E-mail</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                    <Mail size={16} />
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="contato@empresa.com"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    value={clientForm.email}
+                    onChange={e => setClientForm({ ...clientForm, email: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Telefone / WhatsApp</label>
-                <input
-                  type="text"
-                  placeholder="(11) 99999-9999"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.phone}
-                  onChange={e => setClientForm({ ...clientForm, phone: e.target.value })}
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Telefone / WhatsApp</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                    <Phone size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="(11) 99999-9999"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    value={clientForm.phone}
+                    onChange={e => setClientForm({ ...clientForm, phone: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Nome do Responsável</label>
-              <input
-                type="text"
-                placeholder="Quem assina o contrato?"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                value={clientForm.contactPerson}
-                onChange={e => setClientForm({ ...clientForm, contactPerson: e.target.value })}
-              />
+              <label className="text-[13px] font-bold text-slate-600 ml-1">Nome do Responsável</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                  <User size={16} />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Quem assina o contrato?"
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                  value={clientForm.contactPerson}
+                  onChange={e => setClientForm({ ...clientForm, contactPerson: e.target.value })}
+                />
+              </div>
             </div>
           </div>
 
           {/* Section 2: Address */}
-          <div className="space-y-4 pt-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Endereço Completo</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                <MapPin size={18} />
+              </div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Endereço Completo</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="space-y-2 md:col-span-1">
-                <label className="text-sm font-bold text-slate-700">CEP</label>
-                <input
-                  type="text"
-                  placeholder="00000-000"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.zipCode}
-                  onChange={e => setClientForm({ ...clientForm, zipCode: e.target.value })}
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">CEP</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-emerald-500 transition-colors">
+                    <MapPin size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="00000-000"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                    value={clientForm.zipCode}
+                    onChange={e => setClientForm({ ...clientForm, zipCode: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="space-y-2 md:col-span-3">
-                <label className="text-sm font-bold text-slate-700">Endereço (Rua, Número, Comp)</label>
-                <input
-                  type="text"
-                  placeholder="Av. Paulista, 1000 - Cj 10"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.address}
-                  onChange={e => setClientForm({ ...clientForm, address: e.target.value })}
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Endereço (Rua, Número, Comp)</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-emerald-500 transition-colors">
+                    <MapPin size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Av. Paulista, 1000 - Cj 10"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                    value={clientForm.address}
+                    onChange={e => setClientForm({ ...clientForm, address: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Bairro</label>
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Bairro</label>
                 <input
                   type="text"
                   placeholder="Bairro"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   value={clientForm.neighborhood}
                   onChange={e => setClientForm({ ...clientForm, neighborhood: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Cidade</label>
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Cidade</label>
                 <input
                   type="text"
                   placeholder="Cidade"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   value={clientForm.city}
                   onChange={e => setClientForm({ ...clientForm, city: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Estado</label>
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Estado</label>
                 <input
                   type="text"
                   placeholder="UF"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   value={clientForm.state}
                   onChange={e => setClientForm({ ...clientForm, state: e.target.value })}
                 />
@@ -413,87 +476,124 @@ const ClientManager: React.FC = () => {
           </div>
 
           {/* Section 3: Contract Defaults */}
-          <div className="space-y-4 pt-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Dados Padrão do Contrato</h3>
+          <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                <FileText size={18} />
+              </div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Dados Padrão do Contrato</h3>
+            </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Serviços Contratados</label>
-              <textarea
-                placeholder="Descrição resumida dos serviços..."
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 min-h-[60px]"
-                value={clientForm.defaultServices}
-                onChange={e => setClientForm({ ...clientForm, defaultServices: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Prazo do Contrato</label>
-                <input
-                  type="text"
-                  placeholder="Ex: 12 meses"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.defaultTerm}
-                  onChange={e => setClientForm({ ...clientForm, defaultTerm: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Valor Total</label>
-                <input
-                  type="text"
-                  placeholder="Ex: R$ 5.000,00"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.defaultValue}
-                  onChange={e => setClientForm({ ...clientForm, defaultValue: e.target.value })}
+              <label className="text-[13px] font-bold text-slate-600 ml-1">Serviços Contratados</label>
+              <div className="relative group">
+                <div className="absolute top-3 left-4 pointer-events-none text-slate-400 group-focus-within:text-amber-500 transition-colors">
+                  <ClipboardList size={16} />
+                </div>
+                <textarea
+                  placeholder="Descrição resumida dos serviços..."
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all min-h-[80px]"
+                  value={clientForm.defaultServices}
+                  onChange={e => setClientForm({ ...clientForm, defaultServices: e.target.value })}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Forma de Pagamento</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Boleto Bancário"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.defaultPaymentMethod}
-                  onChange={e => setClientForm({ ...clientForm, defaultPaymentMethod: e.target.value })}
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Prazo do Contrato</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-amber-500 transition-colors">
+                    <Clock size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: 12 meses"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
+                    value={clientForm.defaultTerm}
+                    onChange={e => setClientForm({ ...clientForm, defaultTerm: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Condições de Pagamento</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Dia 10 de cada mês"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900"
-                  value={clientForm.defaultPaymentConditions}
-                  onChange={e => setClientForm({ ...clientForm, defaultPaymentConditions: e.target.value })}
-                />
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Valor Total</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-amber-500 transition-colors">
+                    <DollarSign size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: R$ 5.000,00"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
+                    value={clientForm.defaultValue}
+                    onChange={e => setClientForm({ ...clientForm, defaultValue: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Forma de Pagamento</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-amber-500 transition-colors">
+                    <CreditCard size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: Boleto Bancário"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
+                    value={clientForm.defaultPaymentMethod}
+                    onChange={e => setClientForm({ ...clientForm, defaultPaymentMethod: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[13px] font-bold text-slate-600 ml-1">Condições de Pagamento</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-amber-500 transition-colors">
+                    <ClipboardList size={16} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: Dia 10 de cada mês"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
+                    value={clientForm.defaultPaymentConditions}
+                    onChange={e => setClientForm({ ...clientForm, defaultPaymentConditions: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
           {/* Section 4: Obs */}
-          <div className="space-y-2 pt-4 border-t border-slate-100">
-            <label className="text-sm font-bold text-slate-700">Observações Gerais</label>
+          <div className="space-y-3 pt-2">
+            <label className="text-[13px] font-bold text-slate-600 ml-1 flex items-center gap-2">
+              <FileText size={14} className="text-slate-400" />
+              Observações Gerais
+            </label>
             <textarea
               placeholder="Notas internas sobre o cliente..."
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 min-h-[80px]"
+              className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all min-h-[100px]"
               value={clientForm.observations}
               onChange={e => setClientForm({ ...clientForm, observations: e.target.value })}
             />
           </div>
-          <div className="pt-4 flex justify-end space-x-3">
+
+          <div className="pt-6 flex justify-end items-center gap-4 sticky bottom-0 bg-white py-4 border-t border-slate-100 -mx-6 px-6 z-10">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl"
+              className="px-6 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={createLoading}
-              className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl disabled:opacity-50 flex items-center space-x-2"
+              className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl disabled:opacity-50 flex items-center gap-2 shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all hover:-translate-y-0.5"
             >
-              {createLoading && <Loader2 size={16} className="animate-spin" />}
+              {createLoading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
               <span>{modalMode === 'create' ? 'Criar Cliente' : 'Salvar Alterações'}</span>
             </button>
           </div>
