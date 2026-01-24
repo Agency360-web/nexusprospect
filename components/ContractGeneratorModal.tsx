@@ -30,7 +30,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
         if (this.state.hasError) {
             return (
                 <div className="p-8 text-center">
-                    <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+                    <div className="bg-slate-900 text-[#ffd700] p-4 rounded-lg mb-4">
                         <h3 className="font-bold mb-2">Algo deu errado no editor</h3>
                         <pre className="text-xs text-left overflow-auto max-h-40">{this.state.error?.message}</pre>
                     </div>

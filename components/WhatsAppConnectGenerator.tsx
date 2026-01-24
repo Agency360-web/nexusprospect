@@ -38,10 +38,10 @@ const WhatsAppConnectGenerator: React.FC = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                 <div className="flex items-center gap-4 mb-8">
-                    <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl">
+                    <div className="p-3 bg-slate-900 text-[#ffd700] rounded-xl">
                         <QrCode size={32} />
                     </div>
                     <div>
@@ -61,7 +61,7 @@ const WhatsAppConnectGenerator: React.FC = () => {
                                 value={instanceUrl}
                                 onChange={(e) => setInstanceUrl(e.target.value)}
                                 placeholder="https://api.uazapi.com/instance/..."
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono text-sm"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffd700]/20 focus:border-[#ffd700] transition-all font-mono text-sm"
                             />
                             <p className="text-xs text-slate-400 mt-2">
                                 A URL base da sua API (ex: https://conectalabsbs.uazapi.com)
@@ -77,7 +77,7 @@ const WhatsAppConnectGenerator: React.FC = () => {
                                 value={token}
                                 onChange={(e) => setToken(e.target.value)}
                                 placeholder="Seu token de autenticação"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono text-sm"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffd700]/20 focus:border-[#ffd700] transition-all font-mono text-sm"
                             />
                         </div>
 
@@ -98,7 +98,7 @@ const WhatsAppConnectGenerator: React.FC = () => {
                         ) : (
                             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
                                 <div className="text-center">
-                                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <div className="w-12 h-12 bg-slate-900 text-[#ffd700] rounded-full flex items-center justify-center mx-auto mb-3">
                                         <CheckCircle2 size={24} />
                                     </div>
                                     <h3 className="text-lg font-bold text-slate-900">Link Gerado!</h3>
@@ -119,7 +119,7 @@ const WhatsAppConnectGenerator: React.FC = () => {
                                     </button>
                                     <button
                                         onClick={openLink}
-                                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 text-white font-semibold rounded-xl hover:bg-emerald-600 transition-colors shadow-sm shadow-emerald-200"
+                                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#ffd700] text-slate-900 font-semibold rounded-xl hover:bg-[#f8ab15] transition-colors shadow-sm shadow-[#ffd700]/50"
                                     >
                                         <ExternalLink size={18} />
                                         Abrir

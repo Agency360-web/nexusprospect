@@ -216,7 +216,7 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
                         {(transaction.category || 'profissional') === 'profissional' ? (
                             <button
                                 onClick={() => handleMoveCategory('pessoal')}
-                                className="w-full text-left px-3 py-2 text-sm text-brand-600 hover:bg-brand-50 rounded-lg flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-sm text-[#ffd700] hover:bg-slate-800 rounded-lg flex items-center gap-2"
                             >
                                 <Briefcase size={14} />
                                 <span>Mover para Pessoal</span>
@@ -224,7 +224,7 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
                         ) : (
                             <button
                                 onClick={() => handleMoveCategory('profissional')}
-                                className="w-full text-left px-3 py-2 text-sm text-brand-600 hover:bg-brand-50 rounded-lg flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-sm text-[#ffd700] hover:bg-slate-800 rounded-lg flex items-center gap-2"
                             >
                                 <Building2 size={14} />
                                 <span>Mover para Profissional</span>
@@ -747,11 +747,11 @@ const AdministrationDashboard: React.FC = () => {
 
             {/* Header - Premium Dark Hero */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative shadow-2xl shadow-slate-900/10">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-red-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
 
                 <div className="relative z-10">
                     <h1 className="text-3xl font-black mb-2 tracking-tight flex items-center gap-3">
-                        <Building2 className="text-red-500" size={32} />
+                        <Building2 className="text-yellow-500" size={32} />
                         Administração
                     </h1>
                     <p className="text-slate-300 font-medium w-full">Gestão centralizada de departamentos, contratos e recursos da plataforma.</p>

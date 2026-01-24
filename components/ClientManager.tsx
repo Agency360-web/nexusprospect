@@ -255,10 +255,10 @@ const ClientManager: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative shadow-2xl shadow-slate-900/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
         <div className="relative z-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight flex items-center gap-3">
-            <Building2 className="text-red-500" size={32} />
+            <Building2 className="text-yellow-500" size={32} />
             Gestão de Clientes
           </h1>
           <p className="text-slate-300 font-medium w-full">Administre seus tenants, configure ambientes isolados e monitore o status de cada operação.</p>
@@ -266,7 +266,7 @@ const ClientManager: React.FC = () => {
         <div className="relative z-10">
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-slate-900 rounded-xl font-bold transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95"
           >
             <Plus size={20} />
             <span>Novo Cliente</span>
@@ -502,14 +502,14 @@ const ClientManager: React.FC = () => {
 
       <div className="relative group w-full">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-slate-400 group-focus-within:text-brand-500 transition-colors" />
+          <Search className="h-5 w-5 text-slate-400 group-focus-within:text-[#ffd700] transition-colors" />
         </div>
         <input
           type="text"
           placeholder="Buscar cliente por nome, CNPJ ou identificador..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all shadow-sm group-hover:shadow-md"
+          className="block w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:border-[#ffd700] focus:ring-4 focus:ring-[#ffd700]/20 transition-all shadow-sm group-hover:shadow-md"
         />
         <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
           <span className="px-2 py-1 bg-slate-100 rounded-md text-[10px] font-bold text-slate-400 border border-slate-200">CTRL K</span>

@@ -146,7 +146,7 @@ const Dashboard: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
         <div className="relative z-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight">
             Olá, {user?.user_metadata?.full_name?.split(' ')[0] || 'Usuário'} <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
@@ -156,7 +156,7 @@ const Dashboard: React.FC = () => {
         <div className="relative z-10 flex gap-3">
           <button
             onClick={() => navigate('/transmission')}
-            className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-slate-900 rounded-xl font-bold transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95"
           >
             <Zap size={18} />
             <span>Novo Disparo</span>
@@ -178,28 +178,28 @@ const Dashboard: React.FC = () => {
           value={stats.clients.toString()}
           subValue="Empresas ativas"
           icon={<Building2 className="text-brand-600" size={24} />}
-          colorClass="bg-brand-50 group-hover:bg-brand-100"
+          colorClass="bg-slate-900 group-hover:bg-slate-800"
         />
         <StatCard
-          label="Leads Validadaos"
+          label="Leads Validados"
           value={stats.leads.toString()}
           subValue="Base total de contatos"
           icon={<Users className="text-brand-600" size={24} />}
-          colorClass="bg-brand-50 group-hover:bg-brand-100"
+          colorClass="bg-slate-900 group-hover:bg-slate-800"
         />
         <StatCard
           label="Disparos Totais"
           value={stats.transmissions.toLocaleString()}
           subValue="Histórico vitalício"
-          icon={<CheckCircle2 className="text-amber-600" size={24} />}
-          colorClass="bg-amber-50 group-hover:bg-amber-100"
+          icon={<CheckCircle2 className="text-[#ffd700]" size={24} />}
+          colorClass="bg-slate-900 group-hover:bg-slate-800"
         />
         <StatCard
           label="Taxa de Entrega"
           value={`${stats.deliveryRate.toFixed(1)}%`}
           subValue="Média últimos 30 dias"
-          icon={<Activity className="text-rose-600" size={24} />}
-          colorClass="bg-rose-50 group-hover:bg-rose-100"
+          icon={<Activity className="text-[#ffd700]" size={24} />}
+          colorClass="bg-slate-900 group-hover:bg-slate-800"
           trend={stats.deliveryRate > 90 ? 'up' : 'neutral'}
         />
       </div>
@@ -291,7 +291,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col h-full">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Activity size={20} className="text-emerald-500" />
+              <Activity size={20} className="text-[#ffd700]" />
               Sinais Vitais
             </h2>
             <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 rounded-lg">
@@ -356,14 +356,9 @@ const Dashboard: React.FC = () => {
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-50 text-red-600 rounded-lg">
-              <ListTodo size={20} />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Gestão de Tarefas</h2>
-              <p className="text-xs text-slate-400 font-medium">Próximas atividades de todos os clientes</p>
-            </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Gestão de Tarefas</h2>
+            <p className="text-xs text-slate-400 font-medium">Próximas atividades de todos os clientes</p>
           </div>
         </div>
 

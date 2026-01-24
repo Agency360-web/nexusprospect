@@ -184,7 +184,7 @@ const WhatsAppConnectPage: React.FC = () => {
                 {/* Content */}
                 <div className="p-8">
                     {status === 'error' && (
-                        <div className="bg-rose-50 text-rose-600 p-4 rounded-xl flex items-start gap-3 mb-6">
+                        <div className="bg-slate-900 text-[#ffd700] p-4 rounded-xl flex items-start gap-3 mb-6">
                             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
                             <div className="text-sm">
                                 <span className="font-bold block mb-1">Erro na Conexão</span>

@@ -476,10 +476,10 @@ const CampaignWizard: React.FC = () => {
 
       {/* Dark Hero Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative shadow-2xl shadow-slate-900/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
         <div className="relative z-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight flex items-center gap-3">
-            <Zap className="text-red-500" size={32} />
+            <Zap className="text-yellow-500" size={32} />
             Nova Transmissão
           </h1>
           <p className="text-slate-300 font-medium w-full">Crie campanhas personalizadas, segmente sua audiência e dispare mensagens via WhatsApp em poucos cliques.</p>
@@ -667,7 +667,7 @@ const CampaignWizard: React.FC = () => {
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Anexo de Mídia</label>
                     {mediaType !== 'none' && (
-                      <button onClick={clearMedia} className="text-[10px] text-red-500 font-bold hover:underline bg-red-50 px-2 py-0.5 rounded">Remover Mídia</button>
+                      <button onClick={clearMedia} className="text-[10px] text-[#ffd700] font-bold hover:underline bg-slate-900 px-2 py-0.5 rounded">Remover Mídia</button>
                     )}
                   </div>
                   <MediaSelector />

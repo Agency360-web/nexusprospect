@@ -260,7 +260,7 @@ const OperationalProcesses: React.FC = () => {
                 <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div>
                         <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                            <Folder size={18} className="text-red-600" />
+                            <Folder size={18} className="text-yellow-600" />
                             Departamentos
                         </h3>
                     </div>
@@ -296,7 +296,7 @@ const OperationalProcesses: React.FC = () => {
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); openEditDept(dept); }}
-                                            className="p-1.5 hover:bg-white/50 rounded-md text-red-700"
+                                            className="p-1.5 hover:bg-white/50 rounded-md text-yellow-700"
                                         >
                                             <Edit2 size={12} />
                                         </button>
@@ -330,7 +330,7 @@ const OperationalProcesses: React.FC = () => {
                             </div>
                             <button
                                 onClick={() => { resetProcessForm(); setIsProcessModalOpen(true); }}
-                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-500 transition-all shadow-lg shadow-red-200 active:scale-95"
+                                className="flex items-center gap-2 px-4 py-2 bg-[#ffd700] text-slate-900 rounded-xl font-bold hover:bg-[#f8ab15] transition-all shadow-lg shadow-[#ffd700]/30 active:scale-95"
                             >
                                 <Plus size={18} />
                                 <span>Novo Processo</span>
@@ -370,7 +370,7 @@ const OperationalProcesses: React.FC = () => {
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={() => openEditProcess(proc)}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    className="p-2 text-slate-400 hover:text-[#ffd700] hover:bg-slate-900 rounded-lg transition-colors"
                                                 >
                                                     <Edit2 size={16} />
                                                 </button>
@@ -431,7 +431,7 @@ const OperationalProcesses: React.FC = () => {
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome</label>
                                 <input
                                     required
-                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500"
+                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-yellow-500"
                                     value={deptName}
                                     onChange={e => setDeptName(e.target.value)}
                                     placeholder="Ex: Tráfego Pago"
@@ -440,7 +440,7 @@ const OperationalProcesses: React.FC = () => {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição</label>
                                 <textarea
-                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500"
+                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-yellow-500"
                                     value={deptDesc}
                                     onChange={e => setDeptDesc(e.target.value)}
                                     placeholder="Breve descrição da área..."
@@ -449,7 +449,7 @@ const OperationalProcesses: React.FC = () => {
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={() => setIsDeptModalOpen(false)} className="flex-1 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-sm">Cancelar</button>
-                                <button type="submit" className="flex-1 py-2 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-500 shadow-lg shadow-red-200">Salvar</button>
+                                <button type="submit" className="flex-1 py-2 bg-[#ffd700] text-slate-900 rounded-lg font-bold text-sm hover:bg-[#f8ab15] shadow-lg shadow-[#ffd700]/30">Salvar</button>
                             </div>
                         </form>
                     </div>
@@ -466,7 +466,7 @@ const OperationalProcesses: React.FC = () => {
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Título do Processo</label>
                                 <input
                                     required
-                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 font-bold text-slate-800"
+                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-yellow-500 font-bold text-slate-800"
                                     value={procTitle}
                                     onChange={e => setProcTitle(e.target.value)}
                                     placeholder="Ex: Setup de Campanha"
@@ -477,7 +477,7 @@ const OperationalProcesses: React.FC = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prioridade Padrão</label>
                                     <select
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500"
+                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-yellow-500"
                                         value={procPriority}
                                         onChange={(e: any) => setProcPriority(e.target.value)}
                                     >
@@ -489,7 +489,7 @@ const OperationalProcesses: React.FC = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Est. Duração</label>
                                     <input
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500"
+                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-yellow-500"
                                         value={procDuration}
                                         onChange={e => setProcDuration(e.target.value)}
                                         placeholder="Ex: 2 horas"
@@ -500,7 +500,7 @@ const OperationalProcesses: React.FC = () => {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição Detalhada</label>
                                 <textarea
-                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500"
+                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-yellow-500"
                                     value={procDesc}
                                     onChange={e => setProcDesc(e.target.value)}
                                     placeholder="Explique o objetivo deste processo..."
@@ -513,7 +513,7 @@ const OperationalProcesses: React.FC = () => {
                                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-1">
                                     <div className="flex gap-2 p-2">
                                         <input
-                                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-md focus:outline-none focus:border-red-500 text-sm"
+                                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-md focus:outline-none focus:border-yellow-500 text-sm"
                                             value={newItemText}
                                             onChange={e => setNewItemText(e.target.value)}
                                             onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddItem())}
@@ -555,7 +555,7 @@ const OperationalProcesses: React.FC = () => {
 
                             <div className="flex gap-3 pt-4 border-t border-slate-100">
                                 <button type="button" onClick={() => setIsProcessModalOpen(false)} className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors">Cancelar</button>
-                                <button type="submit" className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 shadow-lg shadow-red-200 transition-all active:scale-95">Salvar Processo</button>
+                                <button type="submit" className="flex-1 py-3 bg-[#ffd700] text-slate-900 rounded-xl font-bold text-sm hover:bg-[#f8ab15] shadow-lg shadow-[#ffd700]/30 transition-all active:scale-95">Salvar Processo</button>
                             </div>
                         </form>
                     </div>

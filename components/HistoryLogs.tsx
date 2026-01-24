@@ -130,16 +130,16 @@ const HistoryLogs: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative shadow-2xl shadow-slate-900/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
         <div className="relative z-10">
           <h1 className="text-3xl font-black mb-2 tracking-tight flex items-center gap-3">
-            <Filter className="text-red-500" size={32} />
+            <Filter className="text-yellow-500" size={32} />
             Relatórios de Disparos
           </h1>
           <p className="text-slate-300 font-medium w-full">Histórico completo e detalhado de todas as campanhas e integrações realizadas.</p>
         </div>
         <div className="relative z-10 flex gap-3">
-          <button className="flex items-center space-x-2 px-6 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-500 transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95">
+          <button className="flex items-center space-x-2 px-6 py-3 bg-brand-600 text-slate-900 rounded-xl font-bold hover:bg-brand-500 transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95">
             <Download size={20} />
             <span>Exportar CSV</span>
           </button>

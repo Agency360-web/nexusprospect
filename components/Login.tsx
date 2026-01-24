@@ -46,12 +46,7 @@ const Login: React.FC = () => {
             <div className="w-full max-w-md">
                 {/* Brand */}
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-600 text-white shadow-xl shadow-brand-900/20 mb-6">
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                    </div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Nexus Dispatch</h1>
+                    <img src="/logo.png" alt="Nexus Dispatch" className="h-52 w-auto mx-auto mb-6" />
                     <p className="text-slate-500 mt-2 font-medium">Automação Inteligente para WhatsApp</p>
                 </div>
 
@@ -68,7 +63,7 @@ const Login: React.FC = () => {
 
                     <form onSubmit={handleAuth} className="space-y-5">
                         {error && (
-                            <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start space-x-3 text-rose-600">
+                            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start space-x-3 text-[#ffd700]">
                                 <AlertCircle size={18} className="shrink-0 mt-0.5" />
                                 <span className="text-sm font-bold">{error}</span>
                             </div>
@@ -104,7 +99,7 @@ const Login: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-4 bg-brand-600 text-white rounded-2xl font-bold shadow-lg shadow-brand-900/20 hover:shadow-xl hover:shadow-brand-900/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                            className="w-full py-4 bg-brand-600 text-slate-900 rounded-2xl font-bold shadow-lg shadow-brand-900/20 hover:shadow-xl hover:shadow-brand-900/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-70 disabled:cursor-not-allowed"
                         >
                             {loading ? (
                                 <Loader2 size={20} className="animate-spin" />

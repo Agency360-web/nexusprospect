@@ -64,13 +64,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <div className="flex flex-col h-full">
                     <div className={`p-6 border-b border-slate-100 flex items-center transition-all duration-300 ${isCollapsed ? 'flex-col justify-center gap-2' : 'flex-row justify-between'}`}>
                         <div className={`flex items-center space-x-2 ${isCollapsed ? 'justify-center' : ''}`}>
-                            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
-                                <Send size={18} className="text-white" />
-                            </div>
-                            {!isCollapsed && (
-                                <span className="text-xl font-bold text-slate-900 tracking-tight animate-in fade-in duration-200 whitespace-nowrap">
-                                    NexusDispatch
-                                </span>
+                            {isCollapsed ? (
+                                <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-200">
+                                    <img src="/logo-icon.jpg" alt="Nexus" className="w-9 h-9 object-contain rounded-lg" />
+                                </div>
+                            ) : (
+                                <img src="/logo.png" alt="NexusDispatch" className="h-28 w-auto object-contain animate-in fade-in duration-200" />
                             )}
                         </div>
                         <button
