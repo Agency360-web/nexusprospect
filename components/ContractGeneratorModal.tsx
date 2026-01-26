@@ -191,7 +191,8 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
         prazo: '',
         valor_total: '',
         forma_pagamento: '',
-        condicoes_pagamento: ''
+        condicoes_pagamento: '',
+        data_contrato: new Date().toLocaleDateString('pt-BR')
     });
 
     const [loading, setLoading] = useState(false);
@@ -301,7 +302,8 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
             prazo: '',
             valor_total: '',
             forma_pagamento: '',
-            condicoes_pagamento: ''
+            condicoes_pagamento: '',
+            data_contrato: new Date().toLocaleDateString('pt-BR')
         });
         setSelectedTemplate(null);
         setIsCreatingTemplate(false);
