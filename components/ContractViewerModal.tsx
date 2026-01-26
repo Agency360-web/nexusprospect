@@ -62,7 +62,7 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                     <style>
                         body {
                             font-family: 'Courier New', Courier, monospace;
-                            padding: 20mm;
+                            padding: 20mm 20mm 40mm 20mm;
                             max-width: 100%;
                             margin: 0;
                             line-height: 1.6;
@@ -89,7 +89,7 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                                 -webkit-print-color-adjust: exact;
                                 print-color-adjust: exact;
                                 margin: 0;
-                                padding: 20mm;
+                                padding: 20mm 20mm 40mm 20mm;
                             }
                             img {
                                 -webkit-print-color-adjust: exact;
@@ -184,7 +184,7 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                 {/* Content */}
                 <div
                     ref={printRef}
-                    className="w-full max-w-[210mm] bg-white shadow-xl min-h-[297mm] p-[20mm] text-slate-900 overflow-y-auto"
+                    className="w-full max-w-[210mm] bg-white shadow-xl min-h-[297mm] pt-[20mm] px-[20mm] pb-[40mm] text-slate-900 overflow-y-auto"
                     style={{ fontFamily: '"Courier New", Courier, monospace' }}
                 >
                     <div className="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none" dangerouslySetInnerHTML={{ __html: contract.content_snapshot }} />

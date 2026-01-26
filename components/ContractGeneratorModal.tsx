@@ -239,7 +239,7 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
         content: '<p><strong>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</strong></p><p><br></p><p>CONTRATANTE: {{razao_social}}, CNPJ: {{cnpj}}...</p>',
         editorProps: {
             attributes: {
-                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl focus:outline-none min-h-[500px] p-8 font-mono',
+                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl focus:outline-none min-h-[500px] pt-8 px-8 pb-[40mm] font-mono',
                 style: 'font-family: "Courier New", Courier, monospace;',
             },
         },
@@ -728,7 +728,7 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                                 <EditorContent editor={editor} className="flex-1" />
                             </div>
                         ) : selectedTemplate ? (
-                            <div className="p-16 prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none font-mono whitespace-pre-wrap text-slate-900 leading-relaxed" style={{ fontFamily: 'Courier New' }}>
+                            <div className="pt-16 px-16 pb-[40mm] prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none font-mono whitespace-pre-wrap text-slate-900 leading-relaxed" style={{ fontFamily: 'Courier New' }}>
                                 <div dangerouslySetInnerHTML={{ __html: previewContent }} />
                             </div>
                         ) : (
