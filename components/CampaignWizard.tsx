@@ -23,11 +23,14 @@ import {
   Bold,
   Italic,
   Strikethrough,
-  Smile
+  Smile,
+  MessageSquare,
+  Clock
 } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Client, Tag, WhatsAppNumber, MediaType, Lead, WebhookConfig } from '../types';
 import { supabase } from '../lib/supabase';
+import Modal from './ui/Modal';
 
 const CampaignWizard: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -41,6 +44,8 @@ const CampaignWizard: React.FC = () => {
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState('');
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -54,6 +59,18 @@ const CampaignWizard: React.FC = () => {
   const [currentNumbers, setCurrentNumbers] = useState<WhatsAppNumber[]>([]);
   const [clientWebhooks, setClientWebhooks] = useState<WebhookConfig[]>([]);
   const [recipientCount, setRecipientCount] = useState(0);
+
+  // Interactive Message State
+  const [activeModal, setActiveModal] = useState<'none' | 'interactive'>('none');
+  const [interactiveData, setInteractiveData] = useState({
+    type: 'button' as 'button' | 'list' | 'poll' | 'carousel',
+    text: '',
+    choices: [''],
+    footerText: '',
+    listButton: '',
+    selectableCount: 1
+  });
+  const [isInteractiveActive, setIsInteractiveActive] = useState(false);
 
   const hasOutboundWebhook = clientWebhooks.some(w => w.type === 'outbound' && w.active);
 
@@ -288,7 +305,36 @@ const CampaignWizard: React.FC = () => {
         }
       };
 
-      // 4. Fire Webhook
+      // 3.4 Merge Interactive Data if active
+      if (isInteractiveActive) {
+        (payload as any).interactive = {
+          type: interactiveData.type,
+          text: interactiveData.text || message,
+          choices: interactiveData.choices.filter(c => c.trim()),
+          footerText: interactiveData.footerText,
+          listButton: interactiveData.listButton,
+          selectableCount: interactiveData.selectableCount
+        };
+      }
+
+      // 4. Handle Schedule or Immediate Send
+      if (isScheduled && scheduledDate) {
+        // Save as scheduled
+        await supabase
+          .from('campaigns')
+          .update({
+            status: 'scheduled',
+            scheduled_at: new Date(scheduledDate).toISOString(),
+            transmission_payload: payload
+          })
+          .eq('id', campaignId);
+
+        setIsSending(false);
+        setIsSuccess(true);
+        return;
+      }
+
+      // 5. Fire Webhook (Immediate Send Now)
       try {
         const response = await fetch(webhook.url, {
           method: webhook.method || 'POST',
@@ -344,6 +390,21 @@ const CampaignWizard: React.FC = () => {
 
       alert(`Falha no disparo: ${errorMessage}`);
     }
+  };
+
+  const handleSendInteractive = async () => {
+    if (!interactiveData.text && !message) {
+      alert('O texto da mensagem é obrigatório.');
+      return;
+    }
+
+    if (interactiveData.choices.filter(c => c.trim()).length === 0) {
+      alert('Adicione pelo menos uma opção.');
+      return;
+    }
+
+    setIsInteractiveActive(true);
+    setActiveModal('none');
   };
 
   const toggleTag = (tid: string) => {
@@ -720,21 +781,94 @@ const CampaignWizard: React.FC = () => {
                   )}
                 </div>
 
-                <div className="pt-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg transition-colors ${isScheduled ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                        <Clock size={18} />
+                      </div>
+                      <div>
+                        <span className="block text-sm font-black text-slate-900 tracking-tight">Agendamento</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{isScheduled ? 'Disparo Agendado' : 'Disparo Imediato'}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsScheduled(!isScheduled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isScheduled ? 'bg-amber-500' : 'bg-slate-200'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isScheduled ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+
+                  {isScheduled && (
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                      <input
+                        type="datetime-local"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        min={new Date().toISOString().slice(0, 16)}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 transition-all outline-none"
+                      />
+                      <p className="mt-2 text-[10px] font-medium text-slate-400 italic">O sistema processará o disparo automaticamente no horário selecionado.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button
+                    onClick={() => setActiveModal('interactive')}
+                    disabled={isSending || !selectedNumberId || selectedTagIds.length === 0}
+                    className={`flex-1 group relative flex items-center gap-3 p-4 rounded-3xl transition-all duration-500 border-2 overflow-hidden disabled:opacity-40 ${isInteractiveActive
+                      ? 'bg-[#ffd700] border-[#f8ab15] text-slate-900 shadow-xl shadow-[#ffd700]/30 scale-[1.02]'
+                      : 'bg-white border-slate-100 text-slate-600 hover:border-[#ffd700]/30 hover:bg-[#ffd700]/5 hover:shadow-xl hover:shadow-[#ffd700]/5'
+                      }`}
+                  >
+                    {/* Decorative Background Element */}
+                    <div className={`absolute -right-2 -bottom-2 w-16 h-16 rounded-full blur-2xl transition-opacity duration-700 ${isInteractiveActive ? 'bg-white/20' : 'bg-[#ffd700]/10 group-hover:bg-[#ffd700]/20'}`}></div>
+
+                    <div className={`w-11 h-11 rounded-2xl flex-shrink-0 flex items-center justify-center transition-all duration-500 ${isInteractiveActive
+                      ? 'bg-slate-900 text-[#ffd700] shadow-lg shadow-black/20'
+                      : 'bg-[#ffd700]/10 text-[#ffd700] group-hover:scale-110 group-hover:bg-[#ffd700]/20'
+                      }`}>
+                      {isInteractiveActive ? (
+                        <CheckCircle2 size={20} className="text-[#ffd700] animate-in zoom-in duration-500" />
+                      ) : (
+                        <Zap size={20} className="transition-transform group-hover:rotate-12" />
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-start text-left min-w-0">
+                      <span className={`text-[9px] font-black uppercase tracking-widest leading-none mb-1.5 transition-colors ${isInteractiveActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-yellow-600'}`}>
+                        {isInteractiveActive ? 'Configurado' : 'Interativo'}
+                      </span>
+                      <span className={`text-sm font-extrabold leading-none truncate ${isInteractiveActive ? 'text-slate-900' : 'text-slate-800'}`}>
+                        Botão
+                      </span>
+                    </div>
+
+                    {isInteractiveActive && (
+                      <div className="absolute top-3 right-3 flex space-x-0.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-900 animate-pulse"></div>
+                      </div>
+                    )}
+                  </button>
                   <button
                     onClick={handleSend}
-                    disabled={isSending || !campaignName || !selectedNumberId || selectedTagIds.length === 0}
-                    className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold text-sm shadow-xl shadow-emerald-200 hover:shadow-emerald-300 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                    disabled={isSending || !campaignName || !selectedNumberId || selectedTagIds.length === 0 || (isScheduled && !scheduledDate)}
+                    className={`flex-[2] py-4 rounded-2xl font-bold text-sm shadow-xl transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none ${isScheduled
+                      ? 'bg-amber-500 text-white shadow-amber-200 hover:shadow-amber-300 hover:scale-[1.02]'
+                      : 'bg-emerald-500 text-white shadow-emerald-200 hover:shadow-emerald-300 hover:scale-[1.02]'
+                      }`}
                   >
                     {isSending ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>Enviando...</span>
+                        <span>Processando...</span>
                       </>
                     ) : (
                       <>
-                        <Send size={18} />
-                        <span>Disparar Campanha</span>
+                        {isScheduled ? <Clock size={18} /> : <Send size={18} />}
+                        <span>{isScheduled ? 'Agendar Transmissão' : 'Disparar Campanha'}</span>
                       </>
                     )}
                   </button>
@@ -813,6 +947,133 @@ const CampaignWizard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={activeModal === 'interactive'}
+        onClose={() => setActiveModal('none')}
+        title="Enviar Mensagem Interativa"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Interação</label>
+            <select
+              value={interactiveData.type}
+              onChange={(e) => setInteractiveData({ ...interactiveData, type: e.target.value as any })}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+            >
+              <option value="button">Botões de Resposta</option>
+              <option value="list">Lista de Opções</option>
+              <option value="poll">Enquete (Votação)</option>
+              <option value="carousel">Carrossel de Cards</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Texto Principal</label>
+            <textarea
+              value={interactiveData.text}
+              onChange={(e) => setInteractiveData({ ...interactiveData, text: e.target.value })}
+              placeholder="Digite o corpo da mensagem..."
+              rows={3}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none"
+            />
+          </div>
+
+          {interactiveData.type === 'list' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Texto do Botão da Lista</label>
+              <input
+                type="text"
+                value={interactiveData.listButton}
+                onChange={(e) => setInteractiveData({ ...interactiveData, listButton: e.target.value })}
+                placeholder="Ex: Ver opções"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+              />
+            </div>
+          )}
+
+          {(interactiveData.type === 'button' || interactiveData.type === 'list') && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Texto de Rodapé (Opcional)</label>
+              <input
+                type="text"
+                value={interactiveData.footerText}
+                onChange={(e) => setInteractiveData({ ...interactiveData, footerText: e.target.value })}
+                placeholder="Ex: Selecione uma opção abaixo"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+              />
+            </div>
+          )}
+
+          {interactiveData.type === 'poll' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Opções Selecionáveis</label>
+              <input
+                type="number"
+                min="1"
+                value={interactiveData.selectableCount}
+                onChange={(e) => setInteractiveData({ ...interactiveData, selectableCount: parseInt(e.target.value) || 1 })}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+              Opções / Escolhas ({interactiveData.choices.length})
+            </label>
+            {interactiveData.choices.map((choice, index) => (
+              <div key={index} className="flex gap-2">
+                <input
+                  type="text"
+                  value={choice}
+                  onChange={(e) => {
+                    const newChoices = [...interactiveData.choices];
+                    newChoices[index] = e.target.value;
+                    setInteractiveData({ ...interactiveData, choices: newChoices });
+                  }}
+                  placeholder={`Opção ${index + 1}`}
+                  className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                />
+                <button
+                  onClick={() => {
+                    const newChoices = interactiveData.choices.filter((_, i) => i !== index);
+                    setInteractiveData({ ...interactiveData, choices: newChoices });
+                  }}
+                  className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg text-sm"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => setInteractiveData({ ...interactiveData, choices: [...interactiveData.choices, ''] })}
+              className="w-full py-2 border-2 border-dashed border-slate-100 rounded-xl text-slate-400 hover:text-slate-600 hover:border-slate-200 text-xs font-bold"
+            >
+              + Adicionar Opção
+            </button>
+          </div>
+
+          <div className="pt-4 flex gap-3">
+            <button
+              onClick={() => {
+                setIsInteractiveActive(false);
+                setActiveModal('none');
+              }}
+              className="flex-1 py-3 text-rose-500 hover:bg-rose-50 rounded-xl font-bold text-sm"
+            >
+              Remover / Limpar
+            </button>
+            <button
+              onClick={handleSendInteractive}
+              className="flex-[2] py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+            >
+              <Zap size={18} />
+              <span>Confirmar e Salvar</span>
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

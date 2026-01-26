@@ -20,7 +20,8 @@ import {
   Calendar,
   Clock,
   CheckSquare,
-  Square
+  Square,
+  Megaphone
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,7 +65,8 @@ const Dashboard: React.FC = () => {
     globalLimit: 0,
     globalSent: 0,
     chartData: [] as any[],
-    tasks: [] as any[]
+    tasks: [] as any[],
+    recentCampaigns: [] as any[]
   });
 
   useEffect(() => {
@@ -135,7 +137,12 @@ const Dashboard: React.FC = () => {
         globalLimit,
         globalSent,
         chartData,
-        tasks: tasksRes?.data || [] // Add tasks result
+        tasks: tasksRes?.data || [],
+        recentCampaigns: (await supabase
+          .from('campaigns')
+          .select('*, clients(name)')
+          .order('created_at', { ascending: false })
+          .limit(5)).data || []
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -351,6 +358,77 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Recent Campaigns Section */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Resumo de Campanhas</h2>
+            <p className="text-xs text-slate-400 font-medium">Status dos disparos recentes e agendados</p>
+          </div>
+          <button
+            onClick={() => navigate('/history')}
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Ver Histórico Completo
+          </button>
+        </div>
+        <div className="p-0">
+          {stats.loading ? (
+            <div className="py-10 flex justify-center"><Activity className="animate-spin text-slate-300" /></div>
+          ) : stats.recentCampaigns.length === 0 ? (
+            <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-3">
+              <div className="p-4 bg-slate-50 rounded-full">
+                <Megaphone size={32} />
+              </div>
+              <p className="font-medium">Nenhuma campanha realizada ainda.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {stats.recentCampaigns.map((camp) => (
+                <div key={camp.id} className="p-4 md:p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className={`p-3 rounded-2xl ${camp.status === 'completed' ? 'bg-emerald-50 text-emerald-600' :
+                      camp.status === 'scheduled' ? 'bg-amber-50 text-amber-600' :
+                        camp.status === 'failed' ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600'
+                      }`}>
+                      {camp.status === 'scheduled' ? <Clock size={20} /> : <Zap size={20} />}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900">{camp.name}</h3>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-1">{camp.message}</p>
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{camp.clients?.name}</span>
+                        {camp.scheduled_at && camp.status === 'scheduled' && (
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">
+                            Agendado para: {new Date(camp.scheduled_at).toLocaleString('pt-BR')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${camp.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                      camp.status === 'scheduled' ? 'bg-amber-100 text-amber-700' :
+                        camp.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                      {camp.status === 'completed' ? 'Concluído' :
+                        camp.status === 'scheduled' ? 'Agendado' :
+                          camp.status === 'processing' ? 'Processando' :
+                            camp.status === 'failed' ? 'Falhou' : camp.status}
+                    </span>
+                    {camp.status === 'failed' && camp.error_log && (
+                      <span className="text-[9px] text-rose-500 font-medium max-w-[200px] text-right" title={camp.error_log}>
+                        Erro: {camp.error_log.slice(0, 50)}...
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
