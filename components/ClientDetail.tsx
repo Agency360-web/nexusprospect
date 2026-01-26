@@ -1005,36 +1005,36 @@ const ClientDetail: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center space-x-4">
-          <Link to="/clients" className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors text-slate-600 shadow-sm">
+          <Link to="/clients" className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors text-slate-600 shadow-sm shrink-0">
             <ArrowLeft size={20} />
           </Link>
-          <div>
-            <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-slate-900">{client.name}</h1>
-              <span className="text-[10px] bg-slate-900 text-white px-2 py-0.5 rounded font-mono uppercase tracking-widest">ID: {clientId?.substring(0, 8)}...</span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900 truncate">{client.name}</h1>
+              <span className="text-[10px] bg-slate-900 text-white px-2 py-0.5 rounded font-mono uppercase tracking-widest shrink-0">ID: {clientId?.substring(0, 8)}...</span>
             </div>
-            <p className="text-sm text-slate-500">Gestão de ambiente isolado e audiência</p>
+            <p className="text-xs md:text-sm text-slate-500 truncate">Gestão de ambiente isolado e audiência</p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 w-full lg:w-auto">
           <button
             onClick={handleOpenClientConfig}
-            className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors text-sm font-bold shadow-sm"
+            className="flex-1 lg:flex-none flex items-center justify-center space-x-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors text-sm font-bold shadow-sm"
           >
             <Settings size={16} />
             <span>Configurar</span>
           </button>
-          <Link to="/new-campaign" className="flex items-center space-x-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all text-sm font-bold shadow-lg shadow-slate-900/10">
+          <Link to="/new-campaign" className="flex-1 lg:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all text-sm font-bold shadow-lg shadow-slate-900/10">
             <Plus size={18} />
-            <span>Nova Campanha</span>
+            <span className="truncate">Nova Campanha</span>
           </Link>
         </div>
       </div>
 
       {/* Tabs Nav */}
-      <div className="bg-white border-b border-slate-200 sticky top-16 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
+      <div className="bg-white border-b border-slate-200 sticky top-16 lg:top-0 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
         <TabButton id="overview" label="Geral" icon={Activity} />
         <TabButton id="numbers" label="Canais" icon={Smartphone} />
         <TabButton id="webhooks" label="Webhooks" icon={WebhookIcon} />
@@ -1383,70 +1383,72 @@ const ClientDetail: React.FC = () => {
                 </div>
               )}
 
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-8 py-5 w-12">
-                      <input
-                        type="checkbox"
-                        checked={leads.length > 0 && selectedLeads.length === leads.length}
-                        onChange={toggleSelectAll}
-                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                      />
-                    </th>
-                    <th className="px-2 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Lead / Identificação</th>
-                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">WhatsApp</th>
-                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Segmentação</th>
-                    <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Status</th>
-                    <th className="px-8 py-5 text-right"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {leads.map(lead => (
-                    <tr key={lead.id} className={`hover:bg-slate-50/50 transition-colors ${selectedLeads.includes(lead.id) ? 'bg-slate-50' : ''}`}>
-                      <td className="px-8 py-5">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[800px]">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-8 py-5 w-12">
                         <input
                           type="checkbox"
-                          checked={selectedLeads.includes(lead.id)}
-                          onChange={() => toggleSelectLead(lead.id)}
+                          checked={leads.length > 0 && selectedLeads.length === leads.length}
+                          onChange={toggleSelectAll}
                           className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                         />
-                      </td>
-                      <td className="px-2 py-5">
-                        <div className="font-bold text-slate-900">{lead.name}</div>
-                        <div className="text-[10px] text-slate-400 uppercase tracking-tight">{lead.customFields.empresa}</div>
-                      </td>
-                      <td className="px-8 py-5 font-mono text-slate-500 font-medium">
-                        {lead.phone || lead.email}
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex flex-wrap gap-1.5">
-                          {lead.tags.map(tid => {
-                            const tag = tags.find(t => t.id === tid);
-                            return tag ? (
-                              <span key={tid} className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${tag.color}`}>
-                                {tag.name}
-                              </span>
-                            ) : null;
-                          })}
-                        </div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <span className={`inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${lead.status === 'valid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
-                          }`}>
-                          <CheckCircle2 size={10} className="mr-1" />
-                          {lead.status === 'valid' ? 'Validado' : 'Erro'}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-right">
-                        <button className="text-slate-300 hover:text-slate-900 transition-colors">
-                          <MoreVertical size={20} />
-                        </button>
-                      </td>
+                      </th>
+                      <th className="px-2 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Lead / Identificação</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">WhatsApp</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Segmentação</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Status</th>
+                      <th className="px-8 py-5 text-right"></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {leads.map(lead => (
+                      <tr key={lead.id} className={`hover:bg-slate-50/50 transition-colors ${selectedLeads.includes(lead.id) ? 'bg-slate-50' : ''}`}>
+                        <td className="px-8 py-5">
+                          <input
+                            type="checkbox"
+                            checked={selectedLeads.includes(lead.id)}
+                            onChange={() => toggleSelectLead(lead.id)}
+                            className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                          />
+                        </td>
+                        <td className="px-2 py-5">
+                          <div className="font-bold text-slate-900">{lead.name}</div>
+                          <div className="text-[10px] text-slate-400 uppercase tracking-tight">{lead.customFields.empresa}</div>
+                        </td>
+                        <td className="px-8 py-5 font-mono text-slate-500 font-medium">
+                          {lead.phone || lead.email}
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {lead.tags.map(tid => {
+                              const tag = tags.find(t => t.id === tid);
+                              return tag ? (
+                                <span key={tid} className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${tag.color}`}>
+                                  {tag.name}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className={`inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${lead.status === 'valid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
+                            }`}>
+                            <CheckCircle2 size={10} className="mr-1" />
+                            {lead.status === 'valid' ? 'Validado' : 'Erro'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                          <button className="text-slate-300 hover:text-slate-900 transition-colors">
+                            <MoreVertical size={20} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 <span>{leads.length} Contatos listados</span>
                 <div className="flex space-x-4">

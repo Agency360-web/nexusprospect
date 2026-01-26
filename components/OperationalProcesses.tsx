@@ -253,10 +253,10 @@ const OperationalProcesses: React.FC = () => {
 
 
     return (
-        <div className="flex h-[calc(100vh-280px)] gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-280px)] gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
             {/* Left Sidebar: Departments */}
-            <div className="w-1/3 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
+            <div className="w-full lg:w-1/3 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col overflow-hidden max-h-[400px] lg:max-h-full">
                 <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div>
                         <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -322,18 +322,19 @@ const OperationalProcesses: React.FC = () => {
                             <div>
                                 <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                                     {selectedDept.name}
-                                    <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                                    <span className="text-[10px] sm:text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
                                         {processes.length} Processos
                                     </span>
                                 </h2>
-                                <p className="text-sm text-slate-400 mt-1">{selectedDept.description || 'Sem descrição'}</p>
+                                <p className="text-xs sm:text-sm text-slate-400 mt-1">{selectedDept.description || 'Sem descrição'}</p>
                             </div>
                             <button
                                 onClick={() => { resetProcessForm(); setIsProcessModalOpen(true); }}
-                                className="flex items-center gap-2 px-4 py-2 bg-[#ffd700] text-slate-900 rounded-xl font-bold hover:bg-[#f8ab15] transition-all shadow-lg shadow-[#ffd700]/30 active:scale-95"
+                                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#ffd700] text-slate-900 rounded-xl font-bold hover:bg-[#f8ab15] transition-all shadow-lg shadow-[#ffd700]/30 active:scale-95 text-xs sm:text-sm"
                             >
                                 <Plus size={18} />
-                                <span>Novo Processo</span>
+                                <span className="hidden sm:inline">Novo Processo</span>
+                                <span className="sm:hidden">Novo</span>
                             </button>
                         </div>
 
@@ -343,69 +344,71 @@ const OperationalProcesses: React.FC = () => {
                             ) : processes.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-64 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
                                     <Layout size={48} className="text-slate-200 mb-4" />
-                                    <p className="font-medium">Nenhum processo neste departamento.</p>
-                                    <p className="text-sm">Crie procedimentos padrão para sua equipe.</p>
+                                    <p className="font-medium text-center">Nenhum processo neste departamento.</p>
+                                    <p className="text-sm text-center">Crie procedimentos padrão para sua equipe.</p>
                                 </div>
                             ) : (
-                                processes.map(proc => (
-                                    <div key={proc.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-lg ${proc.priority === 'high' ? 'bg-rose-50 text-rose-600' :
-                                                    proc.priority === 'medium' ? 'bg-amber-50 text-amber-600' :
-                                                        'bg-emerald-50 text-emerald-600'
-                                                    }`}>
-                                                    <FileText size={20} />
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+                                    {processes.map(proc => (
+                                        <div key={proc.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`p-2 rounded-lg ${proc.priority === 'high' ? 'bg-rose-50 text-rose-600' :
+                                                        proc.priority === 'medium' ? 'bg-amber-50 text-amber-600' :
+                                                            'bg-emerald-50 text-emerald-600'
+                                                        }`}>
+                                                        <FileText size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-slate-900 text-base">{proc.title}</h4>
+                                                        {proc.estimated_duration && (
+                                                            <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5 font-medium">
+                                                                <Clock size={12} />
+                                                                {proc.estimated_duration}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h4 className="font-bold text-slate-900 text-base">{proc.title}</h4>
-                                                    {proc.estimated_duration && (
-                                                        <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5 font-medium">
-                                                            <Clock size={12} />
-                                                            {proc.estimated_duration}
+                                                <div className="flex gap-2 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={() => openEditProcess(proc)}
+                                                        className="p-2 text-slate-400 hover:text-[#ffd700] hover:bg-slate-900 rounded-lg transition-colors"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteProcess(proc.id)}
+                                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {proc.description && (
+                                                <p className="text-slate-500 text-sm mb-4 leading-relaxed line-clamp-3 md:line-clamp-none">{proc.description}</p>
+                                            )}
+
+                                            {proc.checklist && (proc.checklist as any[]).length > 0 && (
+                                                <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                        <CheckSquare size={12} />
+                                                        Checklist ({proc.checklist.length})
+                                                    </div>
+                                                    {(proc.checklist as any[]).slice(0, 3).map((item, i) => (
+                                                        <div key={i} className="flex items-center gap-2 text-sm text-slate-600">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                                                            <span className="truncate">{item.text}</span>
                                                         </div>
+                                                    ))}
+                                                    {(proc.checklist as any[]).length > 3 && (
+                                                        <div className="text-xs text-slate-400 pl-3.5">+ {(proc.checklist as any[]).length - 3} itens</div>
                                                     )}
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => openEditProcess(proc)}
-                                                    className="p-2 text-slate-400 hover:text-[#ffd700] hover:bg-slate-900 rounded-lg transition-colors"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteProcess(proc.id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
+                                            )}
                                         </div>
-
-                                        {proc.description && (
-                                            <p className="text-slate-500 text-sm mb-4 leading-relaxed">{proc.description}</p>
-                                        )}
-
-                                        {proc.checklist && (proc.checklist as any[]).length > 0 && (
-                                            <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-                                                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                                    <CheckSquare size={12} />
-                                                    Checklist ({proc.checklist.length})
-                                                </div>
-                                                {(proc.checklist as any[]).slice(0, 3).map((item, i) => (
-                                                    <div key={i} className="flex items-center gap-2 text-sm text-slate-600">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                                                        <span className="truncate">{item.text}</span>
-                                                    </div>
-                                                ))}
-                                                {(proc.checklist as any[]).length > 3 && (
-                                                    <div className="text-xs text-slate-400 pl-3.5">+ {(proc.checklist as any[]).length - 3} itens</div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))
+                                    ))}
+                                </div>
                             )}
                         </div>
                     </>

@@ -343,8 +343,16 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
             razao_social: client.corporateName || client.name,
             cnpj: client.cnpj || '',
             endereco: client.address || '',
+            cep: client.zipCode || '',
+            cidade: client.city || '',
+            bairro: client.neighborhood || '',
             email: client.email || '',
-            responsavel: client.name,
+            responsavel: client.contactPerson || client.name,
+            servicos: client.defaultServices || '',
+            prazo: client.defaultTerm || '',
+            valor_total: client.defaultValue || '',
+            forma_pagamento: client.defaultPaymentMethod || '',
+            condicoes_pagamento: client.defaultPaymentConditions || '',
         }));
     };
 

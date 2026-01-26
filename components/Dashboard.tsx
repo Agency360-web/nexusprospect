@@ -143,27 +143,27 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20">
       {/* Welcome Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-6 md:p-8 rounded-3xl overflow-hidden relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
-        <div className="relative z-10">
-          <h1 className="text-3xl font-black mb-2 tracking-tight">
+        <div className="relative z-10 text-center md:text-left">
+          <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight">
             Olá, {user?.user_metadata?.full_name?.split(' ')[0] || 'Usuário'} <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
           </h1>
-          <p className="text-slate-300 font-medium">Aqui está o pulso da sua operação hoje.</p>
+          <p className="text-slate-300 font-medium text-sm md:text-base">Aqui está o pulso da sua operação hoje.</p>
         </div>
-        <div className="relative z-10 flex gap-3">
+        <div className="relative z-10 flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => navigate('/transmission')}
-            className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-slate-900 rounded-xl font-bold transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-slate-900 rounded-xl font-bold transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95 text-sm md:text-base"
           >
             <Zap size={18} />
             <span>Novo Disparo</span>
           </button>
           <button
             onClick={() => navigate('/clients')}
-            className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all backdrop-blur-sm"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all backdrop-blur-sm text-sm md:text-base"
           >
             <Plus size={18} />
             <span>Cliente</span>
@@ -206,22 +206,22 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col min-h-[400px]">
-          <div className="flex justify-between items-center mb-8">
+        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col min-h-[350px] md:min-h-[400px]">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
               <h2 className="text-xl font-bold text-slate-900">Volume de Mensagens</h2>
               <p className="text-sm text-slate-400">Desempenho de envios no período</p>
             </div>
-            <div className="flex bg-slate-100 p-1 rounded-lg">
+            <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-auto">
               <button
                 onClick={() => setPeriod('7d')}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${period === '7d' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                className={`flex-1 sm:flex-none px-3 py-1 text-xs font-bold rounded-md transition-all ${period === '7d' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
               >
                 7D
               </button>
               <button
                 onClick={() => setPeriod('30d')}
-                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${period === '30d' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                className={`flex-1 sm:flex-none px-3 py-1 text-xs font-bold rounded-md transition-all ${period === '30d' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
               >
                 30D
               </button>
@@ -355,11 +355,17 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Gestão de Tarefas</h2>
             <p className="text-xs text-slate-400 font-medium">Próximas atividades de todos os clientes</p>
           </div>
+          <button
+            onClick={() => navigate('/clients')}
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors sm:hidden"
+          >
+            Ver Todos os Clientes
+          </button>
         </div>
 
         <div className="p-0">
@@ -375,17 +381,17 @@ const Dashboard: React.FC = () => {
           ) : (
             <div className="divide-y divide-slate-50">
               {stats.tasks.map((task) => (
-                <div key={task.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
-                  <div className="flex items-start gap-4">
+                <div key={task.id} className="p-4 md:p-6 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between group gap-4">
+                  <div className="flex items-start gap-4 w-full sm:w-auto">
                     <div className={`mt-1 flex-shrink-0 ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300'}`}>
                       {task.status === 'completed' ? <CheckSquare size={20} /> : <Square size={20} />}
                     </div>
-                    <div>
-                      <h3 className={`font-bold text-sm ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                    <div className="min-w-0 flex-1">
+                      <h3 className={`font-bold text-sm ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'} truncate`}>
                         {task.title}
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
-                      <div className="flex items-center gap-3 mt-2">
+                      <div className="flex flex-wrap items-center gap-3 mt-2">
                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
                           <Building2 size={10} />
                           {task.clients?.name || 'Cliente'}
@@ -400,10 +406,10 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right w-full sm:w-auto mt-2 sm:mt-0">
                     <button
                       onClick={() => navigate(`/clients/${task.client_id}`)}
-                      className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-indigo-600 transition-all text-xs font-bold uppercase flex items-center gap-1"
+                      className="sm:opacity-0 group-hover:opacity-100 p-2 text-indigo-600 sm:text-slate-400 sm:hover:text-indigo-600 transition-all text-xs font-bold uppercase flex items-center justify-center sm:justify-end gap-1 w-full sm:w-auto bg-indigo-50 sm:bg-transparent rounded-lg sm:rounded-none py-2 sm:py-0"
                     >
                       Ver Detalhes <ArrowUpRight size={14} />
                     </button>

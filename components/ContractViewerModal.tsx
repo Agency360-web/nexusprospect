@@ -68,6 +68,10 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                             line-height: 1.6;
                             color: #000;
                         }
+                        .prose p {
+                            margin-top: 1.25em;
+                            margin-bottom: 1.25em;
+                        }
                         .prose {
                             width: 100%;
                         }
@@ -95,7 +99,9 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                     </style>
                 </head>
                 <body>
-                    ${content}
+                    <div class="prose">
+                        ${content}
+                    </div>
                     <script>
                         // Wait for all images to load before printing
                         Promise.all(Array.from(document.images).map(img => {
@@ -176,14 +182,12 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 bg-slate-100 p-8 overflow-y-auto flex justify-center">
-                    <div
-                        ref={printRef}
-                        className="w-full max-w-[210mm] bg-white shadow-xl min-h-[297mm] p-[20mm] text-slate-900"
-                        style={{ fontFamily: '"Courier New", Courier, monospace' }}
-                    >
-                        <div dangerouslySetInnerHTML={{ __html: contract.content_snapshot }} />
-                    </div>
+                <div
+                    ref={printRef}
+                    className="w-full max-w-[210mm] bg-white shadow-xl min-h-[297mm] p-[20mm] text-slate-900 overflow-y-auto"
+                    style={{ fontFamily: '"Courier New", Courier, monospace' }}
+                >
+                    <div className="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none" dangerouslySetInnerHTML={{ __html: contract.content_snapshot }} />
                 </div>
             </div>
         </div>
