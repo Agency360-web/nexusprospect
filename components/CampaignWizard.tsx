@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Send,
   CheckCircle2,
@@ -33,6 +34,8 @@ import { supabase } from '../lib/supabase';
 import Modal from './ui/Modal';
 
 const CampaignWizard: React.FC = () => {
+  const { campaignId } = useParams();
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [campaignName, setCampaignName] = useState('');
@@ -52,6 +55,59 @@ const CampaignWizard: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Load campaign for edit
+  useEffect(() => {
+    if (campaignId) {
+      loadCampaignForEdit(campaignId);
+    }
+  }, [campaignId]);
+
+  const loadCampaignForEdit = async (id: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (data) {
+        setIsEditMode(true);
+        setSelectedClientId(data.client_id);
+        setCampaignName(data.name);
+        setMessage(data.message);
+
+        // Load payload specific data if exists
+        if (data.transmission_payload) {
+          const payload = data.transmission_payload;
+          setSelectedTagIds(payload.audience?.tag_ids || []);
+
+          // Find number ID by phone
+          // This requires fetching numbers first, but we have an effect for client details.
+          // We'll set the phone to a temp state or handle it after numbers fetch.
+        }
+
+        if (data.scheduled_at) {
+          setIsScheduled(true);
+          // Convert to datetime-local format: YYYY-MM-DDTHH:MM
+          const d = new Date(data.scheduled_at);
+          setScheduledDate(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+        }
+
+        // Handle interactive data
+        if (data.transmission_payload?.interactive) {
+          setIsInteractiveActive(true);
+          setInteractiveData(data.transmission_payload.interactive);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading campaign:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Data State
   const [clients, setClients] = useState<Client[]>([]);
@@ -140,6 +196,12 @@ const CampaignWizard: React.FC = () => {
           dailyLimit: n.daily_limit,
           sentToday: n.sent_today
         })));
+
+        // If in edit mode, restore the selected number from payload if possible
+        if (campaignId) {
+          // This is a bit tricky, but we can assume phone number was stored
+          // For now, if we don't have it, we let user select.
+        }
       }
 
       // Fetch Webhooks
@@ -216,25 +278,39 @@ const CampaignWizard: React.FC = () => {
         return;
       }
 
-      // 2. Create Campaign Record in DB
-      const { data: campaignData, error: campaignError } = await supabase
-        .from('campaigns')
-        .insert({
-          client_id: selectedClientId,
-          name: campaignName,
-          message: message,
-          status: 'sending',
-          metadata: {
-            target_tags: selectedTagIds,
-            number_id: selectedNumberId,
-            media_type: mediaType
-          }
-        })
-        .select()
-        .single();
+      // 2. Create or Update Campaign Record in DB
+      let activeCampaignId = campaignId;
 
-      if (campaignError) throw campaignError;
-      const campaignId = campaignData.id;
+      if (!isEditMode) {
+        const { data: campaignData, error: campaignError } = await supabase
+          .from('campaigns')
+          .insert({
+            client_id: selectedClientId,
+            name: campaignName,
+            message: message,
+            status: isScheduled ? 'scheduled' : 'sending',
+            metadata: {
+              target_tags: selectedTagIds,
+              number_id: selectedNumberId,
+              media_type: mediaType
+            }
+          })
+          .select()
+          .single();
+
+        if (campaignError) throw campaignError;
+        activeCampaignId = campaignData.id;
+      } else {
+        await supabase
+          .from('campaigns')
+          .update({
+            name: campaignName,
+            message: message,
+            status: isScheduled ? 'scheduled' : 'sending',
+            client_id: selectedClientId
+          })
+          .eq('id', activeCampaignId);
+      }
 
       // 2.5 Upload Media if exists
       let finalMediaUrl = mediaUrl;
@@ -286,7 +362,7 @@ const CampaignWizard: React.FC = () => {
         event: 'campaign.dispatch',
         timestamp: new Date().toISOString(),
         client_id: selectedClientId,
-        campaign_id: campaignId,
+        campaign_id: activeCampaignId,
         display_name: campaignName,
         channel: 'whatsapp',
         sender_number: currentNumbers.find(n => n.id === selectedNumberId)?.phone,

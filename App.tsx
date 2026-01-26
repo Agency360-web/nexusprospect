@@ -33,6 +33,7 @@ const App: React.FC = () => {
                   <Route path="/clients" element={<ClientManager />} />
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
                   <Route path="/new-campaign" element={<CampaignWizard />} />
+                  <Route path="/edit-campaign/:campaignId" element={<CampaignWizard />} />
                   <Route path="/history" element={<HistoryLogs />} />
                   <Route path="/admin" element={<AdministrationDashboard />} />
                   <Route path="/settings" element={<SettingsPage />} />
@@ -49,6 +50,7 @@ const App: React.FC = () => {
                   <Route path="/clients" element={<ClientManager />} />
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
                   <Route path="/new-campaign" element={<CampaignWizard />} />
+                  <Route path="/edit-campaign/:campaignId" element={<CampaignWizard />} />
                   <Route path="/history" element={<HistoryLogs />} />
                   <Route path="/admin" element={<AdministrationDashboard />} />
                   <Route path="/settings" element={<SettingsPage />} />

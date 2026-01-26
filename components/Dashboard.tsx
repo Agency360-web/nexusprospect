@@ -21,7 +21,11 @@ import {
   Clock,
   CheckSquare,
   Square,
-  Megaphone
+  Megaphone,
+  Trash2,
+  Edit3,
+  XCircle,
+  MoreVertical
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
@@ -146,6 +150,30 @@ const Dashboard: React.FC = () => {
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
+    }
+  };
+
+  const handleDeleteCampaign = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta campanha?')) return;
+    try {
+      const { error } = await supabase.from('campaigns').delete().eq('id', id);
+      if (error) throw error;
+      fetchStats();
+    } catch (err) {
+      console.error('Error deleting campaign:', err);
+      alert('Erro ao excluir campanha.');
+    }
+  };
+
+  const handleCancelCampaign = async (id: string) => {
+    if (!confirm('Deseja cancelar este agendamento? A campanha voltará para rascunho.')) return;
+    try {
+      const { error } = await supabase.from('campaigns').update({ status: 'draft', scheduled_at: null }).eq('id', id);
+      if (error) throw error;
+      fetchStats();
+    } catch (err) {
+      console.error('Error cancelling campaign:', err);
+      alert('Erro ao cancelar agendamento.');
     }
   };
 
@@ -410,15 +438,42 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${camp.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                      camp.status === 'scheduled' ? 'bg-amber-100 text-amber-700' :
-                        camp.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'
-                      }`}>
-                      {camp.status === 'completed' ? 'Concluído' :
-                        camp.status === 'scheduled' ? 'Agendado' :
-                          camp.status === 'processing' ? 'Processando' :
-                            camp.status === 'failed' ? 'Falhou' : camp.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {camp.status === 'scheduled' && (
+                        <>
+                          <button
+                            onClick={() => navigate(`/edit-campaign/${camp.id}`)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            title="Editar"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleCancelCampaign(camp.id)}
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                            title="Cancelar Agendamento"
+                          >
+                            <XCircle size={14} />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => handleDeleteCampaign(camp.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                        title="Excluir"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${camp.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                        camp.status === 'scheduled' ? 'bg-amber-100 text-amber-700' :
+                          camp.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                        {camp.status === 'completed' ? 'Concluído' :
+                          camp.status === 'scheduled' ? 'Agendado' :
+                            camp.status === 'processing' ? 'Processando' :
+                              camp.status === 'failed' ? 'Falhou' : camp.status}
+                      </span>
+                    </div>
                     {camp.status === 'failed' && camp.error_log && (
                       <span className="text-[9px] text-rose-500 font-medium max-w-[200px] text-right" title={camp.error_log}>
                         Erro: {camp.error_log.slice(0, 50)}...

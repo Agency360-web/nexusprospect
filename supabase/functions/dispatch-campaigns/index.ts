@@ -4,7 +4,8 @@ import { Hono } from "https://esm.sh/hono"
 
 const app = new Hono()
 
-app.post('/dispatch-campaigns', async (c) => {
+app.all('*', async (c) => {
+    console.log(`Resource requested: ${c.req.method} ${c.req.url}`)
     const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -13,9 +14,16 @@ app.post('/dispatch-campaigns', async (c) => {
     try {
         // 1. Atomically pick campaigns using SELECT FOR UPDATE SKIP LOCKED
         // This prevents multiple function runs from processing the same campaign
+        console.log('Fetching scheduled campaigns...')
         const { data: pickedCampaigns, error: pickError } = await supabase.rpc('pick_scheduled_campaigns')
 
-        if (pickError) throw pickError
+        if (pickError) {
+            console.error('RPC Error picking campaigns:', pickError)
+            throw pickError
+        }
+
+        console.log(`Picked ${pickedCampaigns?.length || 0} campaigns.`)
+
         if (!pickedCampaigns || pickedCampaigns.length === 0) {
             return c.json({ status: 'no_campaigns' })
         }
