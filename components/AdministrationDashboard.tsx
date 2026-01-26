@@ -648,13 +648,56 @@ const AdministrationDashboard: React.FC = () => {
 
     // Chart Data Generation
     const chartData = useMemo(() => {
-        // Group by day for the selected period
-        // We need both Revenue (positive) and Expenses (negative -> absolute for chart maybe? Or verify request.)
-        // Request: "lucros (receita) utilize a linha verde... custos (despesas) utilize a linha verde" (Actually user said green for both? No "Os custos (despesas) utilize a linha verde". Wait.
-        // Re-reading user request: "1. Os lucros (receita) utilize a linha verde 2. Os custos (despesas) utilize a linha verde"
-        // User probably meant Red for expenses. I'll use Red for expenses as standard.
 
+        // 1. Calculate Start and End dates for the range to pre-fill missing days
+        const now = new Date();
+        let start = new Date(0);
+        let end = new Date();
+
+        switch (dateRange) {
+            case 'today':
+                start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                break;
+            case 'last7':
+                start = new Date();
+                start.setDate(now.getDate() - 7);
+                break;
+            case 'last30':
+                start = new Date();
+                start.setDate(now.getDate() - 30);
+                break;
+            case 'thisMonth':
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                break;
+            case 'lastMonth':
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth(), 0);
+                break;
+            case 'nextMonth':
+                start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+                break;
+            case 'custom':
+                if (appliedCustomStart) start = new Date(appliedCustomStart);
+                if (appliedCustomEnd) end = new Date(appliedCustomEnd);
+                break;
+        }
+
+        // 2. Pre-fill the map with all dates in the range (ascending order)
         const grouped = new Map<string, { revenue: number, expenses: number }>();
+        if (dateRange !== 'all') {
+            const current = new Date(start);
+            const safetyLimit = 366;
+            let count = 0;
+            while (current <= end && count < safetyLimit) {
+                const dateKey = current.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                grouped.set(dateKey, { revenue: 0, expenses: 0 });
+                current.setDate(current.getDate() + 1);
+                count++;
+            }
+        }
 
         filteredTransactions.forEach(t => {
             // Include paid and pending? Usually charts show recognized revenue/cash flow.
@@ -677,12 +720,18 @@ const AdministrationDashboard: React.FC = () => {
             }
         });
 
-        return Array.from(grouped.entries()).map(([date, values]) => ({
+        const result = Array.from(grouped.entries()).map(([date, values]) => ({
             month_label: date,
             revenue: values.revenue,
             expenses: values.expenses,
-        })).reverse(); // Sort properly ideally but sticking to map order for now
-    }, [filteredTransactions]);
+        }));
+
+        if (dateRange === 'all') {
+            return result.reverse();
+        }
+
+        return result;
+    }, [filteredTransactions, dateRange, appliedCustomStart, appliedCustomEnd]);
 
 
     const fetchFinancialData = async () => {
