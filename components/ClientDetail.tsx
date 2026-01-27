@@ -765,31 +765,39 @@ const ClientDetail: React.FC = () => {
     try {
       setLoading(true);
 
-      // Process in batches of 1000 to avoid request size/timeout issues
+      // We still use batching to avoid hitting request size limits on the RPC call
       const batchSize = 1000;
       for (let i = 0; i < selectedLeads.length; i += batchSize) {
         const batch = selectedLeads.slice(i, i + batchSize);
-        const { error } = await supabase
-          .from('leads')
-          .delete()
-          .in('id', batch);
 
-        if (error) throw error;
+        // Use the RPC for more robust deletion
+        const { error } = await supabase.rpc('delete_leads_in_bulk', {
+          lead_ids: batch
+        });
+
+        if (error) {
+          console.error('RPC Error:', error);
+          throw new Error(error.message || 'Erro inesperado na função de banco de dados');
+        }
       }
 
       // Optimistic update
       setLeads(prev => prev.filter(l => !selectedLeads.includes(l.id)));
+      const countDeleted = selectedLeads.length;
       setSelectedLeads([]);
 
       // Update stats
       setStats(prev => ({
         ...prev,
-        totalLeads: prev.totalLeads - selectedLeads.length
+        totalLeads: prev.totalLeads - countDeleted
       }));
 
-    } catch (error) {
+      setSuccessMessage(`${countDeleted} leads excluídos com sucesso!`);
+      setActiveModal('success');
+
+    } catch (error: any) {
       console.error('Error deleting leads:', error);
-      alert('Erro ao excluir leads. Tente novamente.');
+      alert(`Erro crítico ao excluir leads: ${error.message || 'Erro no servidor'}. Verifique o console ou contate o suporte.`);
     } finally {
       setLoading(false);
     }

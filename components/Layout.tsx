@@ -48,7 +48,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { canAccess } = useRBAC();
 
     return (
-        <div className="flex min-h-screen bg-slate-50">
+        <div className="flex h-screen overflow-hidden bg-slate-50">
             {/* Mobile Top Header - Visible only on mobile */}
             <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4">
                 <div className="flex items-center space-x-2">
@@ -72,7 +72,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             )}
 
             <aside className={`
-        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transition-all duration-300 lg:relative lg:translate-x-0
+        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transition-all duration-300 lg:static lg:translate-x-0 h-full
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}>
@@ -164,7 +164,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
             </aside>
 
-            <main className="flex-1 overflow-x-hidden min-h-screen">
+            <main className="flex-1 overflow-y-auto min-h-0 relative">
                 <div className="p-4 md:p-8 pt-20 lg:pt-8 max-w-7xl mx-auto">
                     {children}
                 </div>
