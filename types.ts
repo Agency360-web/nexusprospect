@@ -85,6 +85,7 @@ export interface Lead {
   tags: string[];
   customFields: Record<string, string>;
   status: 'valid' | 'invalid' | 'pending';
+  isSynced?: boolean;
   createdAt?: string;
 }
 

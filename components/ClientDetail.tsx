@@ -179,20 +179,23 @@ const ClientDetail: React.FC = () => {
 
   const handleSyncToSheets = async (leadsToSync?: Lead[]) => {
     if (!client?.google_sheets_config?.url) {
-      // If called automatically, maybe don't alert? But better safe to have config checked before calling.
       if (!leadsToSync) alert('Configure a URL do Webhook primeiro.');
       return;
     }
 
     setModalLoading(true);
     try {
-      // 1. Prepare data
-      const targetLeads = leadsToSync || leads;
+      // 1. Prepare data - if called manually (no leadsToSync), filter for unsynced leads
+      let targetLeads = leadsToSync || leads.filter(l => !l.isSynced);
+
+      if (targetLeads.length === 0) {
+        if (!leadsToSync) alert('Nenhum contato novo para sincronizar.');
+        return;
+      }
+
       const payload = {
         client_id: client.id,
         client_name: client.name,
-        // Send simplified leads structure matching the columns requested: 
-        // 1. Name, 2. Phone, 3. Company, 4. Tags
         leads: targetLeads.map(lead => {
           const tagsStr = (lead.tags || []).map(t => {
             const tag = tags.find(tag => tag.id === t);
@@ -210,10 +213,6 @@ const ClientDetail: React.FC = () => {
       };
 
       // 2. Send to Webhook (Google Sheets)
-      // Using no-cors mode since Google Scripts often have CORS issues, 
-      // but ideally we want to know if it succeeded. 
-      // Note: extensive data might fail with GET, POST is better.
-      // fetch with no-cors implies we can't read response.
       await fetch(client.google_sheets_config.url, {
         method: 'POST',
         mode: 'no-cors',
@@ -223,7 +222,18 @@ const ClientDetail: React.FC = () => {
         body: JSON.stringify(payload)
       });
 
-      // 3. Update last_sync in DB
+      // 3. Update is_synced in DB for targetLeads
+      const syncedIds = targetLeads.map(l => l.id);
+      if (syncedIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from('leads')
+          .update({ is_synced: true })
+          .in('id', syncedIds);
+
+        if (updateError) console.error('Error updating sync status:', updateError);
+      }
+
+      // 4. Update last_sync in DB
       const newConfig = {
         ...client.google_sheets_config,
         last_sync: new Date().toISOString()
@@ -238,6 +248,11 @@ const ClientDetail: React.FC = () => {
         setClient({ ...client, google_sheets_config: newConfig });
       }
 
+      // Optimistic update of local leads state
+      setLeads(prev => prev.map(l =>
+        syncedIds.includes(l.id) ? { ...l, isSynced: true } : l
+      ));
+
       setSuccessMessage('Sincronização enviada com sucesso!');
       setActiveModal('success');
       setTimeout(() => setActiveModal('none'), 2000);
@@ -246,7 +261,7 @@ const ClientDetail: React.FC = () => {
       console.error('Sync error:', error);
       if (!leadsToSync) alert('Erro ao sincronizar. Verifique o console.');
     } finally {
-      if (!leadsToSync) setModalLoading(false); // Don't block UI if auto-sync
+      if (!leadsToSync) setModalLoading(false);
     }
   };
 
@@ -355,9 +370,8 @@ const ClientDetail: React.FC = () => {
 
       // Auto Sync Check
       if (client?.google_sheets_config?.auto_sync && client.google_sheets_config.url && insertedLead) {
-        // We do this in background
-        const updatedLeads = [...leads, insertedLead as Lead];
-        handleSyncToSheets(updatedLeads);
+        // We do this in background with ONLY the new lead
+        handleSyncToSheets([insertedLead as unknown as Lead]);
       }
 
       fetchData();
@@ -931,7 +945,8 @@ const ClientDetail: React.FC = () => {
           email: l.email,
           tags: l.tags || [],
           customFields: l.custom_fields || {},
-          status: l.status
+          status: l.status,
+          isSynced: l.is_synced
         })));
       } else {
         setLeads([]);
