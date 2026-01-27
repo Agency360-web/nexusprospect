@@ -102,6 +102,10 @@ const ClientDetail: React.FC = () => {
   // Backup / Sync State
   const [backupConfig, setBackupConfig] = useState({ url: '', auto_sync: false });
 
+  // Pagination State for Leads
+  const [leadPage, setLeadPage] = useState(1);
+  const leadsPerPage = 50;
+
   const handleDownloadCSV = () => {
     if (leads.length === 0) return;
 
@@ -423,9 +427,17 @@ const ClientDetail: React.FC = () => {
         }).filter(l => l !== null);
 
         if (leadsToInsert.length > 0) {
-          const { error } = await supabase.from('leads').insert(leadsToInsert);
-          if (error) throw error;
-          setSuccessMessage(`${leadsToInsert.length} leads importados com sucesso!`);
+          // Process in batches of 1000
+          const batchSize = 1000;
+          let importedCount = 0;
+          for (let i = 0; i < leadsToInsert.length; i += batchSize) {
+            const batch = leadsToInsert.slice(i, i + batchSize);
+            const { error } = await supabase.from('leads').insert(batch);
+            if (error) throw error;
+            importedCount += batch.length;
+          }
+
+          setSuccessMessage(`${importedCount} leads importados com sucesso!`);
           setActiveModal('success');
           fetchData();
         }
@@ -752,12 +764,18 @@ const ClientDetail: React.FC = () => {
 
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from('leads')
-        .delete()
-        .in('id', selectedLeads);
 
-      if (error) throw error;
+      // Process in batches of 1000 to avoid request size/timeout issues
+      const batchSize = 1000;
+      for (let i = 0; i < selectedLeads.length; i += batchSize) {
+        const batch = selectedLeads.slice(i, i + batchSize);
+        const { error } = await supabase
+          .from('leads')
+          .delete()
+          .in('id', batch);
+
+        if (error) throw error;
+      }
 
       // Optimistic update
       setLeads(prev => prev.filter(l => !selectedLeads.includes(l.id)));
@@ -1403,57 +1421,83 @@ const ClientDetail: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
-                    {leads.map(lead => (
-                      <tr key={lead.id} className={`hover:bg-slate-50/50 transition-colors ${selectedLeads.includes(lead.id) ? 'bg-slate-50' : ''}`}>
-                        <td className="px-8 py-5">
-                          <input
-                            type="checkbox"
-                            checked={selectedLeads.includes(lead.id)}
-                            onChange={() => toggleSelectLead(lead.id)}
-                            className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                          />
-                        </td>
-                        <td className="px-2 py-5">
-                          <div className="font-bold text-slate-900">{lead.name}</div>
-                          <div className="text-[10px] text-slate-400 uppercase tracking-tight">{lead.customFields.empresa}</div>
-                        </td>
-                        <td className="px-8 py-5 font-mono text-slate-500 font-medium">
-                          {lead.phone || lead.email}
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className="flex flex-wrap gap-1.5">
-                            {lead.tags.map(tid => {
-                              const tag = tags.find(t => t.id === tid);
-                              return tag ? (
-                                <span key={tid} className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${tag.color}`}>
-                                  {tag.name}
-                                </span>
-                              ) : null;
-                            })}
-                          </div>
-                        </td>
-                        <td className="px-8 py-5">
-                          <span className={`inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${lead.status === 'valid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
-                            }`}>
-                            <CheckCircle2 size={10} className="mr-1" />
-                            {lead.status === 'valid' ? 'Validado' : 'Erro'}
-                          </span>
-                        </td>
-                        <td className="px-8 py-5 text-right">
-                          <button className="text-slate-300 hover:text-slate-900 transition-colors">
-                            <MoreVertical size={20} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {leads
+                      .filter(lead =>
+                        lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (lead.phone || '').includes(searchTerm) ||
+                        (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (lead.tags || []).some(tid => {
+                          const tag = tags.find(t => t.id === tid);
+                          return tag?.name.toLowerCase().includes(searchTerm.toLowerCase());
+                        })
+                      )
+                      .slice((leadPage - 1) * leadsPerPage, leadPage * leadsPerPage)
+                      .map(lead => (
+                        <tr key={lead.id} className={`hover:bg-slate-50/50 transition-colors ${selectedLeads.includes(lead.id) ? 'bg-slate-50' : ''}`}>
+                          <td className="px-8 py-5">
+                            <input
+                              type="checkbox"
+                              checked={selectedLeads.includes(lead.id)}
+                              onChange={() => toggleSelectLead(lead.id)}
+                              className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                            />
+                          </td>
+                          <td className="px-2 py-5">
+                            <div className="font-bold text-slate-900">{lead.name}</div>
+                            <div className="text-[10px] text-slate-400 uppercase tracking-tight">{lead.customFields?.empresa}</div>
+                          </td>
+                          <td className="px-8 py-5 font-mono text-slate-500 font-medium">
+                            {lead.phone || lead.email}
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex flex-wrap gap-1.5">
+                              {(lead.tags || []).map(tid => {
+                                const tag = tags.find(t => t.id === tid);
+                                return tag ? (
+                                  <span key={tid} className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${tag.color}`}>
+                                    {tag.name}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <span className={`inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${lead.status === 'valid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
+                              }`}>
+                              <CheckCircle2 size={10} className="mr-1" />
+                              {lead.status === 'valid' ? 'Validado' : 'Erro'}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5 text-right">
+                            <button className="text-slate-300 hover:text-slate-900 transition-colors">
+                              <MoreVertical size={20} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
               <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 <span>{leads.length} Contatos listados</span>
-                <div className="flex space-x-4">
-                  <button className="hover:text-slate-900">Anterior</button>
-                  <button className="hover:text-slate-900">Próximo</button>
+                <div className="flex items-center space-x-4">
+                  <span className="text-slate-400">Página {leadPage} de {Math.ceil(leads.length / leadsPerPage)}</span>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setLeadPage(p => Math.max(1, p - 1))}
+                      disabled={leadPage === 1}
+                      className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      onClick={() => setLeadPage(p => Math.min(Math.ceil(leads.length / leadsPerPage), p + 1))}
+                      disabled={leadPage >= Math.ceil(leads.length / leadsPerPage)}
+                      className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Próximo
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
