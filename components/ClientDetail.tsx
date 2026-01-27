@@ -896,14 +896,34 @@ const ClientDetail: React.FC = () => {
       }
 
 
-      // 2. Fetch Leads
-      const { data: leadsData } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('client_id', clientId);
+      // 2. Fetch Leads (with batching to bypass 1000 limit)
+      let allLeads: any[] = [];
+      let lastPageSize = 1000;
+      let offset = 0;
 
-      if (leadsData) {
-        setLeads(leadsData.map((l: any) => ({
+      while (lastPageSize === 1000) {
+        const { data: batch, error: leadsError } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('client_id', clientId)
+          .range(offset, offset + 999);
+
+        if (leadsError) {
+          console.error('Error fetching leads:', leadsError);
+          break;
+        }
+
+        if (batch) {
+          allLeads = [...allLeads, ...batch];
+          lastPageSize = batch.length;
+          offset += 1000;
+        } else {
+          lastPageSize = 0;
+        }
+      }
+
+      if (allLeads.length > 0) {
+        setLeads(allLeads.map((l: any) => ({
           id: l.id,
           clientId: l.client_id,
           name: l.name,
@@ -913,6 +933,8 @@ const ClientDetail: React.FC = () => {
           customFields: l.custom_fields || {},
           status: l.status
         })));
+      } else {
+        setLeads([]);
       }
 
       // 3. Fetch Tags
@@ -988,9 +1010,9 @@ const ClientDetail: React.FC = () => {
 
       // Update stats based on fetched data
       setStats({
-        totalLeads: leadsData?.length || 0,
+        totalLeads: allLeads.length,
         activeTags: tagsData?.length || 0,
-        optInRate: leadsData?.length ? '100%' : '-', // Placeholder logic
+        optInRate: allLeads.length ? '100%' : '-', // Placeholder logic
         bounces: 0 // Placeholder as we don't track bounces yet
       });
 
