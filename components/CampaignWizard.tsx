@@ -364,7 +364,7 @@ const CampaignWizard: React.FC = () => {
         client_id: selectedClientId,
         campaign_id: activeCampaignId,
         display_name: campaignName,
-        message: message,
+        message_text: message,
         channel: 'whatsapp',
         sender_number: currentNumbers.find(n => n.id === selectedNumberId)?.phone,
 
