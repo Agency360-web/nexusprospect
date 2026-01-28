@@ -136,7 +136,7 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Priorities Block */}
-        <div className="bg-rose-50 rounded-3xl border border-rose-100 overflow-hidden flex flex-col">
+        <div className="bg-rose-50 rounded-3xl border border-rose-100 overflow-hidden flex flex-col h-[450px]">
           <div className="bg-slate-900 p-6 flex items-center gap-3">
             <div className="p-2 bg-rose-500/20 rounded-lg">
               <AlertCircle className="text-rose-500" size={20} />
@@ -147,7 +147,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-6 pt-6 space-y-3">
+          <div className="p-6 pt-6 space-y-3 flex-1 overflow-y-auto">
             {priorityTasks.length > 0 ? (
               priorityTasks.map(task => (
                 <div key={task.id} className="bg-white p-3 rounded-xl border border-rose-100 shadow-sm flex items-center justify-between group hover:border-rose-200 transition-all">
@@ -174,7 +174,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Attention Block */}
-        <div className="bg-amber-50 rounded-3xl border border-amber-100 overflow-hidden flex flex-col">
+        <div className="bg-amber-50 rounded-3xl border border-amber-100 overflow-hidden flex flex-col h-[450px]">
           <div className="bg-slate-900 p-6 flex items-center gap-3">
             <div className="p-2 bg-amber-500/20 rounded-lg">
               <Calendar className="text-amber-500" size={20} />
@@ -185,7 +185,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-6 pt-6 space-y-3">
+          <div className="p-6 pt-6 space-y-3 flex-1 overflow-y-auto">
             {attentionTasks.length > 0 ? (
               attentionTasks.map(task => (
                 <div key={task.id} className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm flex items-center justify-between group hover:border-amber-200 transition-all">
@@ -213,7 +213,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Main Task List */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden h-[450px] flex flex-col">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Gestão de Tarefas</h2>
@@ -227,7 +227,7 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
-        <div className="p-0">
+        <div className="p-0 flex-1 overflow-y-auto">
           {loading ? (
             <div className="py-12 flex justify-center"><Activity className="animate-spin text-slate-300" /></div>
           ) : tasks.length === 0 ? (
