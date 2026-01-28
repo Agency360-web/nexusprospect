@@ -27,7 +27,8 @@ import {
     Trash2,
     ChevronLeft,
     ChevronRight,
-    QrCode
+    QrCode,
+    Edit2
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import ContractManager from './ContractManager';
@@ -62,7 +63,7 @@ interface Transaction {
 
 type DateRange = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'nextMonth' | 'all' | 'custom';
 
-const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void }> = ({ transaction, onUpdate }) => {
+const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void, onEdit: (trx: Transaction) => void }> = ({ transaction, onUpdate, onEdit }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -207,6 +208,17 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
                             <span>Excluir</span>
                         </button>
 
+                        <button
+                            onClick={() => {
+                                setIsOpen(false);
+                                onEdit(transaction);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-2"
+                        >
+                            <Edit2 size={14} className="lucide-edit-2" />
+                            <span>Editar</span>
+                        </button>
+
                         <button className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
                             Ver Detalhes
                         </button>
@@ -244,17 +256,46 @@ interface TransactionModalProps {
     onSuccess: () => void;
     user_id: string;
     defaultCategory: 'pessoal' | 'profissional';
+    editingTransaction?: Transaction | null;
 }
 
-const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, onSuccess, user_id, defaultCategory }) => {
+const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, onSuccess, user_id, defaultCategory, editingTransaction }) => {
     const [type, setType] = useState<'income' | 'expense'>('income');
     const [category, setCategory] = useState<'pessoal' | 'profissional'>(defaultCategory);
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [clientName, setClientName] = useState('');
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(new Date().toLocaleDateString('en-CA')); // ISO format YYYY-MM-DD
     const [status, setStatus] = useState<'pago' | 'pendente'>('pago');
     const [loading, setLoading] = useState(false);
+
+    // Sync with editingTransaction
+    useEffect(() => {
+        if (editingTransaction) {
+            setType(editingTransaction.amount >= 0 ? 'income' : 'expense');
+            setCategory(editingTransaction.category || 'profissional');
+            setDescription(editingTransaction.description);
+            setAmount(Math.abs(editingTransaction.amount).toString().replace('.', ','));
+            setClientName(editingTransaction.client_name);
+
+            // Format date for <input type="date">
+            const d = new Date(editingTransaction.transaction_date);
+            // Use local date for input to prevent timezone shift
+            const localDate = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+            setDate(localDate);
+
+            setStatus(editingTransaction.status === 'pago' ? 'pago' : 'pendente');
+        } else {
+            // Reset for new transaction
+            setType('income');
+            setCategory(defaultCategory);
+            setDescription('');
+            setAmount('');
+            setClientName('');
+            setDate(new Date().toLocaleDateString('en-CA'));
+            setStatus('pago');
+        }
+    }, [editingTransaction, isOpen, defaultCategory]);
 
     // Recurrence State
     const [isRecurring, setIsRecurring] = useState(false);
@@ -275,31 +316,50 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
 
             const finalAmount = type === 'expense' ? -Math.abs(numericAmount) : Math.abs(numericAmount);
 
-            const transactionsToInsert = [];
-            const baseDate = new Date(date);
+            if (editingTransaction) {
+                // Update existing
+                const { error } = await supabase
+                    .from('financial_transactions')
+                    .update({
+                        description,
+                        amount: finalAmount,
+                        transaction_date: new Date(date + 'T12:00:00').toISOString(), // Use mid-day to avoid TZ shifts
+                        status,
+                        client_name: clientName,
+                        category,
+                        manual_override: true
+                    })
+                    .eq('id', editingTransaction.id);
 
-            const count = isRecurring ? Math.max(1, recurrenceCount) : 1;
+                if (error) throw error;
+            } else {
+                // Insert new
+                const transactionsToInsert = [];
+                // Use T12:00:00 to ensure the date stays the same in different timezones
+                const baseDate = new Date(date + 'T12:00:00');
 
-            for (let i = 0; i < count; i++) {
-                const currentDate = new Date(baseDate);
-                currentDate.setMonth(baseDate.getMonth() + i);
+                const count = isRecurring ? Math.max(1, recurrenceCount) : 1;
 
-                transactionsToInsert.push({
-                    user_id,
-                    description: isRecurring ? `${description} (${i + 1}/${count})` : description,
-                    amount: finalAmount,
-                    transaction_date: currentDate.toISOString(),
-                    status,
+                for (let i = 0; i < count; i++) {
+                    const currentDate = new Date(baseDate);
+                    currentDate.setMonth(baseDate.getMonth() + i);
 
-                    client_name: clientName || (type === 'expense' ? 'Despesa Operacional' : 'Cliente Avulso'),
-                    manual_override: true,
-                    category
-                });
+                    transactionsToInsert.push({
+                        user_id,
+                        description: isRecurring ? `${description} (${i + 1}/${count})` : description,
+                        amount: finalAmount,
+                        transaction_date: currentDate.toISOString(),
+                        status,
+
+                        client_name: clientName || (type === 'expense' ? 'Despesa Operacional' : 'Cliente Avulso'),
+                        manual_override: true,
+                        category
+                    });
+                }
+
+                const { error } = await supabase.from('financial_transactions').insert(transactionsToInsert);
+                if (error) throw error;
             }
-
-            const { error } = await supabase.from('financial_transactions').insert(transactionsToInsert);
-
-            if (error) throw error;
             onSuccess();
             onClose();
         } catch (error: any) {
@@ -313,7 +373,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 m-4 animate-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-slate-900">Nova Transação</h3>
+                    <h3 className="text-xl font-bold text-slate-900">
+                        {editingTransaction ? 'Editar Transação' : 'Nova Transação'}
+                    </h3>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
                         <Plus className="rotate-45" size={24} />
                     </button>
@@ -406,34 +468,36 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
                         </div>
                     </div>
 
-                    {/* Recurrence Options */}
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <div className="flex items-center gap-2 mb-2">
-                            <input
-                                type="checkbox"
-                                id="recurrence"
-                                checked={isRecurring}
-                                onChange={e => setIsRecurring(e.target.checked)}
-                                className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                            />
-                            <label htmlFor="recurrence" className="text-sm font-medium text-slate-700">Repetir parcelas?</label>
-                        </div>
-
-                        {isRecurring && (
-                            <div className="animate-in slide-in-from-top-1 duration-200">
-                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Número de Meses</label>
+                    {/* Recurrence Options - Only for NEW transactions */}
+                    {!editingTransaction && (
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div className="flex items-center gap-2 mb-2">
                                 <input
-                                    type="number"
-                                    min="2"
-                                    max="120"
-                                    value={recurrenceCount}
-                                    onChange={e => setRecurrenceCount(parseInt(e.target.value))}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-slate-500 transition-colors"
+                                    type="checkbox"
+                                    id="recurrence"
+                                    checked={isRecurring}
+                                    onChange={e => setIsRecurring(e.target.checked)}
+                                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                                 />
-                                <p className="text-[10px] text-slate-400 mt-1">Ex: 12 para 1 ano. Será gerado um lançamento por mês.</p>
+                                <label htmlFor="recurrence" className="text-sm font-medium text-slate-700">Repetir parcelas?</label>
                             </div>
-                        )}
-                    </div>
+
+                            {isRecurring && (
+                                <div className="animate-in slide-in-from-top-1 duration-200">
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Número de Meses</label>
+                                    <input
+                                        type="number"
+                                        min="2"
+                                        max="120"
+                                        value={recurrenceCount}
+                                        onChange={e => setRecurrenceCount(parseInt(e.target.value))}
+                                        className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-slate-500 transition-colors"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">Ex: 12 para 1 ano. Será gerado um lançamento por mês.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div>
                         <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Cliente / Fornecedor (Opcional)</label>
@@ -463,6 +527,7 @@ const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'finance' | 'contracts' | 'whatsapp' | 'processes'>('finance');
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [dashboardScope, setDashboardScope] = useState<'pessoal' | 'profissional'>('profissional');
 
     // Data State
@@ -787,10 +852,14 @@ const AdministrationDashboard: React.FC = () => {
             {user && (
                 <TransactionModal
                     isOpen={isTransactionModalOpen}
-                    onClose={() => setIsTransactionModalOpen(false)}
+                    onClose={() => {
+                        setIsTransactionModalOpen(false);
+                        setEditingTransaction(null);
+                    }}
                     onSuccess={() => { fetchFinancialData(); }}
                     user_id={user.id}
                     defaultCategory={dashboardScope}
+                    editingTransaction={editingTransaction}
                 />
             )}
 
@@ -1180,7 +1249,11 @@ const AdministrationDashboard: React.FC = () => {
                                                             />
                                                         </td>
                                                         <td className="px-8 py-5 text-sm text-slate-500 pl-0 font-medium">
-                                                            {new Date(trx.transaction_date).toLocaleDateString()}
+                                                            {(() => {
+                                                                const d = new Date(trx.transaction_date);
+                                                                // Display in local date format (BR) using local interpretation
+                                                                return new Date(d.getTime() + d.getTimezoneOffset() * 60000).toLocaleDateString();
+                                                            })()}
                                                         </td>
                                                         <td className="px-8 py-5">
                                                             <div className="font-bold text-slate-900 text-sm">{trx.client_name}</div>
@@ -1212,6 +1285,10 @@ const AdministrationDashboard: React.FC = () => {
                                                                 transaction={trx}
                                                                 onUpdate={() => {
                                                                     fetchFinancialData(); // Refresh UI
+                                                                }}
+                                                                onEdit={(t) => {
+                                                                    setEditingTransaction(t);
+                                                                    setIsTransactionModalOpen(true);
                                                                 }}
                                                             />
                                                         </td>

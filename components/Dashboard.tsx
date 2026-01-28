@@ -1,181 +1,109 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  Users,
-  CheckCircle2,
-  AlertCircle,
-  ArrowUpRight,
-  MoreHorizontal,
-  Play,
-  BarChart3,
-  Activity,
-  Globe,
-  Wifi,
-  WifiOff,
   Building2,
   Zap,
   Plus,
   ListTodo,
   Calendar,
-  Clock,
   CheckSquare,
   Square,
-  Megaphone,
   Trash2,
-  Edit3,
-  XCircle,
-  MoreVertical
+  ArrowUpRight,
+  Activity,
+  AlertCircle
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-const StatCard: React.FC<{ label: string, value: string, subValue: string, icon: React.ReactNode, colorClass: string, trend?: 'up' | 'down' | 'neutral' }> = ({ label, value, subValue, icon, colorClass, trend }) => (
-  <div className="group bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-100/50 hover:-translate-y-1 transition-all duration-300">
-    <div className="flex justify-between items-start mb-4">
-      <div className={`p-3 rounded-xl transition-colors duration-300 ${colorClass}`}>
-        {icon}
-      </div>
-      {trend && (
-        <span className={`text-xs font-bold px-2 py-1 rounded-full ${trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-          {trend === 'up' ? '↑' : '↓'}
-        </span>
-      )}
-    </div>
-    <div className="space-y-1">
-      <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">{label}</h3>
-      <div className="flex items-baseline space-x-2">
-        <span className="text-3xl font-black text-slate-900 tracking-tight">{value}</span>
-      </div>
-      <p className="text-xs text-slate-400 font-medium pt-1 border-t border-dashed border-slate-100 mt-3">
-        {subValue}
-      </p>
-    </div>
-  </div>
-);
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [period, setPeriod] = useState('7d');
-  const [stats, setStats] = useState({
-    clients: 0,
-    leads: 0,
-    transmissions: 0,
-    deliveryRate: 0,
-    loading: true,
-    numbers: [] as any[],
-    globalLimit: 0,
-    globalSent: 0,
-    chartData: [] as any[],
-    tasks: [] as any[],
-    recentCampaigns: [] as any[]
-  });
+  const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
     fetchStats();
-  }, [period, user]);
+  }, [user]);
 
   const fetchStats = async () => {
     try {
-      const days = period === '7d' ? 7 : 30;
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*, clients(name)')
+        .eq('status', 'pending')
+        .order('due_date', { ascending: true });
 
-      const [clientsRes, leadsRes, transRes, numbersRes, historyRes, tasksRes] = await Promise.all([
-        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('user_id', user?.id),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('user_id', user?.id),
-        supabase.from('transmissions').select('*', { count: 'exact', head: true }).eq('user_id', user?.id),
-        supabase.from('whatsapp_numbers').select('*, clients(name)').eq('user_id', user?.id),
-        // Fetch actual transmission history for chart (last X days)
-        supabase.from('transmissions')
-          .select('created_at, status')
-          .eq('user_id', user?.id)
-          .gte('created_at', startDate.toISOString()),
-        // Fetch tasks (Urgency Logic: Pending first, ordered by due_date ascending)
-        supabase
-          .from('tasks')
-          .select('*, clients(name)')
-          .eq('status', 'pending') // Focus on pending tasks for urgency
-          .order('due_date', { ascending: true }) // Oldest/Overdue first
-          .limit(10)
-      ]);
-
-      const numbers = numbersRes.data || [];
-      const globalSent = numbers.reduce((acc, curr) => acc + (curr.sent_today || 0), 0);
-      const globalLimit = numbers.reduce((acc, curr) => acc + (curr.daily_limit || 0), 0);
-
-      // Process Chart Data
-      const rawHistory = historyRes.data || [];
-      const chartMap = new Map<string, number>();
-
-      // Initialize map with 0s
-      for (let i = days - 1; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-        chartMap.set(key, 0);
-      }
-
-      let deliveredCount = 0;
-      rawHistory.forEach(t => {
-        const d = new Date(t.created_at);
-        const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-        if (chartMap.has(key)) {
-          chartMap.set(key, (chartMap.get(key) || 0) + 1);
-        }
-        if (t.status !== 'failed') deliveredCount++;
-      });
-
-      const chartData = Array.from(chartMap.entries()).map(([name, envios]) => ({ name, envios }));
-      const deliveryRate = rawHistory.length > 0 ? (deliveredCount / rawHistory.length) * 100 : 0;
-
-      setStats({
-        clients: clientsRes.count || 0,
-        leads: leadsRes.count || 0,
-        transmissions: transRes.count || 0,
-        deliveryRate,
-        loading: false,
-        numbers,
-        globalLimit,
-        globalSent,
-        chartData,
-        tasks: tasksRes?.data || [],
-        recentCampaigns: (await supabase
-          .from('campaigns')
-          .select('*, clients(name)')
-          .order('created_at', { ascending: false })
-          .limit(5)).data || []
-      });
+      if (error) throw error;
+      setTasks(data || []);
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
+      setLoading(false);
     }
   };
 
-  const handleDeleteCampaign = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta campanha?')) return;
+  const handleToggleTask = async (id: string, currentStatus: string) => {
     try {
-      const { error } = await supabase.from('campaigns').delete().eq('id', id);
+      const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: newStatus })
+        .eq('id', id);
+
       if (error) throw error;
       fetchStats();
     } catch (err) {
-      console.error('Error deleting campaign:', err);
-      alert('Erro ao excluir campanha.');
+      console.error('Error toggling task:', err);
     }
   };
 
-  const handleCancelCampaign = async (id: string) => {
-    if (!confirm('Deseja cancelar este agendamento? A campanha voltará para rascunho.')) return;
+  const handleDeleteTask = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta tarefa?')) return;
     try {
-      const { error } = await supabase.from('campaigns').update({ status: 'draft', scheduled_at: null }).eq('id', id);
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id);
+
       if (error) throw error;
       fetchStats();
     } catch (err) {
-      console.error('Error cancelling campaign:', err);
-      alert('Erro ao cancelar agendamento.');
+      console.error('Error deleting task:', err);
+      alert('Erro ao excluir tarefa.');
     }
   };
+
+  const getPriorityTasks = () => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    return tasks.filter(t => {
+      if (!t.due_date) return false;
+      const dueDate = new Date(t.due_date);
+      return dueDate <= today;
+    });
+  };
+
+  const getAttentionTasks = () => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const future = new Date();
+    future.setDate(future.getDate() + 3); // next 3 days
+    future.setHours(23, 59, 59, 999);
+
+    return tasks.filter(t => {
+      if (!t.due_date) return false;
+      const dueDate = new Date(t.due_date);
+      return dueDate > today && dueDate <= future;
+    });
+  };
+
+  const priorityTasks = getPriorityTasks();
+  const attentionTasks = getAttentionTasks();
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20">
@@ -206,292 +134,90 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          label="Total Clientes"
-          value={stats.clients.toString()}
-          subValue="Empresas ativas"
-          icon={<Building2 className="text-brand-600" size={24} />}
-          colorClass="bg-slate-900 group-hover:bg-slate-800"
-        />
-        <StatCard
-          label="Leads Validados"
-          value={stats.leads.toString()}
-          subValue="Base total de contatos"
-          icon={<Users className="text-brand-600" size={24} />}
-          colorClass="bg-slate-900 group-hover:bg-slate-800"
-        />
-        <StatCard
-          label="Disparos Totais"
-          value={stats.transmissions.toLocaleString()}
-          subValue="Histórico vitalício"
-          icon={<CheckCircle2 className="text-[#ffd700]" size={24} />}
-          colorClass="bg-slate-900 group-hover:bg-slate-800"
-        />
-        <StatCard
-          label="Taxa de Entrega"
-          value={`${stats.deliveryRate.toFixed(1)}%`}
-          subValue="Média últimos 30 dias"
-          icon={<Activity className="text-[#ffd700]" size={24} />}
-          colorClass="bg-slate-900 group-hover:bg-slate-800"
-          trend={stats.deliveryRate > 90 ? 'up' : 'neutral'}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col min-h-[350px] md:min-h-[400px]">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Volume de Mensagens</h2>
-              <p className="text-sm text-slate-400">Desempenho de envios no período</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Priorities Block */}
+        <div className="bg-rose-50 rounded-3xl border border-rose-100 overflow-hidden flex flex-col">
+          <div className="bg-slate-900 p-6 flex items-center gap-3">
+            <div className="p-2 bg-rose-500/20 rounded-lg">
+              <AlertCircle className="text-rose-500" size={20} />
             </div>
-            <div className="flex bg-slate-100 p-1 rounded-lg w-full sm:w-auto">
-              <button
-                onClick={() => setPeriod('7d')}
-                className={`flex-1 sm:flex-none px-3 py-1 text-xs font-bold rounded-md transition-all ${period === '7d' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-              >
-                7D
-              </button>
-              <button
-                onClick={() => setPeriod('30d')}
-                className={`flex-1 sm:flex-none px-3 py-1 text-xs font-bold rounded-md transition-all ${period === '30d' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-              >
-                30D
-              </button>
+            <div>
+              <h3 className="text-white font-bold text-lg">Prioridades do Dia</h3>
+              <p className="text-slate-400 text-xs font-medium">Tarefas urgentes para hoje</p>
             </div>
           </div>
 
-          <div className="flex-1 w-full min-h-[300px]">
-            {stats.chartData.some(d => d.envios > 0) ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.chartData}>
-                  <defs>
-                    <linearGradient id="colorEnvios" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
-                    dy={10}
-                    minTickGap={30}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: '16px',
-                      border: 'none',
-                      boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-                      padding: '12px 16px'
-                    }}
-                    itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}
-                    labelStyle={{ color: '#64748b', marginBottom: '4px', fontSize: '12px' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="envios"
-                    stroke="#ef4444"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorEnvios)"
-                    activeDot={{ r: 6, strokeWidth: 0, fill: '#ef4444' }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+          <div className="p-6 pt-6 space-y-3">
+            {priorityTasks.length > 0 ? (
+              priorityTasks.map(task => (
+                <div key={task.id} className="bg-white p-3 rounded-xl border border-rose-100 shadow-sm flex items-center justify-between group hover:border-rose-200 transition-all">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => handleToggleTask(task.id, task.status)} className="text-rose-300 hover:text-rose-600 transition-colors">
+                      <Square size={18} />
+                    </button>
+                    <div>
+                      <div className="font-bold text-slate-800 text-sm line-clamp-1">{task.title}</div>
+                      <div className="text-[10px] uppercase font-bold text-rose-500">
+                        {new Date(task.due_date).toLocaleDateString()} • {task.clients?.name}
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => navigate(`/clients/${task.client_id}`)} className="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                    <ArrowUpRight size={16} />
+                  </button>
+                </div>
+              ))
             ) : (
-              <div className="flex flex-col w-full h-full items-center justify-center text-slate-400 gap-4 border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/50">
-                <div className="p-4 bg-white rounded-full shadow-sm">
-                  <BarChart3 className="text-slate-300" size={32} />
-                </div>
-                <div className="text-center">
-                  <p className="font-bold text-slate-600">Sem dados recentes</p>
-                  <p className="text-sm">Inicie um disparo para ver gráficos.</p>
-                </div>
-              </div>
+              <p className="text-sm text-rose-400 font-medium text-center py-4">Tudo em dia por aqui! 🎉</p>
             )}
           </div>
         </div>
 
-        {/* Infrastructure Status */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col h-full">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Activity size={20} className="text-[#ffd700]" />
-              Sinais Vitais
-            </h2>
-            <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 rounded-lg">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Online</span>
+        {/* Attention Block */}
+        <div className="bg-amber-50 rounded-3xl border border-amber-100 overflow-hidden flex flex-col">
+          <div className="bg-slate-900 p-6 flex items-center gap-3">
+            <div className="p-2 bg-amber-500/20 rounded-lg">
+              <Calendar className="text-amber-500" size={20} />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-lg">Requer Atenção</h3>
+              <p className="text-slate-400 text-xs font-medium">Próximos 3 dias</p>
             </div>
           </div>
 
-          <div className="space-y-4 flex-1 flex flex-col">
-            <div className="space-y-3 flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
-              {stats.loading ? (
-                <div className="flex justify-center py-10"><Activity className="animate-spin text-slate-300" /></div>
-              ) : stats.numbers.length === 0 ? (
-                <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl">
-                  <p className="text-slate-400 text-sm font-medium">Nenhuma conexão ativa.</p>
-                </div>
-              ) : (
-                stats.numbers.map((num, i) => {
-                  const isOnline = num.status === 'active' || num.status === 'connected';
-                  return (
-                    <div key={num.id} className="flex items-center justify-between p-4 bg-white hover:bg-slate-50 transition-colors rounded-2xl border border-slate-100 shadow-sm">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-rose-400'}`}></div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-900">{num.nickname}</div>
-                          <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wide">{num.clients?.name || 'Desconhecido'}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`text-[10px] font-black uppercase ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {isOnline ? 'Ativo' : 'Offline'}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="mt-auto pt-6">
-              <div className="bg-slate-900 p-5 rounded-2xl text-white relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500 rounded-full blur-[60px] opacity-20 -translate-y-1/2 translate-x-1/2 group-hover:opacity-30 transition-opacity"></div>
-                <div className="flex justify-between items-center mb-3 relative z-10">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Cota Diária Global</span>
-                  <span className="text-xs font-mono font-bold">{stats.globalSent} / {stats.globalLimit}</span>
-                </div>
-                <div className="h-1.5 bg-slate-700/50 rounded-full overflow-hidden relative z-10">
-                  <div
-                    className="h-full bg-brand-500 transition-all duration-700 ease-out shadow-[0_0_12px_rgba(239,68,68,0.5)]"
-                    style={{ width: `${stats.globalLimit > 0 ? (stats.globalSent / stats.globalLimit) * 100 : 0}%` }}
-                  ></div>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-2 relative z-10">Renova em 14h 32m</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Campaigns Section */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Resumo de Campanhas</h2>
-            <p className="text-xs text-slate-400 font-medium">Status dos disparos recentes e agendados</p>
-          </div>
-          <button
-            onClick={() => navigate('/history')}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            Ver Histórico Completo
-          </button>
-        </div>
-        <div className="p-0">
-          {stats.loading ? (
-            <div className="py-10 flex justify-center"><Activity className="animate-spin text-slate-300" /></div>
-          ) : stats.recentCampaigns.length === 0 ? (
-            <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-3">
-              <div className="p-4 bg-slate-50 rounded-full">
-                <Megaphone size={32} />
-              </div>
-              <p className="font-medium">Nenhuma campanha realizada ainda.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-50">
-              {stats.recentCampaigns.map((camp) => (
-                <div key={camp.id} className="p-4 md:p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className={`p-3 rounded-2xl ${camp.status === 'completed' ? 'bg-emerald-50 text-emerald-600' :
-                      camp.status === 'scheduled' ? 'bg-amber-50 text-amber-600' :
-                        camp.status === 'failed' ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600'
-                      }`}>
-                      {camp.status === 'scheduled' ? <Clock size={20} /> : <Zap size={20} />}
-                    </div>
+          <div className="p-6 pt-6 space-y-3">
+            {attentionTasks.length > 0 ? (
+              attentionTasks.map(task => (
+                <div key={task.id} className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm flex items-center justify-between group hover:border-amber-200 transition-all">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => handleToggleTask(task.id, task.status)} className="text-amber-300 hover:text-amber-600 transition-colors">
+                      <Square size={18} />
+                    </button>
                     <div>
-                      <h3 className="font-bold text-sm text-slate-900">{camp.name}</h3>
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-1">{camp.message}</p>
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{camp.clients?.name}</span>
-                        {camp.scheduled_at && camp.status === 'scheduled' && (
-                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">
-                            Agendado para: {new Date(camp.scheduled_at).toLocaleString('pt-BR')}
-                          </span>
-                        )}
+                      <div className="font-bold text-slate-800 text-sm line-clamp-1">{task.title}</div>
+                      <div className="text-[10px] uppercase font-bold text-amber-500">
+                        {new Date(task.due_date).toLocaleDateString()} • {task.clients?.name}
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <div className="flex items-center gap-2">
-                      {camp.status === 'scheduled' && (
-                        <>
-                          <button
-                            onClick={() => navigate(`/edit-campaign/${camp.id}`)}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                            title="Editar"
-                          >
-                            <Edit3 size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleCancelCampaign(camp.id)}
-                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                            title="Cancelar Agendamento"
-                          >
-                            <XCircle size={14} />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleDeleteCampaign(camp.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                        title="Excluir"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${camp.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                        camp.status === 'scheduled' ? 'bg-amber-100 text-amber-700' :
-                          camp.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                        {camp.status === 'completed' ? 'Concluído' :
-                          camp.status === 'scheduled' ? 'Agendado' :
-                            camp.status === 'processing' ? 'Processando' :
-                              camp.status === 'failed' ? 'Falhou' : camp.status}
-                      </span>
-                    </div>
-                    {camp.status === 'failed' && camp.error_log && (
-                      <span className="text-[9px] text-rose-500 font-medium max-w-[200px] text-right" title={camp.error_log}>
-                        Erro: {camp.error_log.slice(0, 50)}...
-                      </span>
-                    )}
-                  </div>
+                  <button onClick={() => navigate(`/clients/${task.client_id}`)} className="p-2 text-amber-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all">
+                    <ArrowUpRight size={16} />
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            ) : (
+              <p className="text-sm text-amber-400 font-medium text-center py-4">Sem tarefas próximas. ☕</p>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Main Task List */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Gestão de Tarefas</h2>
-            <p className="text-xs text-slate-400 font-medium">Próximas atividades de todos os clientes</p>
+            <p className="text-xs text-slate-400 font-medium">Todas as atividades pendentes</p>
           </div>
           <button
             onClick={() => navigate('/clients')}
@@ -502,9 +228,9 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="p-0">
-          {stats.loading ? (
+          {loading ? (
             <div className="py-12 flex justify-center"><Activity className="animate-spin text-slate-300" /></div>
-          ) : stats.tasks.length === 0 ? (
+          ) : tasks.length === 0 ? (
             <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-3">
               <div className="p-4 bg-slate-50 rounded-full">
                 <ListTodo size={32} />
@@ -513,12 +239,15 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
-              {stats.tasks.map((task) => (
+              {tasks.map((task) => (
                 <div key={task.id} className="p-4 md:p-6 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between group gap-4">
                   <div className="flex items-start gap-4 w-full sm:w-auto">
-                    <div className={`mt-1 flex-shrink-0 ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300'}`}>
+                    <button
+                      onClick={() => handleToggleTask(task.id, task.status)}
+                      className={`mt-1 flex-shrink-0 transition-all hover:scale-110 active:scale-95 ${task.status === 'completed' ? 'text-emerald-500' : 'text-slate-300 hover:text-slate-400'}`}
+                    >
                       {task.status === 'completed' ? <CheckSquare size={20} /> : <Square size={20} />}
-                    </div>
+                    </button>
                     <div className="min-w-0 flex-1">
                       <h3 className={`font-bold text-sm ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'} truncate`}>
                         {task.title}
@@ -539,10 +268,17 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right w-full sm:w-auto mt-2 sm:mt-0">
+                  <div className="flex items-center gap-4 w-full sm:w-auto mt-2 sm:mt-0 justify-end">
+                    <button
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all rounded-lg"
+                      title="Excluir Tarefa"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                     <button
                       onClick={() => navigate(`/clients/${task.client_id}`)}
-                      className="sm:opacity-0 group-hover:opacity-100 p-2 text-indigo-600 sm:text-slate-400 sm:hover:text-indigo-600 transition-all text-xs font-bold uppercase flex items-center justify-center sm:justify-end gap-1 w-full sm:w-auto bg-indigo-50 sm:bg-transparent rounded-lg sm:rounded-none py-2 sm:py-0"
+                      className="sm:opacity-0 group-hover:opacity-100 p-2 text-indigo-600 sm:text-slate-400 sm:hover:text-indigo-600 transition-all text-xs font-bold uppercase flex items-center justify-end gap-1 bg-indigo-50 sm:bg-transparent rounded-lg sm:rounded-none px-4 sm:px-0 py-2 sm:py-0"
                     >
                       Ver Detalhes <ArrowUpRight size={14} />
                     </button>

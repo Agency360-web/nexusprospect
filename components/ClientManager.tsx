@@ -243,6 +243,7 @@ const ClientManager: React.FC = () => {
         defaultValue: c.default_value,
         defaultPaymentMethod: c.default_payment_method,
         defaultPaymentConditions: c.default_payment_conditions,
+        google_sheets_config: c.google_sheets_config,
 
         observations: c.observations || '',
         onlineNumbers: 0, // Placeholder: requires joining or separate count query

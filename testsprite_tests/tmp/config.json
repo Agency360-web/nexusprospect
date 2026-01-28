@@ -2,6 +2,6 @@
   "status": "init",
   "scope": "codebase",
   "type": "frontend",
-  "localEndpoint": "http://localhost:3000/",
-  "serverPort": 50791
+  "localEndpoint": "http://localhost:3001/",
+  "serverPort": 50257
 }

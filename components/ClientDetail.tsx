@@ -81,7 +81,9 @@ const ClientDetail: React.FC = () => {
     cnpj: '',
     corporateName: '',
     address: '',
-    status: 'active' as Client['status']
+    status: 'active' as Client['status'],
+    whatsapp_instance_url: '',
+    whatsapp_token: ''
   });
 
   // Task State
@@ -556,7 +558,9 @@ const ClientDetail: React.FC = () => {
       cnpj: client.cnpj || '',
       corporateName: client.corporateName || '',
       address: client.address || '',
-      status: client.status || 'active'
+      status: client.status || 'active',
+      whatsapp_instance_url: client.whatsapp_instance_url || '',
+      whatsapp_token: client.whatsapp_token || ''
     });
     setActiveModal('client-config');
   };
@@ -574,7 +578,9 @@ const ClientDetail: React.FC = () => {
         cnpj: clientForm.cnpj,
         corporate_name: clientForm.corporateName,
         address: clientForm.address,
-        status: clientForm.status
+        status: clientForm.status,
+        whatsapp_instance_url: clientForm.whatsapp_instance_url,
+        whatsapp_token: clientForm.whatsapp_token
       }).eq('id', clientId);
 
       if (error) throw error;
@@ -884,7 +890,10 @@ const ClientDetail: React.FC = () => {
           observations: clientData.observations,
           cnpj: clientData.cnpj,
           corporateName: clientData.corporate_name,
-          address: clientData.address
+          address: clientData.address,
+          google_sheets_config: clientData.google_sheets_config,
+          whatsapp_instance_url: clientData.whatsapp_instance_url,
+          whatsapp_token: clientData.whatsapp_token
         });
       }
 
@@ -1680,7 +1689,27 @@ const ClientDetail: React.FC = () => {
               </div>
             </div>
           </div>
-          <div>
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mt-4">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-3 ml-1 flex items-center gap-2">
+              <Smartphone size={14} className="text-emerald-500" />
+              Configuração WhatsApp (API)
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-mono"
+                placeholder="URL da Instância (Ex: https://...)"
+                value={clientForm.whatsapp_instance_url || ''}
+                onChange={e => setClientForm({ ...clientForm, whatsapp_instance_url: e.target.value })}
+              />
+              <input
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-mono"
+                placeholder="Token de Acesso"
+                value={clientForm.whatsapp_token || ''}
+                onChange={e => setClientForm({ ...clientForm, whatsapp_token: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="mt-4">
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Observações Internas</label>
             <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none h-20" placeholder="Observações sobre o cliente..." value={clientForm.observations} onChange={e => setClientForm({ ...clientForm, observations: e.target.value })} />
           </div>

@@ -13,7 +13,8 @@ import {
     ShieldCheck,
     DollarSign,
     Building2,
-    ChevronLeft
+    ChevronLeft,
+    Smartphone
 } from 'lucide-react';
 import { useRBAC } from '../hooks/useRBAC';
 
@@ -138,6 +139,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 icon={<PlusCircle size={20} />}
                                 label="Transmissão"
                                 active={location.pathname === '/new-campaign'}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
+                        {canAccess('transmission') && (
+                            <SidebarItem
+                                to="/whatsapp"
+                                icon={<Smartphone size={20} />}
+                                label="WhatsApp"
+                                active={location.pathname === '/whatsapp'}
                                 isCollapsed={isCollapsed}
                             />
                         )}

@@ -33,6 +33,9 @@ export interface Client {
     auto_sync?: boolean;
     last_sync?: string;
   };
+  whatsapp_instance_url?: string;
+  whatsapp_token?: string;
+  whatsapp_notes?: string;
 }
 
 export type WebhookType = 'inbound' | 'outbound' | 'status';
