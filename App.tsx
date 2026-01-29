@@ -14,7 +14,7 @@ import SettingsPage from './components/SettingsPage';
 
 import AdministrationDashboard from './components/AdministrationDashboard';
 import WhatsAppConnectPage from './components/WhatsAppConnectPage';
-import WhatsAppPage from './components/WhatsAppPage';
+
 
 const App: React.FC = () => {
   return (
@@ -37,7 +37,7 @@ const App: React.FC = () => {
                   <Route path="/edit-campaign/:campaignId" element={<CampaignWizard />} />
                   <Route path="/history" element={<HistoryLogs />} />
                   <Route path="/admin" element={<AdministrationDashboard />} />
-                  <Route path="/whatsapp" element={<WhatsAppPage />} />
+
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </Layout>
@@ -55,7 +55,7 @@ const App: React.FC = () => {
                   <Route path="/edit-campaign/:campaignId" element={<CampaignWizard />} />
                   <Route path="/history" element={<HistoryLogs />} />
                   <Route path="/admin" element={<AdministrationDashboard />} />
-                  <Route path="/whatsapp" element={<WhatsAppPage />} />
+
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </Layout>

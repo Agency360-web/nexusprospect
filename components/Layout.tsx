@@ -14,7 +14,7 @@ import {
     DollarSign,
     Building2,
     ChevronLeft,
-    Smartphone
+
 } from 'lucide-react';
 import { useRBAC } from '../hooks/useRBAC';
 
@@ -142,15 +142,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 isCollapsed={isCollapsed}
                             />
                         )}
-                        {canAccess('transmission') && (
-                            <SidebarItem
-                                to="/whatsapp"
-                                icon={<Smartphone size={20} />}
-                                label="WhatsApp"
-                                active={location.pathname === '/whatsapp'}
-                                isCollapsed={isCollapsed}
-                            />
-                        )}
+
                     </nav>
 
                     <div className="p-4 border-t border-slate-100 space-y-2">
