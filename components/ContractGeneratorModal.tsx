@@ -626,8 +626,12 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
 
                                         <div className="grid grid-cols-1 gap-4">
                                             {Object.keys(variables).map((key) => {
-                                                if (key === 'servicos') {
-                                                    const services = variables.servicos ? variables.servicos.split('<br>') : [''];
+                                                if (key === 'servicos' || key === 'condicoes_pagamento') {
+                                                    const isServices = key === 'servicos';
+                                                    const items = variables[key] ? variables[key].split('<br>') : [''];
+                                                    const placeholder = isServices ? "Digite o serviço..." : "Digite a condição de pagamento...";
+                                                    const addButtonText = isServices ? "Adicionar novo serviço" : "Adicionar nova condição";
+                                                    const removeTitle = isServices ? "Remover serviço" : "Remover condição";
 
                                                     return (
                                                         <div key={key} className="space-y-1">
@@ -635,27 +639,27 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                                                                 {key.replace(/_/g, ' ')}
                                                             </label>
                                                             <div className="space-y-2">
-                                                                {services.map((service, index) => (
+                                                                {items.map((item, index) => (
                                                                     <div key={index} className="flex gap-2">
                                                                         <input
                                                                             type="text"
-                                                                            placeholder="Digite o serviço..."
+                                                                            placeholder={placeholder}
                                                                             className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300"
-                                                                            value={service}
+                                                                            value={item}
                                                                             onChange={(e) => {
-                                                                                const newServices = [...services];
-                                                                                newServices[index] = e.target.value;
-                                                                                setVariables({ ...variables, servicos: newServices.join('<br>') });
+                                                                                const newItems = [...items];
+                                                                                newItems[index] = e.target.value;
+                                                                                setVariables({ ...variables, [key]: newItems.join('<br>') });
                                                                             }}
                                                                         />
-                                                                        {services.length > 1 && (
+                                                                        {items.length > 1 && (
                                                                             <button
                                                                                 onClick={() => {
-                                                                                    const newServices = services.filter((_, i) => i !== index);
-                                                                                    setVariables({ ...variables, servicos: newServices.join('<br>') });
+                                                                                    const newItems = items.filter((_, i) => i !== index);
+                                                                                    setVariables({ ...variables, [key]: newItems.join('<br>') });
                                                                                 }}
                                                                                 className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                                                                                title="Remover serviço"
+                                                                                title={removeTitle}
                                                                             >
                                                                                 <Trash2 size={16} />
                                                                             </button>
@@ -664,13 +668,13 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                                                                 ))}
                                                                 <button
                                                                     onClick={() => {
-                                                                        const newServices = [...services, ''];
-                                                                        setVariables({ ...variables, servicos: newServices.join('<br>') });
+                                                                        const newItems = [...items, ''];
+                                                                        setVariables({ ...variables, [key]: newItems.join('<br>') });
                                                                     }}
                                                                     className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 mt-1"
                                                                 >
                                                                     <Plus size={14} />
-                                                                    Adicionar novo serviço
+                                                                    {addButtonText}
                                                                 </button>
                                                             </div>
                                                         </div>
