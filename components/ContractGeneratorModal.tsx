@@ -625,20 +625,73 @@ const ContractGeneratorModal: React.FC<ContractGeneratorModalProps> = ({ isOpen,
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-4">
-                                            {Object.keys(variables).map((key) => (
-                                                <div key={key} className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                                                        {key.replace(/_/g, ' ')}
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder={`Digite...`}
-                                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300"
-                                                        value={variables[key]}
-                                                        onChange={(e) => setVariables({ ...variables, [key]: e.target.value })}
-                                                    />
-                                                </div>
-                                            ))}
+                                            {Object.keys(variables).map((key) => {
+                                                if (key === 'servicos') {
+                                                    const services = variables.servicos ? variables.servicos.split('<br>') : [''];
+
+                                                    return (
+                                                        <div key={key} className="space-y-1">
+                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                                                                {key.replace(/_/g, ' ')}
+                                                            </label>
+                                                            <div className="space-y-2">
+                                                                {services.map((service, index) => (
+                                                                    <div key={index} className="flex gap-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Digite o serviço..."
+                                                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300"
+                                                                            value={service}
+                                                                            onChange={(e) => {
+                                                                                const newServices = [...services];
+                                                                                newServices[index] = e.target.value;
+                                                                                setVariables({ ...variables, servicos: newServices.join('<br>') });
+                                                                            }}
+                                                                        />
+                                                                        {services.length > 1 && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const newServices = services.filter((_, i) => i !== index);
+                                                                                    setVariables({ ...variables, servicos: newServices.join('<br>') });
+                                                                                }}
+                                                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                                                title="Remover serviço"
+                                                                            >
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const newServices = [...services, ''];
+                                                                        setVariables({ ...variables, servicos: newServices.join('<br>') });
+                                                                    }}
+                                                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 mt-1"
+                                                                >
+                                                                    <Plus size={14} />
+                                                                    Adicionar novo serviço
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div key={key} className="space-y-1">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                                                            {key.replace(/_/g, ' ')}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder={`Digite...`}
+                                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300"
+                                                            value={variables[key]}
+                                                            onChange={(e) => setVariables({ ...variables, [key]: e.target.value })}
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
