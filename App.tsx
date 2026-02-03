@@ -8,7 +8,7 @@ import Login from './components/Login';
 import ClientManager from './components/ClientManager';
 import ClientDetail from './components/ClientDetail';
 import SettingsPage from './components/SettingsPage';
-
+import MessageDispatcher from './components/MessageDispatcher';
 import AdministrationDashboard from './components/AdministrationDashboard';
 
 
@@ -29,7 +29,7 @@ const App: React.FC = () => {
                   <Route path="/clients" element={<ClientManager />} />
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
                   <Route path="/admin" element={<AdministrationDashboard />} />
-
+                  <Route path="/dispatcher" element={<MessageDispatcher />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </Layout>
@@ -44,7 +44,7 @@ const App: React.FC = () => {
                   <Route path="/clients" element={<ClientManager />} />
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
                   <Route path="/admin" element={<AdministrationDashboard />} />
-
+                  <Route path="/dispatcher" element={<MessageDispatcher />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </Layout>

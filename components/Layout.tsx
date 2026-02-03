@@ -122,6 +122,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 isCollapsed={isCollapsed}
                             />
                         )}
+                        {canAccess('admin') && (
+                            <SidebarItem
+                                to="/dispatcher"
+                                icon={<Send size={20} />}
+                                label="Disparador"
+                                active={location.pathname === '/dispatcher'}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
 
                     </nav>
 
