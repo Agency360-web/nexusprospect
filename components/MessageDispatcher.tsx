@@ -12,7 +12,13 @@ import {
     BarChart3,
     Users,
     MessageSquare,
-    Percent
+    Percent,
+    Image as ImageIcon,
+    FileText,
+    Video,
+    Music,
+    X,
+    Paperclip
 } from 'lucide-react';
 
 interface Contact {
@@ -35,6 +41,14 @@ interface DispatchResult {
     }>;
 }
 
+interface MediaFile {
+    file: File;
+    name: string;
+    type: string;
+    preview?: string;
+    base64?: string;
+}
+
 const MessageDispatcher: React.FC = () => {
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [mensagem, setMensagem] = useState('');
@@ -42,9 +56,11 @@ const MessageDispatcher: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [result, setResult] = useState<DispatchResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [selectedMedia, setSelectedMedia] = useState<MediaFile | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const mediaInputRef = useRef<HTMLInputElement>(null);
 
     const parseCSV = (text: string): Contact[] => {
         const lines = text.trim().split('\n');
@@ -88,6 +104,60 @@ const MessageDispatcher: React.FC = () => {
         reader.readAsText(file);
     }, []);
 
+    const convertToBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                const result = reader.result as string;
+                // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
+                const base64 = result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = error => reject(error);
+        });
+    };
+
+    const handleMediaFile = async (file: File) => {
+        const validTypes = [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'video/mp4', 'video/mpeg', 'video/quicktime',
+            'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4',
+            'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+
+        if (!validTypes.some(type => file.type.includes(type) || validTypes.includes(file.type))) {
+            setError('Formato de arquivo não suportado. Use imagens, vídeos, áudios ou PDF.');
+            return;
+        }
+
+        if (file.size > 16 * 1024 * 1024) { // 16MB limit
+            setError('O arquivo deve ter no máximo 16MB.');
+            return;
+        }
+
+        try {
+            const base64 = await convertToBase64(file);
+            let preview = undefined;
+
+            if (file.type.startsWith('image/')) {
+                preview = URL.createObjectURL(file);
+            }
+
+            setSelectedMedia({
+                file,
+                name: file.name,
+                type: file.type,
+                preview,
+                base64
+            });
+            setError(null);
+        } catch (err) {
+            setError('Erro ao processar arquivo de mídia.');
+            console.error(err);
+        }
+    };
+
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
@@ -130,7 +200,12 @@ const MessageDispatcher: React.FC = () => {
                         telefone: c.telefone,
                         empresa: c.empresa
                     })),
-                    mensagem: mensagem
+                    mensagem: mensagem,
+                    midia: selectedMedia ? {
+                        nome: selectedMedia.name,
+                        tipo: selectedMedia.type,
+                        data: selectedMedia.base64
+                    } : null
                 })
             });
 
@@ -158,9 +233,18 @@ const MessageDispatcher: React.FC = () => {
 
     const clearAll = () => {
         setContacts([]);
+        setSelectedMedia(null);
         setResult(null);
         setError(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
+        if (mediaInputRef.current) mediaInputRef.current.value = '';
+    };
+
+    const getMediaIcon = (type: string) => {
+        if (type.startsWith('image/')) return <ImageIcon size={20} className="text-purple-500" />;
+        if (type.startsWith('video/')) return <Video size={20} className="text-blue-500" />;
+        if (type.startsWith('audio/')) return <Music size={20} className="text-amber-500" />;
+        return <FileText size={20} className="text-slate-500" />;
     };
 
     return (
@@ -219,10 +303,10 @@ const MessageDispatcher: React.FC = () => {
                             onDragLeave={handleDragLeave}
                             onClick={() => fileInputRef.current?.click()}
                             className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${isDragging
-                                    ? 'border-emerald-500 bg-emerald-50'
-                                    : contacts.length > 0
-                                        ? 'border-emerald-300 bg-emerald-50'
-                                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                ? 'border-emerald-500 bg-emerald-50'
+                                : contacts.length > 0
+                                    ? 'border-emerald-300 bg-emerald-50'
+                                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                                 }`}
                         >
                             <input
@@ -259,6 +343,70 @@ const MessageDispatcher: React.FC = () => {
                         </p>
                     </div>
 
+                    {/* Media Upload (Above Message) */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                Mídia (Opcional)
+                            </label>
+                            {selectedMedia && (
+                                <button
+                                    onClick={() => setSelectedMedia(null)}
+                                    className="text-xs font-bold text-rose-500 hover:text-rose-600 flex items-center gap-1"
+                                >
+                                    <Trash2 size={14} />
+                                    Remover
+                                </button>
+                            )}
+                        </div>
+
+                        {!selectedMedia ? (
+                            <div
+                                onClick={() => mediaInputRef.current?.click()}
+                                className="border-2 border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl p-6 text-center cursor-pointer transition-all"
+                            >
+                                <input
+                                    ref={mediaInputRef}
+                                    type="file"
+                                    accept="image/*,video/*,audio/*,application/pdf"
+                                    onChange={(e) => e.target.files?.[0] && handleMediaFile(e.target.files[0])}
+                                    className="hidden"
+                                />
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="bg-slate-100 p-3 rounded-full">
+                                        <Paperclip size={24} className="text-slate-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-slate-600">
+                                        Clique para adicionar foto, vídeo, áudio ou PDF
+                                    </p>
+                                    <p className="text-xs text-slate-400">
+                                        Máx. 16MB
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-4">
+                                {selectedMedia.type.startsWith('image/') && selectedMedia.preview ? (
+                                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-white border border-slate-200 flex-shrink-0">
+                                        <img src={selectedMedia.preview} alt="Preview" className="w-full h-full object-cover" />
+                                    </div>
+                                ) : (
+                                    <div className="w-16 h-16 rounded-lg bg-white border border-slate-200 flex items-center justify-center flex-shrink-0">
+                                        {getMediaIcon(selectedMedia.type)}
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-slate-900 truncate">
+                                        {selectedMedia.name}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {(selectedMedia.file.size / 1024 / 1024).toFixed(2)} MB • {selectedMedia.type}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Message Template */}
                     <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
@@ -289,8 +437,8 @@ const MessageDispatcher: React.FC = () => {
                         onClick={handleDispatch}
                         disabled={isLoading || contacts.length === 0}
                         className={`w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${isLoading || contacts.length === 0
-                                ? 'bg-slate-300 cursor-not-allowed'
-                                : 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200'
+                            ? 'bg-slate-300 cursor-not-allowed'
+                            : 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200'
                             }`}
                     >
                         {isLoading ? (

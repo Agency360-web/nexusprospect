@@ -1,5 +1,5 @@
 {
-    "name": "Disparos de WhatsApp - Integração Frontend",
+    "name": "Disparos de WhatsApp - Integração Frontend (Com Mídia)",
     "nodes": [
         {
             "parameters": {
@@ -35,6 +35,12 @@
                             "name": "mensagem_base",
                             "value": "={{ $json.body.mensagem }}",
                             "type": "string"
+                        },
+                        {
+                            "id": "midia-obj",
+                            "name": "midia_obj",
+                            "value": "={{ $json.body.midia }}",
+                            "type": "object"
                         },
                         {
                             "id": "total-count",
@@ -96,6 +102,12 @@
                             "name": "mensagem",
                             "value": "={{ $('Parse Input Data').item.json.mensagem_base.replace('{nome}', $json.nome).replace('{empresa}', $json.empresa) }}",
                             "type": "string"
+                        },
+                        {
+                            "id": "midia-data",
+                            "name": "midia",
+                            "value": "={{ $('Parse Input Data').item.json.midia_obj }}",
+                            "type": "object"
                         }
                     ]
                 },
@@ -135,8 +147,115 @@
                 300
             ],
             "id": "wait-node",
-            "name": "Wait",
-            "webhookId": "wait-dispatcher"
+            "name": "Wait"
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "condition-midia",
+                                        "leftValue": "={{ $json.midia }}",
+                                        "rightValue": "",
+                                        "operator": {
+                                            "type": "object",
+                                            "operation": "notEmpty"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "Com Mídia"
+                        }
+                    ]
+                }
+            },
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3.2,
+            "position": [
+                1720,
+                300
+            ],
+            "id": "check-media",
+            "name": "Tem Mídia?"
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.midia.tipo }}",
+                                        "rightValue": "image",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "startsWith"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "Imagem"
+                        },
+                        {
+                            "conditions": {
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.midia.tipo }}",
+                                        "rightValue": "video",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "startsWith"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "Video"
+                        },
+                        {
+                            "conditions": {
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.midia.tipo }}",
+                                        "rightValue": "audio",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "startsWith"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "Audio"
+                        }
+                    ]
+                },
+                "fallbackOutput": 3
+            },
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3.2,
+            "position": [
+                2000,
+                200
+            ],
+            "id": "media-type",
+            "name": "Tipo de Mídia"
         },
         {
             "parameters": {
@@ -146,10 +265,6 @@
                 "headerParameters": {
                     "parameters": [
                         {
-                            "name": "Accept",
-                            "value": "application/json"
-                        },
-                        {
                             "name": "token",
                             "value": "387f4693-01b7-40bd-b876-ee71c98c316e"
                         }
@@ -158,22 +273,124 @@
                 "sendBody": true,
                 "specifyBody": "json",
                 "jsonBody": "={{ JSON.stringify({ number: $json.telefone, text: $json.mensagem }) }}",
-                "options": {
-                    "response": {
-                        "response": {
-                            "fullResponse": true
-                        }
-                    }
-                }
+                "options": {}
             },
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                1720,
-                300
+                2000,
+                600
             ],
-            "id": "send-message",
-            "name": "Send WhatsApp Message"
+            "id": "send-text",
+            "name": "Enviar Texto"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://conectalabsbs.uazapi.com/send/image",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "token",
+                            "value": "387f4693-01b7-40bd-b876-ee71c98c316e"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ number: $json.telefone, body: $json.midia.data, mediaType: 'base64', fileName: $json.midia.nome, caption: $json.mensagem }) }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2400,
+                0
+            ],
+            "id": "send-image",
+            "name": "Enviar Imagem"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://conectalabsbs.uazapi.com/send/video",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "token",
+                            "value": "387f4693-01b7-40bd-b876-ee71c98c316e"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ number: $json.telefone, body: $json.midia.data, mediaType: 'base64', fileName: $json.midia.nome, caption: $json.mensagem }) }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2400,
+                200
+            ],
+            "id": "send-video",
+            "name": "Enviar Video"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://conectalabsbs.uazapi.com/send/audio",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "token",
+                            "value": "387f4693-01b7-40bd-b876-ee71c98c316e"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ number: $json.telefone, body: $json.midia.data, mediaType: 'base64' }) }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2400,
+                400
+            ],
+            "id": "send-audio",
+            "name": "Enviar Audio"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://conectalabsbs.uazapi.com/send/pdf",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "token",
+                            "value": "387f4693-01b7-40bd-b876-ee71c98c316e"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ number: $json.telefone, body: $json.midia.data, mediaType: 'base64', fileName: $json.midia.nome, caption: $json.mensagem }) }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2400,
+                600
+            ],
+            "id": "send-doc",
+            "name": "Enviar Documento"
         },
         {
             "parameters": {
@@ -204,7 +421,7 @@
             "type": "n8n-nodes-base.set",
             "typeVersion": 3.4,
             "position": [
-                1940,
+                2800,
                 300
             ],
             "id": "set-result",
@@ -217,7 +434,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
             "position": [
-                2160,
+                3000,
                 300
             ],
             "id": "aggregate-results",
@@ -242,7 +459,7 @@
             "type": "n8n-nodes-base.respondToWebhook",
             "typeVersion": 1.1,
             "position": [
-                2380,
+                3200,
                 300
             ],
             "id": "respond-webhook",
@@ -309,14 +526,108 @@
             "main": [
                 [
                     {
-                        "node": "Send WhatsApp Message",
+                        "node": "Tem Mídia?",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "Send WhatsApp Message": {
+        "Tem Mídia?": {
+            "main": [
+                [
+                    {
+                        "node": "Tipo de Mídia",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Enviar Texto",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Tipo de Mídia": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Imagem",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Enviar Video",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Enviar Audio",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Enviar Documento",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enviar Texto": {
+            "main": [
+                [
+                    {
+                        "node": "Set Result Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enviar Imagem": {
+            "main": [
+                [
+                    {
+                        "node": "Set Result Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enviar Video": {
+            "main": [
+                [
+                    {
+                        "node": "Set Result Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enviar Audio": {
+            "main": [
+                [
+                    {
+                        "node": "Set Result Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Enviar Documento": {
             "main": [
                 [
                     {
@@ -349,12 +660,5 @@
                 ]
             ]
         }
-    },
-    "active": false,
-    "settings": {
-        "executionOrder": "v1"
-    },
-    "meta": {
-        "instanceId": "dispatcher-integration"
     }
 }
