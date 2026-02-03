@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   Building2,
-  Zap,
   Plus,
   ListTodo,
   Calendar,
@@ -118,18 +117,11 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="relative z-10 flex flex-col sm:flex-row gap-3">
           <button
-            onClick={() => navigate('/transmission')}
+            onClick={() => navigate('/clients')}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-slate-900 rounded-xl font-bold transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95 text-sm md:text-base"
           >
-            <Zap size={18} />
-            <span>Novo Disparo</span>
-          </button>
-          <button
-            onClick={() => navigate('/clients')}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all backdrop-blur-sm text-sm md:text-base"
-          >
             <Plus size={18} />
-            <span>Cliente</span>
+            <span>Novo Cliente</span>
           </button>
         </div>
       </div>
