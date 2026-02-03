@@ -3,9 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
     Send,
-    History,
     Settings,
-    PlusCircle,
     Menu,
     X,
     Users,
@@ -121,24 +119,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 icon={<Users size={20} />}
                                 label="Clientes"
                                 active={location.pathname.startsWith('/clients')}
-                                isCollapsed={isCollapsed}
-                            />
-                        )}
-                        {canAccess('reports') && (
-                            <SidebarItem
-                                to="/history"
-                                icon={<History size={20} />}
-                                label="Relatórios"
-                                active={location.pathname === '/history'}
-                                isCollapsed={isCollapsed}
-                            />
-                        )}
-                        {canAccess('transmission') && (
-                            <SidebarItem
-                                to="/new-campaign"
-                                icon={<PlusCircle size={20} />}
-                                label="Transmissão"
-                                active={location.pathname === '/new-campaign'}
                                 isCollapsed={isCollapsed}
                             />
                         )}

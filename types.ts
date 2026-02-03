@@ -33,32 +33,6 @@ export interface Client {
     auto_sync?: boolean;
     last_sync?: string;
   };
-  whatsapp_instance_url?: string;
-  whatsapp_token?: string;
-  whatsapp_notes?: string;
-}
-
-export type WebhookType = 'inbound' | 'outbound' | 'status';
-
-export interface WebhookConfig {
-  id: string;
-  clientId: string;
-  name: string;
-  url: string;
-  type: WebhookType;
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD';
-  active: boolean;
-  headers: Record<string, string>;
-}
-
-export interface WhatsAppNumber {
-  id: string;
-  clientId: string;
-  nickname: string;
-  phone: string;
-  status: 'active' | 'inactive' | 'blocked' | 'connected';
-  dailyLimit: number;
-  sentToday: number;
 }
 
 export interface EmailSender {
@@ -90,27 +64,6 @@ export interface Lead {
   status: 'valid' | 'invalid' | 'pending';
   isSynced?: boolean;
   createdAt?: string;
-}
-
-export type MediaType = 'none' | 'image' | 'video' | 'audio' | 'pdf';
-
-export interface Campaign {
-  id: string;
-  clientId: string;
-  name: string;
-  message: string;
-  mediaUrl?: string;
-  mediaType: MediaType;
-  createdAt: string;
-  scheduledAt?: string;
-  totalContacts: number;
-  sentCount: number;
-  deliveredCount: number;
-  errorCount: number;
-  status: 'draft' | 'running' | 'completed' | 'paused' | 'scheduled';
-  numberIds: string[];
-  webhookIds: string[];
-  targetTagIds: string[];
 }
 
 export interface Goal {

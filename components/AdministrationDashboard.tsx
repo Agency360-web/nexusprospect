@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import ContractManager from './ContractManager';
-import WhatsAppConnectGenerator from './WhatsAppConnectGenerator';
 import OperationalProcesses from './OperationalProcesses';
 
 // Interfaces
@@ -525,7 +524,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
 
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'finance' | 'contracts' | 'whatsapp' | 'processes'>('finance');
+    const [activeTab, setActiveTab] = useState<'finance' | 'contracts' | 'processes'>('finance');
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [dashboardScope, setDashboardScope] = useState<'pessoal' | 'profissional'>('profissional');
@@ -885,7 +884,6 @@ const AdministrationDashboard: React.FC = () => {
                 <TabButton id="finance" label="Financeiro" icon={Activity} />
                 <TabButton id="contracts" label="Gestão de Contratos" icon={FileText} />
                 <TabButton id="processes" label="Processos Operacionais" icon={Briefcase} />
-                <TabButton id="whatsapp" label="Conexão WhatsApp" icon={QrCode} />
             </div>
 
             <div className="pt-6">
@@ -1357,10 +1355,6 @@ const AdministrationDashboard: React.FC = () => {
                     <div className="animate-in slide-in-from-bottom-2 duration-300">
                         <OperationalProcesses />
                     </div>
-                )}
-
-                {activeTab === 'whatsapp' && (
-                    <WhatsAppConnectGenerator />
                 )}
             </div>
 
