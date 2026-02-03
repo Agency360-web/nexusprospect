@@ -1,0 +1,360 @@
+{
+    "name": "Disparos de WhatsApp - Integração Frontend",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "conecta",
+                "responseMode": "responseNode",
+                "options": {
+                    "rawBody": false
+                }
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                400,
+                300
+            ],
+            "id": "webhook-trigger",
+            "name": "Webhook - Recebe Contatos",
+            "webhookId": "conecta-dispatcher"
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "contacts-array",
+                            "name": "contacts",
+                            "value": "={{ $json.body.contacts }}",
+                            "type": "array"
+                        },
+                        {
+                            "id": "mensagem-base",
+                            "name": "mensagem_base",
+                            "value": "={{ $json.body.mensagem }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "total-count",
+                            "name": "total",
+                            "value": "={{ $json.body.contacts.length }}",
+                            "type": "number"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                620,
+                300
+            ],
+            "id": "parse-input",
+            "name": "Parse Input Data"
+        },
+        {
+            "parameters": {
+                "fieldToSplitOut": "contacts",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.splitOut",
+            "typeVersion": 1,
+            "position": [
+                840,
+                300
+            ],
+            "id": "split-contacts",
+            "name": "Split Contacts"
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "telefone-formatted",
+                            "name": "telefone",
+                            "value": "={{ $json.telefone.toString().replace(/\\D/g, '') }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "nome",
+                            "name": "nome",
+                            "value": "={{ $json.nome }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "empresa",
+                            "name": "empresa",
+                            "value": "={{ $json.empresa }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "mensagem-final",
+                            "name": "mensagem",
+                            "value": "={{ $('Parse Input Data').item.json.mensagem_base.replace('{nome}', $json.nome).replace('{empresa}', $json.empresa) }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                1060,
+                300
+            ],
+            "id": "prepare-message",
+            "name": "Prepare Message"
+        },
+        {
+            "parameters": {
+                "jsCode": "const min = 130;\nconst max = 360;\nconst randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;\nreturn { ...items[0].json, waitTime: randomNumber };"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1280,
+                300
+            ],
+            "id": "random-delay",
+            "name": "Random Delay Time"
+        },
+        {
+            "parameters": {
+                "amount": "={{ $json.waitTime }}",
+                "unit": "milliseconds"
+            },
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1500,
+                300
+            ],
+            "id": "wait-node",
+            "name": "Wait",
+            "webhookId": "wait-dispatcher"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://conectalabsbs.uazapi.com/send/text",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Accept",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "token",
+                            "value": "387f4693-01b7-40bd-b876-ee71c98c316e"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ number: $json.telefone, text: $json.mensagem }) }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1720,
+                300
+            ],
+            "id": "send-message",
+            "name": "Send WhatsApp Message"
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "result-telefone",
+                            "name": "telefone",
+                            "value": "={{ $('Prepare Message').item.json.telefone }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "result-status",
+                            "name": "status",
+                            "value": "={{ $json.statusCode >= 200 && $json.statusCode < 300 ? 'enviado' : 'falha' }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "result-erro",
+                            "name": "erro",
+                            "value": "={{ $json.statusCode >= 200 && $json.statusCode < 300 ? '' : $json.body?.message || 'Erro desconhecido' }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                1940,
+                300
+            ],
+            "id": "set-result",
+            "name": "Set Result Status"
+        },
+        {
+            "parameters": {
+                "jsCode": "const allItems = items;\nconst total = allItems.length;\nconst enviados = allItems.filter(i => i.json.status === 'enviado').length;\nconst falhas = total - enviados;\n\nreturn [{\n  json: {\n    total,\n    enviados,\n    falhas,\n    percentual_sucesso: total > 0 ? Math.round((enviados / total) * 100 * 10) / 10 : 0,\n    percentual_falha: total > 0 ? Math.round((falhas / total) * 100 * 10) / 10 : 0,\n    detalhes: allItems.map(i => ({\n      telefone: i.json.telefone,\n      status: i.json.status,\n      erro: i.json.erro || null\n    }))\n  }\n}];"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2160,
+                300
+            ],
+            "id": "aggregate-results",
+            "name": "Aggregate Results"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ $json }}",
+                "options": {
+                    "responseCode": 200,
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                2380,
+                300
+            ],
+            "id": "respond-webhook",
+            "name": "Respond with Results"
+        }
+    ],
+    "connections": {
+        "Webhook - Recebe Contatos": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Input Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Input Data": {
+            "main": [
+                [
+                    {
+                        "node": "Split Contacts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Split Contacts": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Message": {
+            "main": [
+                [
+                    {
+                        "node": "Random Delay Time",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Random Delay Time": {
+            "main": [
+                [
+                    {
+                        "node": "Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait": {
+            "main": [
+                [
+                    {
+                        "node": "Send WhatsApp Message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send WhatsApp Message": {
+            "main": [
+                [
+                    {
+                        "node": "Set Result Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Set Result Status": {
+            "main": [
+                [
+                    {
+                        "node": "Aggregate Results",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Aggregate Results": {
+            "main": [
+                [
+                    {
+                        "node": "Respond with Results",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "meta": {
+        "instanceId": "dispatcher-integration"
+    }
+}
