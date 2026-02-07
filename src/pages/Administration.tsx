@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Calendar,
@@ -31,7 +31,7 @@ import {
     Edit2
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import ContractManager from './ContractManager';
+import ContractManager from '../components/ContractManager';
 import OperationalProcesses from './OperationalProcesses';
 
 // Interfaces

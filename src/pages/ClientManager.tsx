@@ -27,8 +27,8 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { Client } from '../types';
-import { supabase } from '../lib/supabase';
-import Modal from './ui/Modal';
+import { supabase } from '../services/supabase';
+import Modal from '../components/ui/Modal';
 
 interface ClientWithStats extends Client {
   onlineNumbers: number;

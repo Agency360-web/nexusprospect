@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../services/supabase';
 import { Contract } from '../types';
 import { Plus, Search, FileText, MoreHorizontal, Download, Clock, CheckCircle2, Send, Trash2, Edit2, Eye } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';

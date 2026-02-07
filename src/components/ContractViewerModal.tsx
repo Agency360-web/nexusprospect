@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { X, Printer, CheckCircle2, Send, Clock, FileText } from 'lucide-react';
 import { Contract } from '../types';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../services/supabase';
 
 interface ContractViewerModalProps {
     isOpen: boolean;

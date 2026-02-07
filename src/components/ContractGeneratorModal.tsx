@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../services/supabase';
 import { ContractTemplate, Contract, Client } from '../types';
 import { X, Save, FileText, ChevronRight, UserCheck, ArrowLeft, Type, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Highlighter, Palette, Plus, Trash2, Edit2, Image as ImageIcon, Minus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';

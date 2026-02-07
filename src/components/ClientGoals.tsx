@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Target, Mail, Smartphone, TrendingUp, AlertCircle, CheckCircle2, Save, Loader2 } from 'lucide-react';
 import { Goal, GoalsMetric } from '../types';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../services/supabase';
 
 interface ClientGoalsProps {
     clientId: string;

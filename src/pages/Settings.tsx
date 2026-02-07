@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRBAC } from '../hooks/useRBAC';
-import Modal from './ui/Modal';
-import { supabase } from '../lib/supabase';
+import Modal from '../components/ui/Modal';
+import { supabase } from '../services/supabase';
 
 type SettingsTab = 'general' | 'users';
 

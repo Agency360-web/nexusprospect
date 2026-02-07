@@ -42,10 +42,10 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client, EmailSender, Task } from '../types';
-import ClientGoals from './ClientGoals';
-import ClientOverviewGoals from './ClientOverviewGoals';
-import { supabase } from '../lib/supabase';
-import Modal from './ui/Modal';
+import ClientGoals from '../components/ClientGoals';
+import ClientOverviewGoals from '../components/ClientOverviewGoals';
+import { supabase } from '../services/supabase';
+import Modal from '../components/ui/Modal';
 
 const ClientDetail: React.FC = () => {
   const { clientId } = useParams();

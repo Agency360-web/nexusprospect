@@ -28,11 +28,36 @@ export interface Client {
   defaultPaymentConditions?: string;
 
   // Integrations
+  whatsapp_instance_url?: string;
+  whatsapp_token?: string;
   google_sheets_config?: {
     url?: string;
     auto_sync?: boolean;
     last_sync?: string;
   };
+}
+
+export interface WebhookConfig {
+  id: string;
+  clientId: string;
+  name: string;
+  url: string;
+  type: string;
+  method: string;
+  headers?: Record<string, string>;
+  events: string[];
+  active: boolean;
+}
+
+export interface WhatsAppNumber {
+  id: string;
+  clientId: string;
+  nickname: string;
+  phone: string;
+  status: 'active' | 'connected' | 'disconnected';
+  qrCode?: string;
+  sentToday: number;
+  dailyLimit: number;
 }
 
 export interface EmailSender {

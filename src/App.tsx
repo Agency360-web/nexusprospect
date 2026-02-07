@@ -1,15 +1,15 @@
 import React from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
-import Login from './components/Login';
-import ClientManager from './components/ClientManager';
-import ClientDetail from './components/ClientDetail';
-import SettingsPage from './components/SettingsPage';
-import MessageDispatcher from './components/MessageDispatcher';
-import AdministrationDashboard from './components/AdministrationDashboard';
+import { ProtectedRoute } from './layouts/ProtectedRoute';
+import Layout from './layouts/MainLayout';
+import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
+import ClientManager from './pages/ClientManager';
+import ClientDetail from './pages/ClientDetail';
+import SettingsPage from './pages/Settings';
+import MessageDispatcher from './pages/MessageDispatcher';
+import AdministrationDashboard from './pages/Administration';
 
 
 const App: React.FC = () => {
