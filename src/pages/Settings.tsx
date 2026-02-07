@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Settings,
   Users,
@@ -28,6 +29,16 @@ interface Profile {
 const SettingsPage: React.FC = () => {
   const { user, signOut } = useAuth();
   const { hasRole } = useRBAC();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [saveLoading, setSaveLoading] = useState(false);
@@ -202,7 +213,7 @@ const SettingsPage: React.FC = () => {
 
             <div className="pt-4 border-t border-slate-200 mt-4">
               <button
-                onClick={signOut}
+                onClick={handleLogout}
                 className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-[#ea384c] hover:bg-red-50"
               >
                 <LogOut size={18} />
