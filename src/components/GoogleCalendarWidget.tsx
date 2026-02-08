@@ -1,39 +1,32 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import {
-    Calendar,
-    Clock,
-    ExternalLink,
-    Link2,
-    X,
-    Users,
-    MapPin,
-    Video,
-    Loader2,
-    RefreshCw,
-    LogIn,
-    LogOut,
-    ChevronRight
-} from 'lucide-react';
-import {
-    getGoogleAuthUrl,
     exchangeCodeForTokens,
     refreshAccessToken,
     fetchCalendarEvents,
-    formatEventTime,
-    formatEventDate,
     getWeekRange,
+    getMonthRange,
+    getTodayRange,
     isGoogleCalendarConfigured,
+    formatEventDate,
+    formatEventTime,
+    createCalendarEvent,
+    updateCalendarEvent,
+    deleteCalendarEvent,
+    GoogleCalendarInput,
     CalendarEvent
 } from '../services/googleCalendar';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from './ui/Modal';
+import EventDetailsModal from './calendar/EventDetailsModal';
+import EventFormModal from './calendar/EventFormModal';
+import CalendarHeader from './calendar/CalendarHeader';
+import CalendarList from './calendar/CalendarList';
+import CalendarGrid from './calendar/CalendarGrid';
+import { Clock, Users, X, ChevronRight, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 
 interface EventWithClient extends CalendarEvent {
-    linkedClient?: {
-        id: string;
-        name: string;
-    } | null;
+    // linkedClient already in CalendarEvent interface but overriding for safety if needed
 }
 
 interface Client {
@@ -44,22 +37,21 @@ interface Client {
 const GoogleCalendarWidget: React.FC = () => {
     const { user } = useAuth();
 
-    // Debug
-    useEffect(() => {
-        console.log('VITE_GOOGLE_CLIENT_ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID ? 'Configured' : 'Missing');
-        console.log('VITE_GOOGLE_CLIENT_SECRET:', import.meta.env.VITE_GOOGLE_CLIENT_SECRET ? 'Configured' : 'Missing');
-    }, []);
-
+    // State
+    const [filterMode, setFilterMode] = useState<'today' | 'week' | 'month'>('today');
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
     const [events, setEvents] = useState<EventWithClient[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<EventWithClient | null>(null);
     const [linkModalOpen, setLinkModalOpen] = useState(false);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [searchClient, setSearchClient] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
-    // Check for OAuth callback code in URL
+    // Initial Check & OAuth Callback
     useEffect(() => {
         const handleOAuthCallback = async () => {
             const urlParams = new URLSearchParams(window.location.search);
@@ -68,8 +60,6 @@ const GoogleCalendarWidget: React.FC = () => {
             if (code && user) {
                 try {
                     const tokens = await exchangeCodeForTokens(code);
-
-                    // Store tokens in database
                     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
                     await supabase.from('user_google_tokens').upsert({
@@ -80,11 +70,9 @@ const GoogleCalendarWidget: React.FC = () => {
                         scope: tokens.scope
                     }, { onConflict: 'user_id' });
 
-                    // Clean URL
                     window.history.replaceState({}, document.title, window.location.pathname);
-
                     setIsConnected(true);
-                    fetchEvents(tokens.access_token);
+                    // Fetch will be triggered by useEffect dependency on isConnected/currentDate/filterMode
                 } catch (error) {
                     console.error('OAuth callback error:', error);
                 }
@@ -92,9 +80,12 @@ const GoogleCalendarWidget: React.FC = () => {
         };
 
         handleOAuthCallback();
+        if (isGoogleCalendarConfigured()) {
+            checkConnection();
+        }
     }, [user]);
 
-    // Fetch stored tokens and check connection
+    // Check Connection & Token
     const checkConnection = useCallback(async () => {
         if (!user) return;
 
@@ -111,9 +102,7 @@ const GoogleCalendarWidget: React.FC = () => {
 
                 if (expiresAt > now) {
                     setIsConnected(true);
-                    fetchEvents(tokenData.access_token);
                 } else if (tokenData.refresh_token) {
-                    // Token expired, try to refresh
                     try {
                         const newTokens = await refreshAccessToken(tokenData.refresh_token);
                         const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
@@ -124,7 +113,6 @@ const GoogleCalendarWidget: React.FC = () => {
                         }).eq('user_id', user.id);
 
                         setIsConnected(true);
-                        fetchEvents(newTokens.access_token);
                     } catch (refreshError) {
                         console.error('Token refresh failed:', refreshError);
                         setIsConnected(false);
@@ -138,69 +126,101 @@ const GoogleCalendarWidget: React.FC = () => {
         }
     }, [user]);
 
-    useEffect(() => {
-        checkConnection();
-    }, [checkConnection]);
+    // Fetch Events Logic
+    const fetchEvents = useCallback(async () => {
+        if (!user || !isConnected) return;
 
-    // Fetch clients for linking
-    useEffect(() => {
-        const fetchClients = async () => {
-            if (!user) return;
-
-            const { data } = await supabase
-                .from('clients')
-                .select('id, name')
-                .eq('user_id', user.id)
-                .order('name');
-
-            setClients(data || []);
-        };
-
-        fetchClients();
-    }, [user]);
-
-    const fetchEvents = async (accessToken: string) => {
         try {
             setRefreshing(true);
-            const { start, end } = getWeekRange();
-            const calendarEvents = await fetchCalendarEvents(accessToken, start, end);
+            const accessTokenData = await supabase
+                .from('user_google_tokens')
+                .select('access_token')
+                .eq('user_id', user.id)
+                .single();
 
-            // Fetch linked clients for these events
+            if (!accessTokenData.data) return;
+
+            let start, end;
+
+            if (filterMode === 'today') {
+                const range = getTodayRange();
+                start = range.start;
+                end = range.end;
+            } else if (filterMode === 'week') {
+                const range = getWeekRange();
+                start = range.start;
+                end = range.end;
+            } else { // month
+                const range = getMonthRange(currentDate);
+                start = range.start;
+                end = range.end;
+            }
+
+            const calendarEvents = await fetchCalendarEvents(accessTokenData.data.access_token, start, end);
+
+            // Fetch linked clients
             const eventIds = calendarEvents.map(e => e.id);
-            const { data: links } = await supabase
-                .from('calendar_event_clients')
-                .select('event_id, client_id, clients(id, name)')
-                .eq('user_id', user?.id)
-                .in('event_id', eventIds);
+            if (eventIds.length > 0) {
+                const { data: links } = await supabase
+                    .from('calendar_event_clients')
+                    .select('event_id, client_id, clients(id, name)')
+                    .eq('user_id', user.id)
+                    .in('event_id', eventIds);
 
-            // Merge events with client links
-            const eventsWithClients = calendarEvents.map(event => {
-                const link = links?.find(l => l.event_id === event.id);
-                return {
-                    ...event,
-                    linkedClient: link?.clients ? { id: (link.clients as any).id, name: (link.clients as any).name } : null
-                };
-            });
+                // Merge
+                const eventsWithClients = calendarEvents.map(event => {
+                    const link = links?.find(l => l.event_id === event.id);
+                    return {
+                        ...event,
+                        linkedClient: link?.clients ? { id: (link.clients as any).id, name: (link.clients as any).name } : null
+                    };
+                });
+                setEvents(eventsWithClients);
+            } else {
+                setEvents(calendarEvents);
+            }
 
-            setEvents(eventsWithClients);
         } catch (error: any) {
             if (error.message === 'TOKEN_EXPIRED') {
-                setIsConnected(false);
+                setIsConnected(false); // Prompt re-login or auto-refresh next time
             }
             console.error('Error fetching events:', error);
         } finally {
             setRefreshing(false);
         }
-    };
+    }, [user, isConnected, filterMode, currentDate]);
 
+    // Fetch Clients for Modal
+    useEffect(() => {
+        const fetchClients = async () => {
+            if (!user) return;
+            const { data } = await supabase
+                .from('clients')
+                .select('id, name')
+                .eq('user_id', user.id)
+                .order('name');
+            setClients(data || []);
+        };
+        fetchClients();
+    }, [user]);
+
+    // Trigger fetch on dependencies
+    useEffect(() => {
+        if (isConnected) {
+            fetchEvents();
+        }
+    }, [fetchEvents]);
+
+    // Handlers
     const handleConnect = () => {
-        const authUrl = getGoogleAuthUrl(user?.id);
-        window.location.href = authUrl;
+        import('../services/googleCalendar').then(module => {
+            const authUrl = module.getGoogleAuthUrl(user?.id);
+            window.location.href = authUrl;
+        });
     };
 
     const handleDisconnect = async () => {
         if (!user) return;
-
         await supabase.from('user_google_tokens').delete().eq('user_id', user.id);
         setIsConnected(false);
         setEvents([]);
@@ -212,7 +232,6 @@ const GoogleCalendarWidget: React.FC = () => {
         try {
             if (clientId) {
                 const client = clients.find(c => c.id === clientId);
-
                 await supabase.from('calendar_event_clients').upsert({
                     user_id: user.id,
                     event_id: selectedEvent.id,
@@ -222,14 +241,12 @@ const GoogleCalendarWidget: React.FC = () => {
                     client_id: clientId
                 }, { onConflict: 'user_id,event_id' });
 
-                // Update local state
                 setEvents(prev => prev.map(e =>
                     e.id === selectedEvent.id
                         ? { ...e, linkedClient: client ? { id: client.id, name: client.name } : null }
                         : e
                 ));
             } else {
-                // Remove link
                 await supabase
                     .from('calendar_event_clients')
                     .delete()
@@ -240,12 +257,148 @@ const GoogleCalendarWidget: React.FC = () => {
                     e.id === selectedEvent.id ? { ...e, linkedClient: null } : e
                 ));
             }
-
             setLinkModalOpen(false);
+            // Don't clear selectedEvent here if we want to go back to details, but usually we close link modal and force user to reopen
+            // Or we could reopen details modal. Let's just close for now.
             setSelectedEvent(null);
         } catch (error) {
             console.error('Error linking client:', error);
         }
+    };
+
+    // CRUD Handlers
+    const handleCreateEvent = async (eventInput: GoogleCalendarInput, clientId?: string) => {
+        if (!user) return;
+        try {
+            const { data: tokenData } = await supabase
+                .from('user_google_tokens')
+                .select('access_token')
+                .eq('user_id', user.id)
+                .single();
+
+            if (tokenData?.access_token) {
+                const newEvent = await createCalendarEvent(tokenData.access_token, eventInput);
+
+                if (clientId) {
+                    await supabase.from('calendar_event_clients').insert({
+                        user_id: user.id,
+                        event_id: newEvent.id,
+                        event_title: newEvent.summary,
+                        event_start: newEvent.start.dateTime || newEvent.start.date,
+                        event_end: newEvent.end.dateTime || newEvent.end.date,
+                        client_id: clientId
+                    });
+                }
+
+                fetchEvents(); // Refresh list
+                setIsFormModalOpen(false);
+            }
+        } catch (error) {
+            console.error('Error creating event:', error);
+            alert('Erro ao criar evento. Verifique se você está conectado e se concedeu as permissões necessárias.');
+        }
+    };
+
+    const handleUpdateEvent = async (eventInput: GoogleCalendarInput, clientId?: string) => {
+        if (!user || !selectedEvent) return;
+        try {
+            const { data: tokenData } = await supabase
+                .from('user_google_tokens')
+                .select('access_token')
+                .eq('user_id', user.id)
+                .single();
+
+            if (tokenData?.access_token) {
+                const updatedEvent = await updateCalendarEvent(tokenData.access_token, selectedEvent.id, eventInput);
+
+                if (clientId) {
+                    await supabase.from('calendar_event_clients').upsert({
+                        user_id: user.id,
+                        event_id: updatedEvent.id,
+                        event_title: updatedEvent.summary,
+                        event_start: updatedEvent.start.dateTime || updatedEvent.start.date,
+                        event_end: updatedEvent.end.dateTime || updatedEvent.end.date,
+                        client_id: clientId
+                    }, { onConflict: 'user_id,event_id' });
+                } else {
+                    // If client was removed (it was selected but now undefined)
+                    // We should delete the link
+                    await supabase
+                        .from('calendar_event_clients')
+                        .delete()
+                        .eq('user_id', user.id)
+                        .eq('event_id', updatedEvent.id);
+                }
+
+                fetchEvents();
+                setIsFormModalOpen(false);
+                setSelectedEvent(null);
+            }
+        } catch (error) {
+            console.error('Error updating event:', error);
+            alert('Erro ao atualizar evento.');
+        }
+    };
+
+    const handleDeleteEvent = async (eventId: string) => {
+        if (!user) return;
+        try {
+            const { data: tokenData } = await supabase
+                .from('user_google_tokens')
+                .select('access_token')
+                .eq('user_id', user.id)
+                .single();
+
+            if (tokenData?.access_token) {
+                await deleteCalendarEvent(tokenData.access_token, eventId);
+                fetchEvents();
+                setIsDetailsModalOpen(false);
+                setSelectedEvent(null);
+            }
+        } catch (error) {
+            console.error('Error deleting event:', error);
+            alert('Erro ao excluir evento.');
+        }
+    };
+
+    const openCreateModal = () => {
+        setSelectedEvent(null);
+        setIsFormModalOpen(true);
+    };
+
+    const openEditModal = (event: CalendarEvent) => {
+        // Cast to EventWithClient if needed, but for form it's fine
+        setSelectedEvent(event as EventWithClient);
+        setIsDetailsModalOpen(false);
+        setIsFormModalOpen(true);
+    };
+
+    const openLinkModal = (event: CalendarEvent) => {
+        setSelectedEvent(event as EventWithClient);
+        setIsDetailsModalOpen(false);
+        setLinkModalOpen(true);
+    };
+
+    const handleEventClick = (event: CalendarEvent) => {
+        setSelectedEvent(event as EventWithClient);
+        setIsDetailsModalOpen(true);
+    };
+
+    // Navigation Handlers
+    const handlePrev = () => {
+        const newDate = new Date(currentDate);
+        newDate.setMonth(newDate.getMonth() - 1);
+        setCurrentDate(newDate);
+    };
+
+    const handleNext = () => {
+        const newDate = new Date(currentDate);
+        newDate.setMonth(newDate.getMonth() + 1);
+        setCurrentDate(newDate);
+    };
+
+    const handleTodayNav = () => {
+        setCurrentDate(new Date());
     };
 
     const filteredClients = useMemo(() => {
@@ -253,150 +406,78 @@ const GoogleCalendarWidget: React.FC = () => {
         return clients.filter(c => c.name.toLowerCase().includes(searchClient.toLowerCase()));
     }, [clients, searchClient]);
 
-    const todayEvents = useMemo(() => {
-        const today = new Date().toDateString();
-        return events.filter(e => {
-            const eventDate = new Date(e.start.dateTime || e.start.date || '');
-            return eventDate.toDateString() === today;
-        });
-    }, [events]);
 
-    const upcomingEvents = useMemo(() => {
-        const today = new Date().toDateString();
-        return events.filter(e => {
-            const eventDate = new Date(e.start.dateTime || e.start.date || '');
-            return eventDate.toDateString() !== today;
-        });
-    }, [events]);
-
+    // Renders
     if (!isGoogleCalendarConfigured()) {
         return (
             <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2.5 bg-blue-50 text-blue-500 rounded-xl">
-                        <Calendar size={20} />
+                    <div className="p-2.5 bg-slate-100 text-slate-500 rounded-xl">
+                        <CalendarIcon size={20} />
                     </div>
                     <h3 className="text-lg font-bold text-slate-800">Google Agenda</h3>
                 </div>
                 <div className="text-center py-6 text-slate-500">
                     <p className="text-sm">Configuração necessária.</p>
-                    <p className="text-xs mt-1">Adicione VITE_GOOGLE_CLIENT_ID e VITE_GOOGLE_CLIENT_SECRET no .env.local</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (loading) {
-        return (
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-                <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
                 </div>
             </div>
         );
     }
 
     return (
-        <>
-            <div className="bg-white rounded-3xl border border-blue-100 p-5 shadow-sm transition-all hover:shadow-md hover:border-blue-200">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-blue-50 text-blue-500 rounded-xl">
-                            <Calendar size={20} />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-slate-800 leading-tight">Minha Agenda</h3>
-                            <p className="text-xs font-medium text-slate-400">Próximos 7 dias</p>
-                        </div>
-                    </div>
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm transition-all hover:shadow-md">
+            <CalendarHeader
+                filterMode={filterMode}
+                onFilterChange={setFilterMode}
+                currentDate={currentDate}
+                onPrev={handlePrev}
+                onNext={handleNext}
+                onToday={handleTodayNav}
+                isConnected={isConnected}
+                onConnect={handleConnect}
+                onDisconnect={handleDisconnect}
+                refreshing={refreshing}
+                onRefresh={fetchEvents}
+                onAddEvent={openCreateModal}
+            />
 
-                    <div className="flex items-center gap-2">
-                        {isConnected && (
-                            <button
-                                onClick={() => checkConnection()}
-                                disabled={refreshing}
-                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
-                            >
-                                <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-                            </button>
-                        )}
-                        <button
-                            onClick={isConnected ? handleDisconnect : handleConnect}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isConnected
-                                ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                : 'bg-blue-500 text-white hover:bg-blue-600'
-                                }`}
-                        >
-                            {isConnected ? (
-                                <>
-                                    <LogOut size={14} />
-                                    <span>Desconectar</span>
-                                </>
-                            ) : (
-                                <>
-                                    <LogIn size={14} />
-                                    <span>Conectar Google</span>
-                                </>
-                            )}
-                        </button>
+            {!isConnected ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4">
+                        <CalendarIcon className="w-8 h-8 text-slate-400" />
                     </div>
+                    <h4 className="text-lg font-bold text-slate-800 mb-2">Conecte sua agenda</h4>
+                    <p className="text-slate-500 text-sm max-w-xs mx-auto">
+                        Visualize seus compromissos (Hoje, Semana ou Mês) e vincule-os aos seus clientes.
+                    </p>
+                    <button
+                        onClick={handleConnect}
+                        className="mt-6 bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                    >
+                        Conectar Google Agenda
+                    </button>
                 </div>
+            ) : (
+                <div className="min-h-[300px]">
+                    {(filterMode === 'today' || filterMode === 'week') && (
+                        <CalendarList
+                            events={events}
+                            onLinkClick={handleEventClick}
+                            loading={loading || refreshing}
+                        />
+                    )}
+                    {filterMode === 'month' && (
+                        <CalendarGrid
+                            currentDate={currentDate}
+                            events={events}
+                            onLinkClick={handleEventClick}
+                            loading={loading || refreshing}
+                        />
+                    )}
+                </div>
+            )}
 
-                {/* Content */}
-                {!isConnected ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-3">
-                            <Calendar className="w-6 h-6 text-blue-400" />
-                        </div>
-                        <p className="text-slate-600 font-medium text-sm mb-1">Conecte sua agenda</p>
-                        <p className="text-slate-400 text-xs">Veja seus compromissos e vincule a clientes</p>
-                    </div>
-                ) : events.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-2">
-                            <span className="text-xl">📅</span>
-                        </div>
-                        <p className="text-slate-500 text-sm font-medium">Nenhum evento nos próximos 7 dias</p>
-                    </div>
-                ) : (
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                        {/* Today's Events */}
-                        {todayEvents.length > 0 && (
-                            <div>
-                                <div className="text-[10px] font-bold uppercase tracking-wider text-blue-500 mb-2">Hoje</div>
-                                <div className="space-y-2">
-                                    {todayEvents.map(event => (
-                                        <EventCard
-                                            key={event.id}
-                                            event={event}
-                                            onLinkClick={() => { setSelectedEvent(event); setLinkModalOpen(true); }}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Upcoming Events */}
-                        {upcomingEvents.length > 0 && (
-                            <div>
-                                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Próximos</div>
-                                <div className="space-y-2">
-                                    {upcomingEvents.map(event => (
-                                        <EventCard
-                                            key={event.id}
-                                            event={event}
-                                            onLinkClick={() => { setSelectedEvent(event); setLinkModalOpen(true); }}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Link Client Modal */}
+            {/* Link Client Modal - Colors Updated */}
             <Modal
                 isOpen={linkModalOpen}
                 onClose={() => { setLinkModalOpen(false); setSelectedEvent(null); setSearchClient(''); }}
@@ -404,7 +485,7 @@ const GoogleCalendarWidget: React.FC = () => {
             >
                 <div className="space-y-4">
                     {selectedEvent && (
-                        <div className="bg-blue-50 p-4 rounded-xl">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                             <h4 className="font-bold text-slate-900 mb-1">{selectedEvent.summary}</h4>
                             <div className="flex items-center gap-2 text-sm text-slate-600">
                                 <Clock size={14} />
@@ -419,109 +500,87 @@ const GoogleCalendarWidget: React.FC = () => {
                             placeholder="Buscar cliente..."
                             value={searchClient}
                             onChange={(e) => setSearchClient(e.target.value)}
-                            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 outline-none transition-all"
+                            autoFocus
                         />
                     </div>
 
-                    <div className="max-h-[250px] overflow-y-auto space-y-1">
+                    <div className="max-h-[250px] overflow-y-auto space-y-1 custom-scrollbar pr-1">
                         {selectedEvent?.linkedClient && (
                             <button
                                 onClick={() => handleLinkClient(null)}
-                                className="w-full flex items-center justify-between p-3 hover:bg-rose-50 rounded-xl transition-colors text-left group"
+                                className="w-full flex items-center justify-between p-3 hover:bg-rose-50 rounded-xl transition-colors text-left group border border-transparent hover:border-rose-100"
                             >
                                 <div className="flex items-center gap-2">
-                                    <X size={16} className="text-rose-500" />
-                                    <span className="text-rose-600 font-medium">Remover vínculo</span>
+                                    <div className="p-1.5 bg-rose-100 text-rose-500 rounded-lg">
+                                        <X size={14} />
+                                    </div>
+                                    <span className="text-rose-600 font-medium">Remover vínculo atual</span>
                                 </div>
                             </button>
                         )}
 
-                        {filteredClients.map(client => (
-                            <button
-                                key={client.id}
-                                onClick={() => handleLinkClient(client.id)}
-                                className={`w-full flex items-center justify-between p-3 hover:bg-blue-50 rounded-xl transition-colors text-left group ${selectedEvent?.linkedClient?.id === client.id ? 'bg-blue-50 border border-blue-200' : ''
-                                    }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <Users size={16} className="text-slate-400" />
-                                    <span className="font-medium text-slate-700">{client.name}</span>
-                                </div>
-                                <ChevronRight size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-                            </button>
-                        ))}
+                        {filteredClients.length === 0 ? (
+                            <div className="text-center py-4 text-slate-400 text-sm">
+                                Nenhum cliente encontrado.
+                            </div>
+                        ) : (
+                            filteredClients.map(client => (
+                                <button
+                                    key={client.id}
+                                    onClick={() => handleLinkClient(client.id)}
+                                    className={`w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-all text-left group border ${selectedEvent?.linkedClient?.id === client.id
+                                        ? 'bg-slate-100 border-slate-200'
+                                        : 'border-transparent hover:border-slate-200'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-1.5 rounded-lg ${selectedEvent?.linkedClient?.id === client.id
+                                            ? 'bg-slate-800 text-white'
+                                            : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200 group-hover:text-slate-600'
+                                            }`}>
+                                            <Users size={14} />
+                                        </div>
+                                        <span className={`font-medium ${selectedEvent?.linkedClient?.id === client.id
+                                            ? 'text-slate-900'
+                                            : 'text-slate-700'
+                                            }`}>{client.name}</span>
+                                    </div>
+                                    {selectedEvent?.linkedClient?.id === client.id && (
+                                        <div className="text-xs font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-md">
+                                            Vinculado
+                                        </div>
+                                    )}
+                                    <ChevronRight size={16} className={`transition-colors ${selectedEvent?.linkedClient?.id === client.id
+                                        ? 'text-slate-400'
+                                        : 'text-slate-300 group-hover:text-slate-400'
+                                        }`} />
+                                </button>
+                            ))
+                        )}
                     </div>
                 </div>
             </Modal>
-        </>
-    );
-};
 
-// Event Card Component
-const EventCard: React.FC<{ event: EventWithClient; onLinkClick: () => void }> = ({ event, onLinkClick }) => {
-    const hasVideoCall = event.conferenceData?.entryPoints?.some(e => e.uri);
+            {/* Event Details Modal */}
+            <EventDetailsModal
+                isOpen={isDetailsModalOpen}
+                onClose={() => { setIsDetailsModalOpen(false); setSelectedEvent(null); }}
+                event={selectedEvent}
+                onEdit={openEditModal}
+                onDelete={handleDeleteEvent}
+                onLinkClient={openLinkModal}
+            />
 
-    return (
-        <div className="group bg-slate-50 hover:bg-white p-3 rounded-xl border border-transparent hover:border-blue-100 transition-all">
-            <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-slate-700 text-sm mb-1 truncate group-hover:text-blue-600 transition-colors">
-                        {event.summary}
-                    </h4>
-
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="font-semibold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">
-                            {formatEventTime(event)}
-                        </span>
-
-                        {event.location && (
-                            <span className="text-slate-400 flex items-center gap-1 truncate max-w-[120px]">
-                                <MapPin size={12} />
-                                {event.location}
-                            </span>
-                        )}
-
-                        {hasVideoCall && (
-                            <span className="text-emerald-500 flex items-center gap-1">
-                                <Video size={12} />
-                                <span>Chamada</span>
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Linked Client Badge */}
-                    {event.linkedClient && (
-                        <div className="mt-2 inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-lg">
-                            <Users size={12} />
-                            <span className="font-medium">{event.linkedClient.name}</span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-1">
-                    <button
-                        onClick={onLinkClick}
-                        className={`p-1.5 rounded-lg transition-all ${event.linkedClient
-                            ? 'text-amber-500 hover:bg-amber-50'
-                            : 'text-slate-300 hover:text-blue-500 hover:bg-blue-50'
-                            }`}
-                        title={event.linkedClient ? 'Alterar cliente' : 'Vincular cliente'}
-                    >
-                        <Link2 size={14} />
-                    </button>
-
-                    {event.htmlLink && (
-                        <a
-                            href={event.htmlLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                        >
-                            <ExternalLink size={14} />
-                        </a>
-                    )}
-                </div>
-            </div>
+            {/* Event Form Modal */}
+            <EventFormModal
+                isOpen={isFormModalOpen}
+                onClose={() => { setIsFormModalOpen(false); setSelectedEvent(null); }}
+                onSubmit={selectedEvent ? handleUpdateEvent : handleCreateEvent}
+                initialData={selectedEvent}
+                title={selectedEvent ? 'Editar Evento' : 'Novo Evento'}
+                clients={clients}
+            />
         </div>
     );
 };
