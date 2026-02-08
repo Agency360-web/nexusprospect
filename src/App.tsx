@@ -5,6 +5,7 @@ import { ProtectedRoute } from './layouts/ProtectedRoute';
 import Layout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
 import ClientManager from './pages/ClientManager';
 import ClientDetail from './pages/ClientDetail';
 import SettingsPage from './pages/Settings';
@@ -17,8 +18,9 @@ const App: React.FC = () => {
     <AuthProvider>
       <HashRouter>
         <Routes>
-          {/* Public Route */}
+          {/* Public Routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected Routes */}
           <Route path="/" element={
