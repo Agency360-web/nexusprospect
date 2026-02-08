@@ -1,24 +1,35 @@
 import { useAuth } from '../contexts/AuthContext';
 
+// Páginas padrão para usuários sem configuração explícita
+const DEFAULT_PAGES = ['dashboard', 'admin', 'clients', 'settings', 'reports', 'transmission'];
+
 export const useRBAC = () => {
-    const { profile } = useAuth();
+    const { profile, user } = useAuth();
 
     /**
      * Checks if the user has access to a specific page/module.
      * Admins always have access to everything.
+     * Users without explicit permissions get default access.
      */
     const canAccess = (pageKey: string): boolean => {
-        if (!profile) return false;
+        // Se não tem usuário autenticado, bloqueia
+        if (!user) return false;
+
+        // Se profile ainda não carregou mas user existe, dar acesso padrão
+        if (!profile) {
+            return DEFAULT_PAGES.includes(pageKey);
+        }
 
         // Admins have bypass
         if (profile.role === 'admin') return true;
 
         // Check explicit permissions
-        if (profile.allowed_pages && Array.isArray(profile.allowed_pages)) {
+        if (profile.allowed_pages && Array.isArray(profile.allowed_pages) && profile.allowed_pages.length > 0) {
             return profile.allowed_pages.includes(pageKey);
         }
 
-        return false;
+        // Fallback: se não tiver allowed_pages configurado, dar acesso padrão
+        return DEFAULT_PAGES.includes(pageKey);
     };
 
     /**
@@ -32,6 +43,7 @@ export const useRBAC = () => {
         canAccess,
         hasRole,
         role: profile?.role,
-        loading: !profile // You might want to handle loading states in UI
+        loading: !profile && !user
     };
 };
+
