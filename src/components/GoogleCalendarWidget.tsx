@@ -43,6 +43,13 @@ interface Client {
 
 const GoogleCalendarWidget: React.FC = () => {
     const { user } = useAuth();
+
+    // Debug
+    useEffect(() => {
+        console.log('VITE_GOOGLE_CLIENT_ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID ? 'Configured' : 'Missing');
+        console.log('VITE_GOOGLE_CLIENT_SECRET:', import.meta.env.VITE_GOOGLE_CLIENT_SECRET ? 'Configured' : 'Missing');
+    }, []);
+
     const [loading, setLoading] = useState(true);
     const [events, setEvents] = useState<EventWithClient[]>([]);
     const [isConnected, setIsConnected] = useState(false);
@@ -317,8 +324,8 @@ const GoogleCalendarWidget: React.FC = () => {
                         <button
                             onClick={isConnected ? handleDisconnect : handleConnect}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isConnected
-                                    ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                                ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                : 'bg-blue-500 text-white hover:bg-blue-600'
                                 }`}
                         >
                             {isConnected ? (
@@ -495,8 +502,8 @@ const EventCard: React.FC<{ event: EventWithClient; onLinkClick: () => void }> =
                     <button
                         onClick={onLinkClick}
                         className={`p-1.5 rounded-lg transition-all ${event.linkedClient
-                                ? 'text-amber-500 hover:bg-amber-50'
-                                : 'text-slate-300 hover:text-blue-500 hover:bg-blue-50'
+                            ? 'text-amber-500 hover:bg-amber-50'
+                            : 'text-slate-300 hover:text-blue-500 hover:bg-blue-50'
                             }`}
                         title={event.linkedClient ? 'Alterar cliente' : 'Vincular cliente'}
                     >
