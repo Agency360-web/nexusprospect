@@ -28,11 +28,13 @@ const Dashboard: React.FC = () => {
   }, [user]);
 
   const fetchStats = async () => {
+    if (!user) return;
     try {
       const { data, error } = await supabase
         .from('tasks')
-        .select('*, clients(name)')
+        .select('*, clients!inner(name, user_id)')
         .eq('status', 'pending')
+        .eq('clients.user_id', user.id)
         .order('due_date', { ascending: true });
 
       if (error) throw error;

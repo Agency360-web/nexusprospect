@@ -72,16 +72,18 @@ const ClientManager: React.FC = () => {
 
   const [createLoading, setCreateLoading] = useState(false);
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
-
   // Get user from auth
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchClients();
+    }
+  }, [user]);
 
   const handleOpenCreate = () => {
     setModalMode('create');
@@ -210,11 +212,13 @@ const ClientManager: React.FC = () => {
   };
 
   const fetchClients = async () => {
+    if (!user) return;
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('clients')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

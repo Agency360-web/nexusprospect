@@ -7,6 +7,7 @@ interface UserProfile {
     role: 'admin' | 'operator' | 'support' | 'user';
     allowed_pages?: string[];
     full_name?: string;
+    organization_id?: string;
 }
 
 interface AuthContextType {
