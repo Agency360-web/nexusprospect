@@ -136,20 +136,26 @@ const SettingsPage: React.FC = () => {
         .eq('id', user.id)
         .single();
 
-      if (!currentProfile?.organization_id) {
-        setProfiles([]);
-        return;
+      // Se tiver organization_id, filtrar por ele
+      if (currentProfile?.organization_id) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('organization_id', currentProfile.organization_id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        setProfiles(data || []);
+      } else {
+        // Fallback: comportamento antigo - buscar todos os profiles (para compatibilidade)
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        setProfiles(data || []);
       }
-
-      // Buscar todos os profiles da mesma organização
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('organization_id', currentProfile.organization_id)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      setProfiles(data || []);
     } catch (error) {
       console.error('Error fetching profiles:', error);
     } finally {
@@ -192,16 +198,12 @@ const SettingsPage: React.FC = () => {
     if (!user) return;
     setSaveLoading(true);
     try {
-      // Buscar organization_id do usuário atual
+      // Buscar organization_id do usuário atual (opcional)
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('organization_id')
         .eq('id', user.id)
         .single();
-
-      if (!currentProfile?.organization_id) {
-        throw new Error('Você precisa ter uma organização para convidar membros.');
-      }
 
       // Call the Edge Function to send real invitation
       const { data, error } = await supabase.functions.invoke('invite-user', {
@@ -209,7 +211,7 @@ const SettingsPage: React.FC = () => {
           email: newUserEmail,
           role: newUserRole,
           allowed_pages: newUserPermissions,
-          organization_id: currentProfile.organization_id
+          organization_id: currentProfile?.organization_id || null // Opcional
         }
       });
 
