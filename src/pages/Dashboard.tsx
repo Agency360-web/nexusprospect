@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import GoogleCalendarWidget from '../components/GoogleCalendarWidget';
 
 
 const Dashboard: React.FC = () => {
@@ -243,9 +244,12 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Google Calendar Widget */}
+      <GoogleCalendarWidget />
 
     </div>
   );
 };
 
 export default Dashboard;
+
