@@ -630,47 +630,82 @@ const ClientManager: React.FC = () => {
           <p className="text-slate-400 font-medium animate-pulse">Carregando clientes...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredClients.map(client => (
-            <div
-              key={client.id}
-              onClick={() => navigate(`/clients/${client.id}`)}
-              className="group bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden"
-            >
-              <div className="relative z-10 p-6 h-full flex flex-col">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="p-3.5 bg-slate-50 rounded-2xl text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shadow-sm">
-                    <Building2 size={24} />
-                  </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Header da Lista */}
+          <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <div className="col-span-4">Cliente</div>
+            <div className="col-span-3">Contato</div>
+            <div className="col-span-2">Status</div>
+            <div className="col-span-2">Criado em</div>
+            <div className="col-span-1 text-right">Ações</div>
+          </div>
 
-                  {/* Gear Menu */}
-                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+          {/* Lista de Clientes */}
+          <div className="divide-y divide-slate-100">
+            {filteredClients.map(client => (
+              <div
+                key={client.id}
+                onClick={() => navigate(`/clients/${client.id}`)}
+                className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-slate-50 cursor-pointer transition-colors group"
+              >
+                {/* Nome e Email */}
+                <div className="col-span-4 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                    <Building2 size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900 truncate" title={client.name}>{client.name}</h3>
+                    <p className="text-xs text-slate-500 truncate" title={client.email || 'Sem e-mail'}>{client.email || '—'}</p>
+                  </div>
+                </div>
+
+                {/* Contato */}
+                <div className="col-span-3 flex items-center">
+                  <span className="text-sm text-slate-600 truncate">{client.phone || client.contactPerson || '—'}</span>
+                </div>
+
+                {/* Status */}
+                <div className="col-span-2 flex items-center">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase ${client.status === 'active'
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-slate-100 text-slate-500'
+                    }`}>
+                    <Circle size={6} className={`mr-1.5 fill-current ${client.status === 'active' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                    {client.status === 'active' ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+
+                {/* Data */}
+                <div className="col-span-2 flex items-center">
+                  <span className="text-sm text-slate-500">{new Date(client.createdAt).toLocaleDateString('pt-BR')}</span>
+                </div>
+
+                {/* Ações */}
+                <div className="col-span-1 flex items-center justify-end" onClick={e => e.stopPropagation()}>
+                  <div className="relative">
                     <button
                       onClick={() => setActiveMenuClientId(activeMenuClientId === client.id ? null : client.id)}
-                      className={`p-2 rounded-xl transition-all duration-200 ${activeMenuClientId === client.id ? 'bg-slate-100 text-slate-900 ring-2 ring-slate-200' : 'text-slate-300 hover:bg-slate-50 hover:text-slate-600'}`}
+                      className={`p-2 rounded-lg transition-all ${activeMenuClientId === client.id ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
                     >
-                      <MoreVertical size={20} />
+                      <MoreVertical size={18} />
                     </button>
 
                     {activeMenuClientId === client.id && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setActiveMenuClientId(null)} />
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-200">
-                          <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            Ações do Cliente
-                          </div>
+                        <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-200">
                           <button
                             onClick={(e) => { setActiveMenuClientId(null); handleOpenEdit(e, client); }}
-                            className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-slate-50 text-slate-600 text-sm font-bold transition-colors"
+                            className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 text-slate-600 text-sm font-medium transition-colors"
                           >
-                            <Edit2 size={16} />
-                            <span>Editar Dados</span>
+                            <Edit2 size={14} />
+                            <span>Editar</span>
                           </button>
                           <button
                             onClick={(e) => { setActiveMenuClientId(null); handleDeleteClient(e, client.id); }}
-                            className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-rose-50 text-rose-500 text-sm font-bold transition-colors border-t border-slate-50"
+                            className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-rose-50 text-rose-500 text-sm font-medium transition-colors border-t border-slate-50"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                             <span>Excluir</span>
                           </button>
                         </div>
@@ -678,51 +713,17 @@ const ClientManager: React.FC = () => {
                     )}
                   </div>
                 </div>
-
-                <div className="mb-4">
-                  <h3 className="text-xl font-bold text-slate-900 mb-1 line-clamp-1" title={client.name}>{client.name}</h3>
-                  <p className="text-sm text-slate-500 line-clamp-1" title={client.email || 'Sem e-mail'}>{client.email || '—'}</p>
-                </div>
-
-                <div className="flex flex-wrap gap-2 mt-auto">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${client.status === 'active'
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                    : 'bg-slate-50 text-slate-500 border-slate-200'
-                    }`}>
-                    <Circle size={6} className={`mr-1.5 fill-current ${client.status === 'active' ? 'text-emerald-500' : 'text-slate-400'}`} />
-                    {client.status === 'active' ? 'Ativo' : 'Inativo'}
-                  </span>
-
-                  {client.totalNumbers > 0 ? (
-                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase px-3 py-1 rounded-lg border ${client.onlineNumbers === client.totalNumbers
-                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200'
-                      : client.onlineNumbers > 0 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                      }`}>
-                      <Wifi size={12} />
-                      {client.onlineNumbers}/{client.totalNumbers} Online
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase px-3 py-1 rounded-lg border border-dashed border-slate-200 text-slate-400 bg-slate-50/50">
-                      Sem Conexões
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-6 border-t border-slate-100 mt-6">
-                  <div className="flex items-center text-[10px] font-medium text-slate-400 uppercase tracking-wide">
-                    <Calendar size={12} className="mr-1.5" />
-                    <span>{new Date(client.createdAt).toLocaleDateString('pt-BR')}</span>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all duration-300 shadow-sm">
-                    <ChevronRight size={16} />
-                  </div>
-                </div>
               </div>
+            ))}
+          </div>
 
-              {/* Decorative Background */}
-              <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-gradient-to-br from-slate-50 to-slate-100 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+          {/* Empty State */}
+          {filteredClients.length === 0 && (
+            <div className="text-center py-12 text-slate-400">
+              <Building2 size={40} className="mx-auto mb-3 text-slate-300" />
+              <p className="font-medium">Nenhum cliente encontrado</p>
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>

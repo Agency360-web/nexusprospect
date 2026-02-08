@@ -39,17 +39,19 @@ import {
   ListTodo,
   X,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Key
 } from 'lucide-react';
 import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client, EmailSender, Task } from '../types';
 import ClientGoals from '../components/ClientGoals';
 import ClientOverviewGoals from '../components/ClientOverviewGoals';
+import ClientCredentials from '../components/ClientCredentials';
 import { supabase } from '../services/supabase';
 import Modal from '../components/ui/Modal';
 
 const ClientDetail: React.FC = () => {
   const { clientId } = useParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'numbers' | 'webhooks' | 'leads' | 'campaigns' | 'goals'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'numbers' | 'webhooks' | 'leads' | 'campaigns' | 'goals' | 'credentials'>('overview');
   const [copied, setCopied] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -1113,6 +1115,7 @@ const ClientDetail: React.FC = () => {
         <TabButton id="leads" label="Leads" icon={Users} />
         <TabButton id="campaigns" label="Campanhas" icon={History} />
         <TabButton id="goals" label="Metas" icon={Target} />
+        <TabButton id="credentials" label="Acessos" icon={Key} />
       </div>
 
       <div className="pt-4">
@@ -1577,6 +1580,10 @@ const ClientDetail: React.FC = () => {
 
         {activeTab === 'goals' && (
           <ClientGoals clientId={clientId!} />
+        )}
+
+        {activeTab === 'credentials' && (
+          <ClientCredentials clientId={clientId!} />
         )}
       </div>
 

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import {
   Building2,
@@ -23,11 +23,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchStats();
-  }, [user]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     if (!user) return;
     try {
       const { data, error } = await supabase
@@ -44,9 +40,13 @@ const Dashboard: React.FC = () => {
       console.error('Error fetching dashboard stats:', error);
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const handleToggleTask = async (id: string, currentStatus: string) => {
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const handleToggleTask = useCallback(async (id: string, currentStatus: string) => {
     try {
       const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
       const { error } = await supabase
@@ -59,9 +59,9 @@ const Dashboard: React.FC = () => {
     } catch (err) {
       console.error('Error toggling task:', err);
     }
-  };
+  }, [fetchStats]);
 
-  const handleDeleteTask = async (id: string) => {
+  const handleDeleteTask = useCallback(async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir esta tarefa?')) return;
     try {
       const { error } = await supabase
@@ -75,36 +75,31 @@ const Dashboard: React.FC = () => {
       console.error('Error deleting task:', err);
       alert('Erro ao excluir tarefa.');
     }
-  };
+  }, [fetchStats]);
 
-  const getPriorityTasks = () => {
+  // Memoize task calculations
+  const priorityTasks = useMemo(() => {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
-
     return tasks.filter(t => {
       if (!t.due_date) return false;
       const dueDate = new Date(t.due_date);
       return dueDate <= today;
     });
-  };
+  }, [tasks]);
 
-  const getAttentionTasks = () => {
+  const attentionTasks = useMemo(() => {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
-
     const future = new Date();
-    future.setDate(future.getDate() + 3); // next 3 days
+    future.setDate(future.getDate() + 3);
     future.setHours(23, 59, 59, 999);
-
     return tasks.filter(t => {
       if (!t.due_date) return false;
       const dueDate = new Date(t.due_date);
       return dueDate > today && dueDate <= future;
     });
-  };
-
-  const priorityTasks = getPriorityTasks();
-  const attentionTasks = getAttentionTasks();
+  }, [tasks]);
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20">

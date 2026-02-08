@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 
@@ -45,7 +45,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (data) {
                     setProfile(data);
                 } else {
-                    // Fallback if profile doesn't exist yet (should trigger creation in real app, but safe default here)
                     setProfile(null);
                 }
             } catch (err) {
@@ -80,16 +79,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => subscription.unsubscribe();
     }, []);
 
-    const signOut = async () => {
+    const signOut = useCallback(async () => {
         await supabase.auth.signOut();
         setProfile(null);
-    };
+    }, []);
+
+    // Memoize context value to prevent unnecessary re-renders
+    const value = useMemo(() => ({
+        session,
+        user,
+        profile,
+        loading,
+        signOut
+    }), [session, user, profile, loading, signOut]);
 
     return (
-        <AuthContext.Provider value={{ session, user, profile, loading, signOut }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
 };
 
 export const useAuth = () => useContext(AuthContext);
+
