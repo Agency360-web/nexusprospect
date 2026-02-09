@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar, CheckCircle2, XCircle, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, XCircle, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { getGoogleAuthUrl, isGoogleCalendarConfigured } from '../../services/googleCalendar';
+
+// Google Calendar SVG Icon (official multicolor)
+const GoogleCalendarIcon = () => (
+    <svg viewBox="0 0 200 200" className="w-8 h-8">
+        <path fill="#4285F4" d="M152.637 47.363H47.363v105.274h105.274z" />
+        <path fill="#34A853" d="M152.637 152.637H47.363L47.363 47.363z" opacity=".3" />
+        <path fill="#EA4335" d="M152.637 47.363l-35.091 35.091 35.091 35.091z" />
+        <path fill="#FBBC05" d="M47.363 152.637l35.091-35.091-35.091-35.091z" />
+        <path fill="#4285F4" d="M117.546 117.546l35.091 35.091V47.363z" />
+        <path fill="#34A853" d="M82.454 82.454L47.363 47.363v105.274z" />
+        <rect fill="#fff" x="60" y="85" width="80" height="8" rx="2" />
+        <rect fill="#fff" x="60" y="105" width="60" height="8" rx="2" />
+        <rect fill="#fff" x="60" y="125" width="40" height="8" rx="2" />
+    </svg>
+);
 
 const IntegrationsTab: React.FC = () => {
     const { user } = useAuth();
@@ -81,10 +96,18 @@ const IntegrationsTab: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                {/* Google-style gradient accent bar */}
+                <div className="h-1 w-full flex">
+                    <div className="flex-1 bg-[#4285F4]"></div>
+                    <div className="flex-1 bg-[#EA4335]"></div>
+                    <div className="flex-1 bg-[#FBBC05]"></div>
+                    <div className="flex-1 bg-[#34A853]"></div>
+                </div>
+
                 <div className="p-6 flex items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
-                        <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                            <Calendar size={24} />
+                        <div className="p-2 bg-slate-50 rounded-xl shrink-0 border border-slate-100">
+                            <GoogleCalendarIcon />
                         </div>
                         <div>
                             <h3 className="font-bold text-slate-900 text-base">Google Agenda</h3>
@@ -99,7 +122,7 @@ const IntegrationsTab: React.FC = () => {
                                         Verificando status...
                                     </div>
                                 ) : isConnected ? (
-                                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full text-xs font-bold border border-emerald-100">
+                                    <div className="flex items-center gap-2 text-white bg-[#34A853] px-3 py-1 rounded-full text-xs font-bold shadow-sm">
                                         <CheckCircle2 size={14} />
                                         Conectado
                                     </div>
@@ -121,7 +144,7 @@ const IntegrationsTab: React.FC = () => {
                         ) : isConnected ? (
                             <button
                                 onClick={handleDisconnect}
-                                className="px-4 py-2 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-sm transition-colors border border-transparent hover:border-rose-100"
+                                className="px-4 py-2 text-[#EA4335] hover:bg-red-50 rounded-xl font-bold text-sm transition-colors border border-transparent hover:border-red-100"
                             >
                                 Desconectar
                             </button>
@@ -129,10 +152,10 @@ const IntegrationsTab: React.FC = () => {
                             <button
                                 onClick={handleConnect}
                                 disabled={connecting}
-                                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                                className="flex items-center gap-2 px-5 py-2.5 bg-[#4285F4] text-white rounded-xl font-bold text-sm hover:bg-[#3367D6] transition-all shadow-lg shadow-blue-200"
                             >
                                 {connecting ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
-                                <span>Conectar</span>
+                                <span>Conectar com Google</span>
                             </button>
                         )}
                     </div>
@@ -141,7 +164,7 @@ const IntegrationsTab: React.FC = () => {
                 {isConnected && (
                     <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                         <div className="flex items-center gap-2">
-                            <RefreshCw size={12} />
+                            <RefreshCw size={12} className="text-[#34A853]" />
                             <span>Sincronização automática ativa</span>
                         </div>
                         <span>Última verificação: Agora mesmo</span>
