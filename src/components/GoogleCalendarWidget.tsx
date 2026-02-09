@@ -440,22 +440,21 @@ const GoogleCalendarWidget: React.FC = () => {
                 onRefresh={fetchEvents}
                 onAddEvent={openCreateModal}
             />
-
             {!isConnected ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4">
                         <CalendarIcon className="w-8 h-8 text-slate-400" />
                     </div>
-                    <h4 className="text-lg font-bold text-slate-800 mb-2">Conecte sua agenda</h4>
+                    <h4 className="text-lg font-bold text-slate-800 mb-2">Google Agenda não conectada</h4>
                     <p className="text-slate-500 text-sm max-w-xs mx-auto">
-                        Visualize seus compromissos (Hoje, Semana ou Mês) e vincule-os aos seus clientes.
+                        Para visualizar seus compromissos, você precisa integrar sua conta do Google.
                     </p>
-                    <button
-                        onClick={handleConnect}
+                    <a
+                        href="#/settings"
                         className="mt-6 bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
                     >
-                        Conectar Google Agenda
-                    </button>
+                        Ir para Configurações
+                    </a>
                 </div>
             ) : (
                 <div className="min-h-[300px]">

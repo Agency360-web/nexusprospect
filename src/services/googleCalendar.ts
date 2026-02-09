@@ -63,6 +63,13 @@ export interface GoogleTokens {
  * Generate the Google OAuth authorization URL
  */
 export const getGoogleAuthUrl = (state?: string): string => {
+    // Debugging redirect URI mismatch
+    console.log('Google Auth Config:', {
+        CLIENT_ID: CLIENT_ID ? 'Set' : 'Missing',
+        REDIRECT_URI: REDIRECT_URI,
+        Origin: window.location.origin
+    });
+
     const params = new URLSearchParams({
         client_id: CLIENT_ID,
         redirect_uri: REDIRECT_URI,

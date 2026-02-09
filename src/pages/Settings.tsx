@@ -10,14 +10,16 @@ import {
   User,
   Loader2,
   Trash2,
-  Building2
+  Building2,
+  Link2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRBAC } from '../hooks/useRBAC';
 import Modal from '../components/ui/Modal';
 import { supabase } from '../services/supabase';
+import IntegrationsTab from '../components/settings/IntegrationsTab';
 
-type SettingsTab = 'general' | 'organization' | 'users';
+type SettingsTab = 'general' | 'organization' | 'users' | 'integrations';
 
 interface Profile {
   id: string;
@@ -303,6 +305,7 @@ const SettingsPage: React.FC = () => {
             <TabItem id="general" label="Geral" icon={Settings} />
             <TabItem id="organization" label="Minha Empresa" icon={Building2} />
             <TabItem id="users" label="Usuários & Acessos" icon={Users} />
+            <TabItem id="integrations" label="Integrações" icon={Link2} />
 
             <div className="pt-4 border-t border-slate-200 mt-4">
               <button
@@ -468,6 +471,10 @@ const SettingsPage: React.FC = () => {
                   )}
                 </div>
               </div>
+            )}
+
+            {activeTab === 'integrations' && (
+              <IntegrationsTab />
             )}
           </div>
 
