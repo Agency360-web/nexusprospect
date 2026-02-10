@@ -350,15 +350,7 @@ const SettingsPage: React.FC = () => {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Logo da Empresa</label>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-[#ffd700] border border-dashed border-slate-800">
-                        <Plus size={24} />
-                      </div>
-                      <p className="text-xs text-slate-400">Recomendado: SVG ou PNG (512x512px)</p>
-                    </div>
-                  </div>
+
                 </div>
               </div>
             )}

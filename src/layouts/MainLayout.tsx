@@ -127,12 +127,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </nav>
 
                     <div className="p-4 border-t border-slate-100 space-y-2">
-                        {!isCollapsed && canAccess('admin') && (
-                            <div className="px-4 py-2 flex items-center space-x-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-in fade-in duration-200">
-                                <ShieldCheck size={12} />
-                                <span>Admin Hub</span>
-                            </div>
-                        )}
+
 
                         {canAccess('settings') && (
                             <SidebarItem

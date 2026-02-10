@@ -3,6 +3,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CheckCircle2, XCircle, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { getGoogleAuthUrl, isGoogleCalendarConfigured } from '../../services/googleCalendar';
+import WhatsAppConnectionTab from './WhatsAppConnectionTab';
 
 // Google Calendar SVG Icon (official multicolor)
 const GoogleCalendarIcon = () => (
@@ -171,6 +172,9 @@ const IntegrationsTab: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* WhatsApp Connection Card */}
+            <WhatsAppConnectionTab />
         </div>
     );
 };
