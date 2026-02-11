@@ -11,15 +11,17 @@ import {
   Loader2,
   Trash2,
   Building2,
-  Link2
+  Link2,
+  Bot
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRBAC } from '../hooks/useRBAC';
 import Modal from '../components/ui/Modal';
 import { supabase } from '../services/supabase';
 import IntegrationsTab from '../components/settings/IntegrationsTab';
+import AiAgentTab from '../components/settings/AiAgentTab';
 
-type SettingsTab = 'general' | 'organization' | 'users' | 'integrations';
+type SettingsTab = 'general' | 'organization' | 'users' | 'integrations' | 'ai-agent';
 
 interface Profile {
   id: string;
@@ -306,6 +308,7 @@ const SettingsPage: React.FC = () => {
             <TabItem id="organization" label="Minha Empresa" icon={Building2} />
             <TabItem id="users" label="Usuários & Acessos" icon={Users} />
             <TabItem id="integrations" label="Integrações" icon={Link2} />
+            <TabItem id="ai-agent" label="Agente IA" icon={Bot} />
 
             <div className="pt-4 border-t border-slate-200 mt-4">
               <button
@@ -467,6 +470,10 @@ const SettingsPage: React.FC = () => {
 
             {activeTab === 'integrations' && (
               <IntegrationsTab />
+            )}
+
+            {activeTab === 'ai-agent' && (
+              <AiAgentTab />
             )}
           </div>
 
