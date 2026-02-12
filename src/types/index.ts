@@ -35,6 +35,8 @@ export interface Client {
     auto_sync?: boolean;
     last_sync?: string;
   };
+  contract_start_date?: string;
+  contract_value?: number;
 }
 
 export interface WebhookConfig {
@@ -128,6 +130,7 @@ export interface ContractTemplate {
   name: string;
   content: string;
   created_at: string;
+  // Make these optional if they aren't always present
 }
 
 export interface Contract {
@@ -139,4 +142,46 @@ export interface Contract {
   variables: Record<string, string>;
   content_snapshot: string;
   created_at: string;
+}
+
+export interface OperationalCost {
+  id: string;
+  clientId: string;
+  description: string;
+  category: string;
+  value: number;
+  date: string;
+  createdAt: string;
+}
+
+
+export interface Meeting {
+  id: string;
+  clientId: string;
+  title: string;
+  description?: string;
+  date: string;
+  link?: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  createdAt: string;
+}
+
+export interface Note {
+  id: string;
+  clientId: string;
+  content: string;
+  isPinned: boolean;
+  createdAt: string;
+}
+
+export interface Complaint {
+  id: string;
+  clientId: string;
+  title: string;
+  description?: string;
+  status: 'pending' | 'in_progress' | 'resolved';
+  severity: 'low' | 'medium' | 'high';
+  date: string;
+  resolutionNotes?: string;
+  createdAt: string;
 }

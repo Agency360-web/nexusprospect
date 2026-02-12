@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Existing Tables (Mappings) ---
+
+model Client {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  status    String?  @default("active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  email     String?  @unique
+  leads     Lead[]
+  goals     Goal[]
+  transmissions Transmission[]
+  campaigns Campaign[]
+  emailSenders EmailSender[]
+
+  @@map("clients")
+}
+
+model Lead {
+  id           String   @id @default(uuid()) @db.Uuid
+  clientId     String?  @map("client_id") @db.Uuid
+  name         String
+  phone        String?
+  email        String?
+  tags         String[]
+  customFields Json?    @default("{}") @map("custom_fields")
+  status       String?  @default("pending")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  isSynced     Boolean? @default(false) @map("is_synced")
+
+  client       Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("leads")
+}
+
+model Goal {
+  id            String   @id @default(uuid()) @db.Uuid
+  clientId      String?  @map("client_id") @db.Uuid
+  month         Int
+  year          Int
+  channel       String
+  monthlyTarget Int?     @default(0) @map("monthly_target")
+  annualTarget  Int?     @default(0) @map("annual_target")
+  weeklyTargets Json?    @default("[0,0,0,0]") @map("weekly_targets")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  client        Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, month, year, channel])
+  @@index([clientId])
+  @@map("goals")
+}
+
+model Transmission {
+  id        String   @id @default(uuid()) @db.Uuid
+  clientId  String?  @map("client_id") @db.Uuid
+  channel   String
+  status    String?  @default("sent")
+  recipient String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, channel])
+  @@map("transmissions")
+}
+
+model Campaign {
+  id        String   @id @default(uuid()) @db.Uuid
+  clientId  String?  @map("client_id") @db.Uuid
+  name      String
+  message   String?
+  status    String?  @default("draft")
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("campaigns")
+}
+
+model EmailSender {
+  id        String   @id @default(uuid()) @db.Uuid
+  clientId  String?  @map("client_id") @db.Uuid
+  email     String
+  provider  String
+  fromName  String?  @map("from_name")
+  status    String?  @default("active")
+  dailyLimit Int?    @default(500) @map("daily_limit")
+  sentToday Int?     @default(0) @map("sent_today")
+  config    Json?    @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("email_senders")
+}
+
+model AiAgentSettings {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @unique @map("organization_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  agentName      String   @default("") @map("agent_name")
+  prompt         String   @default("")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("ai_agent_settings")
+}
+
+model WhatsappConnection {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique @map("user_id") @db.Uuid
+  instance  String
+  status    String?  @default("pending")
+  qrcode    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@index([userId])
+  @@index([instance])
+  @@map("whatsapp_connections")
+}
+
+// --- NEW MODULE: Intelligent Dispatcher ---
+
+model DispatchCampaign {
+  id                  String    @id @default(uuid()) @db.Uuid
+  userId              String?   @map("usuario_id") @db.Uuid
+  name                String    @map("nome_campanha") @db.VarChar(255)
+  status              String?   @default("draft") // draft, em_andamento, pausado, concluido, cancelado, erro
+  totalLeads          Int?      @default(0) @map("total_leads")
+  sentCustom          Int?      @default(0) @map("enviados_personalizados")
+  sentDefault         Int?      @default(0) @map("enviados_padrao")
+  skipped             Int?      @default(0) @map("pulados")
+  errors              Int?      @default(0) @map("erros")
+  delayMinSeconds     Int?      @default(150) @map("delay_min_segundos")
+  delayMaxSeconds     Int?      @default(320) @map("delay_max_segundos")
+  defaultMessage      String    @map("mensagem_padrao") // Fallback
+  whatsappInstance    String?   @map("instancia_whatsapp") @db.VarChar(100)
+  createdAt           DateTime? @default(now()) @map("criado_em") @db.Timestamptz
+  updatedAt           DateTime? @default(now()) @map("atualizado_em") @db.Timestamptz
+
+  leads               DispatchLead[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("campanhas_disparo")
+}
+
+model DispatchLead {
+  id              String    @id @default(uuid()) @db.Uuid
+  campaignId      String?   @map("campanha_id") @db.Uuid
+  name            String?   @map("nome_lead") @db.VarChar(255)
+  phone           String    @map("telefone") @db.VarChar(50)
+  company         String?   @map("empresa") @db.VarChar(255)
+  site            String?   @map("site") @db.VarChar(500)
+  status          String?   @default("pendente") // pendente, processando, enviado_personalizado, enviado_padrao, pulado, erro
+  fallbackReason  String?   @map("motivo_fallback")
+  generatedMessage String?  @map("mensagem_gerada")
+  errorDetail     String?   @map("erro_detalhe")
+  sentAt          DateTime? @map("enviado_em") @db.Timestamptz
+  createdAt       DateTime? @default(now()) @map("criado_em") @db.Timestamptz
+
+  campaign        DispatchCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([status])
+  @@index([phone])
+  @@map("disparo_leads")
+}

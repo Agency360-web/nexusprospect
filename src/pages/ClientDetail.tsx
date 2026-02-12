@@ -1,57 +1,56 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Loader2,
   ArrowLeft,
-  Webhook as WebhookIcon,
-  Smartphone,
-  History,
   Settings,
   Plus,
-  Play,
-  Activity,
-  Zap,
   CheckCircle2,
-  Copy,
   Trash2,
-  Edit2,
-  ListPlus,
-  Globe,
   MoreVertical,
-  Check,
   Users,
-  Tag as TagIcon,
   Search,
-  Filter,
   FileUp,
-  AlertCircle,
-  RefreshCw,
-  Clock,
-  ExternalLink,
-  Lock,
-  Wifi,
-  WifiOff,
   Target,
   Mail,
-  AtSign,
-
-  ListTodo,
-  X,
-  Download,
   FileSpreadsheet,
-  Key
+  Key,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  PieChart,
+  Smartphone,
+  Download,
+  RefreshCw,
+  Activity
 } from 'lucide-react';
-import { WebhookConfig, WhatsAppNumber, Lead, Tag, Client, EmailSender, Task } from '../types';
+import { Lead, Tag, Client, OperationalCost } from '../types';
 import ClientGoals from '../components/ClientGoals';
-import ClientOverviewGoals from '../components/ClientOverviewGoals';
 import ClientCredentials from '../components/ClientCredentials';
+import ClientOverview from '../components/ClientOverview/ClientOverview';
 import { supabase } from '../services/supabase';
 import Modal from '../components/ui/Modal';
+import { useAuth } from '../contexts/AuthContext';
+
+// Interface locally defined for Financial Transactions
+interface Transaction {
+  id: string;
+  user_id: string;
+  transaction_date: string;
+  amount: number;
+  description: string;
+  category: string;
+  status: 'pendente' | 'pago' | 'atrasado';
+  client_name?: string;
+  payment_method?: string;
+  created_at?: string;
+}
 
 const ClientDetail: React.FC = () => {
+  const { user } = useAuth();
   const { clientId } = useParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'numbers' | 'webhooks' | 'leads' | 'campaigns' | 'goals' | 'credentials'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'goals' | 'credentials' | 'costs'>('overview');
   const [copied, setCopied] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -59,20 +58,13 @@ const ClientDetail: React.FC = () => {
   const [client, setClient] = useState<Client | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
-
-  const [numbers, setNumbers] = useState<WhatsAppNumber[]>([]);
-  const [emailSenders, setEmailSenders] = useState<EmailSender[]>([]);
-  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+  const [costs, setCosts] = useState<OperationalCost[]>([]);
+  const [financialTransactions, setFinancialTransactions] = useState<Transaction[]>([]);
 
   // Modal State
-  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'webhook' | 'number' | 'email' | 'success' | 'client-config' | 'task-create' | 'task-detail' | 'backup'>('none');
+  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'success' | 'client-config' | 'backup' | 'cost'>('none');
   const [modalLoading, setModalLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-
-  // Webhook Editing State
-  const [editingWebhook, setEditingWebhook] = useState<WebhookConfig | null>(null);
-
-  const [webhookMode, setWebhookMode] = useState<'create' | 'edit'>('create');
 
   // Client Config State
   const [clientForm, setClientForm] = useState({
@@ -88,20 +80,10 @@ const ClientDetail: React.FC = () => {
     whatsapp_token: ''
   });
 
-  // Task State
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [taskFilter, setTaskFilter] = useState<'pending' | 'completed'>('pending');
-  const [newTask, setNewTask] = useState({
-    title: '', description: '', startDate: '', dueDate: '', status: 'pending',
-    checklist: [] as { text: string, completed: boolean }[]
-  });
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
-  const [newChecklistItem, setNewChecklistItem] = useState('');
-
-  // Number Editing State
-  const [editingNumber, setEditingNumber] = useState<WhatsAppNumber | null>(null);
-  const [numberMode, setNumberMode] = useState<'create' | 'edit'>('create');
+  // Costs State
+  const [newCost, setNewCost] = useState({ description: '', category: 'Infrastructure', value: '', date: new Date().toISOString().split('T')[0] });
+  const [costFilterMonth, setCostFilterMonth] = useState(new Date().getMonth());
+  const [costFilterYear, setCostFilterYear] = useState(new Date().getFullYear());
 
   // Backup / Sync State
   const [backupConfig, setBackupConfig] = useState({ url: '', auto_sync: false });
@@ -284,9 +266,6 @@ const ClientDetail: React.FC = () => {
 
   // Form State
   const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', company: '', tags: '' });
-  const [newWebhook, setNewWebhook] = useState({ name: '', url: '', type: 'outbound' as const, method: 'POST' as const });
-  const [newNumber, setNewNumber] = useState({ nickname: '', phone: '' });
-  const [newEmail, setNewEmail] = useState({ email: '', provider: 'smtp', fromName: '' });
   const [leadType, setLeadType] = useState<'whatsapp' | 'email'>('whatsapp');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -472,84 +451,6 @@ const ClientDetail: React.FC = () => {
   };
 
 
-  const handleOpenWebhookModal = (mode: 'create' | 'edit', webhook?: WebhookConfig) => {
-    setWebhookMode(mode);
-    if (mode === 'edit' && webhook) {
-      setEditingWebhook(webhook);
-      setNewWebhook({
-        name: webhook.name,
-        url: webhook.url,
-        type: webhook.type as any,
-        method: (webhook.method || 'POST') as any // Cast to avoid literal type mismatch
-      });
-    } else {
-      setEditingWebhook(null);
-      setNewWebhook({ name: '', url: '', type: 'outbound', method: 'POST' });
-    }
-    setActiveModal('webhook');
-  };
-
-  const handleCreateWebhook = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clientId) return;
-    setModalLoading(true);
-    try {
-      if (webhookMode === 'create') {
-        const { error } = await supabase.from('webhook_configs').insert({
-          client_id: clientId,
-          name: newWebhook.name,
-          url: newWebhook.url,
-          type: 'outbound', // Defaulting to outbound as per user request
-          method: newWebhook.method,
-          active: true
-        });
-        if (error) throw error;
-      } else if (webhookMode === 'edit' && editingWebhook) {
-        const { error } = await supabase.from('webhook_configs').update({
-          name: newWebhook.name,
-          url: newWebhook.url,
-          method: newWebhook.method
-        }).eq('id', editingWebhook.id);
-        if (error) throw error;
-      }
-
-      setActiveModal('none');
-      setNewWebhook({ name: '', url: '', type: 'outbound', method: 'POST' });
-      fetchData();
-    } catch (err) { console.error(err); alert('Erro ao salvar webhook'); }
-    finally { setModalLoading(false); }
-  };
-
-  const handleDeleteWebhook = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este webhook?')) return;
-    try {
-      setLoading(true);
-      const { error } = await supabase.from('webhook_configs').delete().eq('id', id);
-      if (error) throw error;
-      fetchData();
-    } catch (err) { console.error(err); alert('Erro ao excluir webhook'); }
-    finally { setLoading(false); }
-  };
-
-  const handleDuplicateWebhook = async (webhook: WebhookConfig) => {
-    if (!clientId) return;
-    try {
-      setLoading(true);
-      const { error } = await supabase.from('webhook_configs').insert({
-        client_id: clientId,
-        name: `${webhook.name} (Cópia)`,
-        url: webhook.url,
-        type: webhook.type,
-        method: webhook.method,
-        active: webhook.active,
-        headers: webhook.headers
-      });
-      if (error) throw error;
-      fetchData();
-    } catch (err) { console.error(err); alert('Erro ao duplicar webhook'); }
-    finally { setLoading(false); }
-  };
-
   const handleOpenClientConfig = () => {
     if (!client) return;
     setClientForm({
@@ -592,193 +493,12 @@ const ClientDetail: React.FC = () => {
     finally { setModalLoading(false); }
   };
 
-  const handleOpenNumberModal = (mode: 'create' | 'edit', number?: WhatsAppNumber) => {
-    setNumberMode(mode);
-    if (mode === 'edit' && number) {
-      setEditingNumber(number);
-      setNewNumber({ nickname: number.nickname, phone: number.phone });
-    } else {
-      setEditingNumber(null);
-      setNewNumber({ nickname: '', phone: '' });
-    }
-    setActiveModal('number');
-  };
-
   const formatDateForInput = (dateString?: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     const offset = date.getTimezoneOffset() * 60000;
     const localDate = new Date(date.getTime() - offset);
     return localDate.toISOString().slice(0, 16);
-  };
-
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clientId) return;
-    setModalLoading(true);
-    try {
-      const { error } = await supabase.from('tasks').insert({
-        client_id: clientId,
-        title: newTask.title,
-        description: newTask.description,
-        start_date: newTask.startDate ? new Date(newTask.startDate).toISOString() : null,
-        due_date: newTask.dueDate ? new Date(newTask.dueDate).toISOString() : null,
-        status: newTask.status,
-        checklist: newTask.checklist
-      });
-      if (error) throw error;
-
-      setActiveModal('none');
-      setNewTask({ title: '', description: '', startDate: '', dueDate: '', status: 'pending', checklist: [] });
-      fetchData();
-    } catch (err: any) {
-      console.error(err);
-      alert(`Erro ao criar tarefa: ${err.message || 'Erro desconhecido'}`);
-    }
-
-    finally { setModalLoading(false); }
-  };
-
-  const handleUpdateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTask) return;
-    setModalLoading(true);
-    try {
-      const { error } = await supabase.from('tasks').update({
-        title: selectedTask.title,
-        description: selectedTask.description,
-        start_date: selectedTask.startDate ? new Date(selectedTask.startDate).toISOString() : null,
-        due_date: selectedTask.dueDate ? new Date(selectedTask.dueDate).toISOString() : null,
-        status: selectedTask.status,
-        checklist: selectedTask.checklist
-      }).eq('id', selectedTask.id);
-      if (error) throw error;
-
-      setActiveModal('none');
-      setSelectedTask(null);
-      fetchData();
-    } catch (err: any) {
-      console.error(err);
-      alert(`Erro ao atualizar tarefa: ${err.message || 'Erro desconhecido'}`);
-    }
-
-    finally { setModalLoading(false); }
-  };
-
-  const handleDeleteTask = async (id: string) => {
-    if (!confirm('Excluir esta tarefa?')) return;
-    try {
-      const { error } = await supabase.from('tasks').delete().eq('id', id);
-      if (error) throw error;
-      if (selectedTask?.id === id) { setActiveModal('none'); setSelectedTask(null); }
-      fetchData();
-    } catch (err) { console.error(err); alert('Erro ao excluir tarefa'); }
-  };
-
-  const handleBulkDeleteTasks = async () => {
-    if (!confirm(`Excluir ${selectedTasks.length} tarefas?`)) return;
-    try {
-      const { error } = await supabase.from('tasks').delete().in('id', selectedTasks);
-      if (error) throw error;
-      setSelectedTasks([]);
-      fetchData();
-    } catch (err) { console.error(err); alert('Erro ao excluir tarefas'); }
-  };
-
-  const toggleTaskSelection = (id: string) => {
-    if (selectedTasks.includes(id)) setSelectedTasks(prev => prev.filter(tid => tid !== id));
-    else setSelectedTasks(prev => [...prev, id]);
-  };
-
-  const getTaskStatusColor = (task: Task) => {
-    if (task.status === 'completed') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    if (task.dueDate && new Date(task.dueDate) < new Date()) return 'bg-rose-100 text-rose-700 border-rose-200';
-    return 'bg-emerald-50 text-emerald-600 border-emerald-100'; // "Em dia" -> Light Green
-  };
-
-  const handleOpenTaskModal = (task?: Task) => {
-    if (task) {
-      setSelectedTask(task);
-      setActiveModal('task-detail');
-    } else {
-      setSelectedTask(null); // Critical fix: Clear selectedTask so checklist adds to newTask
-      setNewTask({ title: '', description: '', startDate: '', dueDate: '', status: 'pending', checklist: [] });
-      setActiveModal('task-create');
-    }
-  };
-
-  const handleAddChecklistItem = () => {
-    if (!newChecklistItem.trim()) return;
-    if (selectedTask) {
-      setSelectedTask({ ...selectedTask, checklist: [...selectedTask.checklist, { text: newChecklistItem, completed: false }] });
-    } else {
-      setNewTask({ ...newTask, checklist: [...newTask.checklist, { text: newChecklistItem, completed: false }] });
-    }
-    setNewChecklistItem('');
-  };
-
-  const toggleChecklistItem = (index: number, isEditMode: boolean) => {
-    if (isEditMode && selectedTask) {
-      const newChecklist = [...selectedTask.checklist];
-      newChecklist[index].completed = !newChecklist[index].completed;
-      setSelectedTask({ ...selectedTask, checklist: newChecklist });
-    } else if (!isEditMode) {
-      const newChecklist = [...newTask.checklist];
-      newChecklist[index].completed = !newChecklist[index].completed;
-      setNewTask({ ...newTask, checklist: newChecklist });
-    }
-  };
-
-  const handleCompleteTask = async () => {
-    if (!selectedTask) return;
-    const newStatus = selectedTask.status === 'completed' ? 'pending' : 'completed';
-    // Optimistic update for UI in modal
-    setSelectedTask({ ...selectedTask, status: newStatus });
-    // Actual DB update will happen on Save, or we can do it immediately? 
-    // User requested "mark as completed" inside modal. It implies an action.
-    // Let's just update state and let "Salvar" persist everything to be safe/consistent.
-  };
-
-
-
-  const handleSaveNumber = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clientId) return;
-    setModalLoading(true);
-    try {
-      if (numberMode === 'create') {
-        const { error } = await supabase.from('whatsapp_numbers').insert({
-          client_id: clientId,
-          nickname: newNumber.nickname,
-          phone: newNumber.phone,
-          status: 'active',
-          daily_limit: 1000,
-          sent_today: 0
-        });
-        if (error) throw error;
-      } else if (numberMode === 'edit' && editingNumber) {
-        const { error } = await supabase.from('whatsapp_numbers').update({
-          nickname: newNumber.nickname,
-          phone: newNumber.phone
-        }).eq('id', editingNumber.id);
-        if (error) throw error;
-      }
-      setActiveModal('none');
-      setNewNumber({ nickname: '', phone: '' });
-      fetchData();
-    } catch (err) { console.error(err); alert('Erro ao salvar número'); }
-    finally { setModalLoading(false); }
-  };
-
-  const handleDeleteNumber = async (id: string) => {
-    if (!confirm('Twem certeza que deseja excluir este número?')) return;
-    try {
-      setLoading(true);
-      const { error } = await supabase.from('whatsapp_numbers').delete().eq('id', id);
-      if (error) throw error;
-      fetchData();
-    } catch (err) { console.error(err); alert('Erro ao excluir número'); }
-    finally { setLoading(false); }
   };
 
   const handleBulkDelete = async () => {
@@ -833,6 +553,46 @@ const ClientDetail: React.FC = () => {
     }
   };
 
+  const handleCreateCost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientId) return;
+    setModalLoading(true);
+    try {
+      const { error } = await supabase.from('operational_costs').insert({
+        client_id: clientId,
+        description: newCost.description,
+        category: newCost.category,
+        value: parseFloat(newCost.value.replace('R$', '').replace('.', '').replace(',', '.').trim()),
+        date: newCost.date
+      });
+
+      if (error) throw error;
+
+      setActiveModal('none');
+      setNewCost({ description: '', category: 'Infrastructure', value: '', date: new Date().toISOString().split('T')[0] });
+      setSuccessMessage('Custo adicionado com sucesso!');
+      setActiveModal('success');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao adicionar custo');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDeleteCost = async (id: string) => {
+    if (!confirm('Excluir este custo?')) return;
+    try {
+      const { error } = await supabase.from('operational_costs').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao excluir custo');
+    }
+  };
+
   const toggleSelectLead = (id: string) => {
     if (selectedLeads.includes(id)) {
       setSelectedLeads(prev => prev.filter(lid => lid !== id));
@@ -841,36 +601,17 @@ const ClientDetail: React.FC = () => {
     }
   };
 
-  const handleCreateEmailSender = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clientId) return;
-    setModalLoading(true);
-    try {
-      const { error } = await supabase.from('email_senders').insert({
-        client_id: clientId,
-        email: newEmail.email,
-        provider: newEmail.provider,
-        from_name: newEmail.fromName,
-        status: 'active',
-        daily_limit: 500
-      });
-      if (error) throw error;
-      setActiveModal('none');
-      setNewEmail({ email: '', provider: 'smtp', fromName: '' });
-      setSuccessMessage('E-mail vinculado com sucesso!');
-      setActiveModal('success');
-      fetchData();
-    } catch (err) { console.error(err); alert('Erro ao vincular e-mail'); }
-    finally { setModalLoading(false); }
-  };
-
   useEffect(() => {
-    if (clientId) fetchData();
-  }, [clientId]);
+    if (clientId) {
+      console.log('useEffect triggered. clientId:', clientId, 'user:', user?.id);
+      fetchData();
+    }
+  }, [clientId, user]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
+      console.log('fetchData started. User:', user?.id);
 
       // 1. Fetch Client Info
       const { data: clientData, error: clientError } = await supabase
@@ -898,28 +639,6 @@ const ClientDetail: React.FC = () => {
           whatsapp_token: clientData.whatsapp_token
         });
       }
-
-      // 1.5 Fetch Tasks
-      const { data: tasksData } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('due_date', { ascending: true });
-
-      if (tasksData) {
-        setTasks(tasksData.map((t: any) => ({
-          id: t.id,
-          clientId: t.client_id,
-          title: t.title,
-          description: t.description,
-          startDate: t.start_date,
-          dueDate: t.due_date,
-          status: t.status,
-          checklist: t.checklist || [],
-          createdAt: t.created_at
-        })));
-      }
-
 
       // 2. Fetch Leads (with batching to bypass 1000 limit)
       let allLeads: any[] = [];
@@ -978,60 +697,51 @@ const ClientDetail: React.FC = () => {
         })));
       }
 
-      // 4. Fetch Numbers
-      const { data: numbersData } = await supabase
-        .from('whatsapp_numbers')
+      // 6. Fetch Costs
+      const { data: costsData } = await supabase
+        .from('operational_costs')
         .select('*')
-        .eq('client_id', clientId);
+        .eq('client_id', clientId)
+        .order('date', { ascending: false });
 
-      if (numbersData) {
-        setNumbers(numbersData.map((n: any) => ({
-          id: n.id,
-          clientId: n.client_id,
-          nickname: n.nickname,
-          phone: n.phone,
-          status: n.status,
-          dailyLimit: n.daily_limit,
-          sentToday: n.sent_today
+      if (costsData) {
+        setCosts(costsData.map((c: any) => ({
+          id: c.id,
+          clientId: c.client_id,
+          description: c.description,
+          category: c.category,
+          value: c.value,
+          date: c.date,
+          createdAt: c.created_at
         })));
       }
 
-      // 4.5 Fetch Email Senders
-      const { data: emailsData } = await supabase
-        .from('email_senders')
-        .select('*')
-        .eq('client_id', clientId);
+      // 7. Fetch Financial Transactions (for dynamic revenue)
+      if (user?.id) {
+        const { data: trxData } = await supabase
+          .from('financial_transactions')
+          .select('*')
+          .eq('user_id', user.id);
 
-      if (emailsData) {
-        setEmailSenders(emailsData.map((e: any) => ({
-          id: e.id,
-          clientId: e.client_id,
-          email: e.email,
-          provider: e.provider,
-          fromName: e.from_name,
-          status: e.status,
-          dailyLimit: e.daily_limit,
-          sentToday: e.sent_today
-        })));
-      }
-
-      // 5. Fetch Webhooks
-      const { data: webhooksData } = await supabase
-        .from('webhook_configs')
-        .select('*')
-        .eq('client_id', clientId);
-
-      if (webhooksData) {
-        setWebhooks(webhooksData.map((w: any) => ({
-          id: w.id,
-          clientId: w.client_id,
-          name: w.name,
-          url: w.url,
-          type: w.type,
-          method: w.method,
-          active: w.active,
-          headers: w.headers || {}
-        })));
+        if (trxData) {
+          // We store all transactions for this user, filtering happens in render
+          // This is efficient enough for now as transaction count per user isn't huge
+          // Alternatively, we could filter by client_name here if strictly needed, 
+          // but client name might not always match perfectly if edited, so getting all allows soft matching if needed later.
+          // For this implementation, we will trust client_name matches.
+          setFinancialTransactions(trxData.map((t: any) => ({
+            id: t.id,
+            user_id: t.user_id,
+            transaction_date: t.transaction_date,
+            amount: t.amount,
+            description: t.description,
+            category: t.category,
+            status: t.status,
+            client_name: t.client_name,
+            payment_method: t.payment_method,
+            created_at: t.created_at
+          })));
+        }
       }
 
       // Update stats based on fetched data
@@ -1110,290 +820,21 @@ const ClientDetail: React.FC = () => {
       {/* Tabs Nav */}
       <div className="bg-white border-b border-slate-200 sticky top-16 lg:top-0 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
         <TabButton id="overview" label="Geral" icon={Activity} />
-        <TabButton id="numbers" label="Canais" icon={Smartphone} />
-        <TabButton id="webhooks" label="Webhooks" icon={WebhookIcon} />
         <TabButton id="leads" label="Leads" icon={Users} />
-        <TabButton id="campaigns" label="Campanhas" icon={History} />
         <TabButton id="goals" label="Metas" icon={Target} />
         <TabButton id="credentials" label="Acessos" icon={Key} />
+        <TabButton id="costs" label="Custos" icon={DollarSign} />
       </div>
 
       <div className="pt-4">
-        {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-2 duration-300">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-900 mb-6 flex items-center space-x-2">
-                  <Users size={18} className="text-slate-400" />
-                  <span>Resumo da Audiência</span>
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-center">
-                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Total Leads</div>
-                    <div className="text-2xl font-black text-slate-900">{stats.totalLeads}</div>
-                  </div>
-                  <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 text-center">
-                    <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-1">Opt-in</div>
-                    <div className="text-2xl font-black text-emerald-700">{stats.optInRate}</div>
-                  </div>
-                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-center">
-                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Tags Ativas</div>
-                    <div className="text-2xl font-black text-slate-900">{stats.activeTags}</div>
-                  </div>
-                  <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100 text-center">
-                    <div className="text-[10px] text-rose-600 font-bold uppercase tracking-wider mb-1">Bounces</div>
-                    <div className="text-2xl font-black text-rose-700">{stats.bounces}</div>
-                  </div>
-                </div>
-              </div>
 
-              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-slate-900 flex items-center space-x-2">
-                    <ListTodo size={18} className="text-slate-400" />
-                    <span>Gestão de Tarefas</span>
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    {selectedTasks.length > 0 && (
-                      <button onClick={handleBulkDeleteTasks} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir selecionadas">
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                    <button onClick={() => handleOpenTaskModal()} className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors">
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </div>
 
-                <div className="flex space-x-4 border-b border-slate-100 mb-4">
-                  <button onClick={() => setTaskFilter('pending')} className={`pb-2 text-sm font-bold ${taskFilter === 'pending' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400'}`}>Pendentes</button>
-                  <button onClick={() => setTaskFilter('completed')} className={`pb-2 text-sm font-bold ${taskFilter === 'completed' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400'}`}>Concluídas</button>
-                </div>
-
-                <div className="space-y-3">
-                  {tasks.filter(t => t.status === taskFilter).length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 text-sm">Nenhuma tarefa {taskFilter === 'pending' ? 'pendente' : 'concluída'}</div>
-                  ) : (
-                    tasks.filter(t => t.status === taskFilter).map(task => {
-                      const isOverdue = task.status !== 'completed' && task.dueDate && new Date(task.dueDate) < new Date();
-
-                      return (
-                        <div
-                          key={task.id}
-                          onClick={() => handleOpenTaskModal(task)}
-                          className={`group flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer shadow-sm hover:shadow-md ${isOverdue
-                            ? 'bg-rose-50 border-rose-200 hover:border-rose-300'
-                            : 'bg-white border-slate-100 hover:border-slate-300'
-                            }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div onClick={(e) => { e.stopPropagation(); toggleTaskSelection(task.id); }} className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer transition-colors ${selectedTasks.includes(task.id) ? 'bg-slate-900 border-slate-900 text-white' : isOverdue ? 'border-rose-300 hover:border-rose-400' : 'border-slate-300 hover:border-slate-400'}`}>
-                              {selectedTasks.includes(task.id) && <Check size={12} />}
-                            </div>
-                            <div>
-                              <div className={`font-bold ${task.status === 'completed' ? 'line-through text-slate-400' : isOverdue ? 'text-rose-900' : 'text-slate-900'}`}>{task.title}</div>
-                              <div className={`flex items-center space-x-2 text-xs mt-1 ${isOverdue ? 'text-rose-600/80' : 'text-slate-500'}`}>
-                                {task.dueDate && (
-                                  <span className="flex items-center"><Clock size={10} className="mr-1" /> {new Date(task.dueDate).toLocaleDateString('pt-BR')}</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getTaskStatusColor(task)}`}>
-                            {task.status === 'completed' ? 'Concluída' : isOverdue ? 'Atrasada' : 'Em dia'}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-
-              <ClientOverviewGoals clientId={clientId!} />
-
-              {/* Removed Actions for Growth Section */}
-            </div>
-
-            <div className="space-y-6">
-              {/* Removed Endpoint Token Section */}
-
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                  <Activity size={16} className="text-slate-400" />
-                  Status da Instância
-                </h4>
-                <div className="space-y-4">
-                  {numbers.filter(n => n.status === 'active' || n.status === 'connected').length > 0 ? (
-                    numbers.filter(n => n.status === 'active' || n.status === 'connected').map(num => (
-                      <div key={num.id} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                          <span className="text-xs font-medium text-slate-600 truncate max-w-[150px]">{num.nickname}</span>
-                        </div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-                          Online
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-4 text-center">
-                      <WifiOff size={24} className="text-slate-300 mb-2" />
-                      <p className="text-xs text-slate-400">Nenhum canal ativo</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'numbers' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-900">Canais de Disparo Ativos</h3>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setActiveModal('email')}
-                  className="flex items-center space-x-2 px-4 py-2 bg-white border border-slate-200 text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors"
-                >
-                  <Plus size={14} />
-                  <span>Vincular Novo E-mail</span>
-                </button>
-                <button
-                  onClick={() => handleOpenNumberModal('create')}
-                  className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
-                >
-                  <Plus size={14} />
-                  <span>Vincular Novo Número</span>
-                </button>
-              </div>
-            </div>
-
-            {/* WhatsApp Numbers Grid */}
-            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">WhatsApp</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              {numbers.map((num, i) => {
-                // Determine status based on num.status
-                const isOnline = num.status === 'active' || num.status === 'connected';
-                return (
-                  <div key={num.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative group overflow-hidden">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="flex items-center space-x-4">
-                        <div className={`p-4 rounded-2xl relative ${isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
-                          <Smartphone size={24} />
-                          {isOnline && <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white animate-pulse"></div>}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900">{num.nickname}</h4>
-                          <p className="text-xs font-mono text-slate-500">{num.phone}</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${isOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                          {isOnline ? <Wifi size={10} /> : <WifiOff size={10} />}
-                          {isOnline ? 'Online' : 'Offline'}
-                        </span>
-                        <span className="text-[8px] text-slate-400 font-bold uppercase">Sincronizado há 2m</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Uso do Limite Diário</span>
-                        <span className="text-xs font-bold text-slate-900">{num.sentToday} / {num.dailyLimit}</span>
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-500 ${num.sentToday > num.dailyLimit * 0.9 ? 'bg-amber-500' : 'bg-slate-900'}`}
-                          style={{ width: `${(num.sentToday / num.dailyLimit) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-6 flex justify-between items-center">
-                      <div className="flex -space-x-1">
-                        <div className="w-5 h-5 rounded-full bg-slate-100 border border-white flex items-center justify-center text-[8px] font-bold">SP</div>
-                        <div className="w-5 h-5 rounded-full bg-slate-100 border border-white flex items-center justify-center text-[8px] font-bold text-slate-400">+</div>
-                      </div>
-                      <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleOpenNumberModal('edit', num)}
-                          className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteNumber(num.id)}
-                          className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'webhooks' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="font-bold text-slate-900">Integrações de Entrada/Saída</h3>
-                <button
-                  onClick={() => handleOpenWebhookModal('create')}
-                  className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
-                >
-                  <Plus size={14} />
-                  <span>Configurar Webhook</span>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {webhooks.map(wh => (
-                  <div key={wh.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center space-x-4">
-                      <div className={`p-3 rounded-xl ${wh.active ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
-                        <WebhookIcon size={20} />
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-slate-900">{wh.name}</span>
-                          <span className="text-[8px] bg-slate-200 px-1 py-0.5 rounded font-bold uppercase text-slate-500">{wh.type}</span>
-                        </div>
-                        <code className="text-[10px] text-slate-400 font-mono mt-1 block truncate max-w-xs">{wh.url}</code>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleOpenWebhookModal('edit', wh)}
-                        className="p-2 text-slate-400 hover:text-slate-900"
-                        title="Editar"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDuplicateWebhook(wh)}
-                        className="p-2 text-slate-400 hover:text-slate-900"
-                        title="Duplicar"
-                      >
-                        <Copy size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteWebhook(wh.id)}
-                        className="p-2 text-slate-400 hover:text-rose-500"
-                        title="Excluir"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        {activeTab === 'overview' && client && (
+          <ClientOverview client={client} onUpdate={() => {
+            supabase.from('clients').select('*').eq('id', clientId!).single().then(({ data }) => {
+              if (data) setClient(data);
+            });
+          }} />
         )}
 
         {activeTab === 'leads' && (
@@ -1561,22 +1002,7 @@ const ClientDetail: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'campaigns' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-white p-12 rounded-3xl border border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="p-6 bg-slate-50 rounded-full text-slate-300">
-                <History size={48} />
-              </div>
-              <div>
-                <h4 className="text-xl font-bold text-slate-900">Histórico de Disparos</h4>
-                <p className="text-sm text-slate-500 max-w-sm mx-auto">Visualize relatórios detalhados de entrega, abertura e erros de campanhas passadas deste cliente.</p>
-              </div>
-              <Link to="/new-campaign" className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold shadow-xl shadow-slate-900/10">
-                Iniciar Primeiro Disparo
-              </Link>
-            </div>
-          </div>
-        )}
+
 
         {activeTab === 'goals' && (
           <ClientGoals clientId={clientId!} />
@@ -1585,9 +1011,290 @@ const ClientDetail: React.FC = () => {
         {activeTab === 'credentials' && (
           <ClientCredentials clientId={clientId!} />
         )}
+
+        {activeTab === 'costs' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Financial Calculations */}
+            {(() => {
+              const currentMonthRevenue = financialTransactions
+                .filter(t => {
+                  // Métodos de Normalização
+                  const normalize = (s: string) => (s || '').trim().toLowerCase();
+                  const getDigits = (s: string) => (s || '').replace(/\D/g, '');
+
+                  const tClientName = normalize(t.client_name);
+                  const tDigits = getDigits(t.client_name || ''); // Use only client_name for now, description can be ambiguous
+
+                  const clientName = normalize(client?.name);
+                  const corporateName = normalize(client?.corporateName);
+                  const clientDocument = getDigits(client?.cnpj); // Pode ser CPF ou CNPJ
+
+                  // 1. Busca por Documento (Prioritária)
+                  // Verifica se os dígitos do documento do cliente estão presentes nos dígitos da transação
+                  // Exigimos pelo menos 11 dígitos (CPF) para evitar falsos positivos
+                  // Se tDigits for maior que 3 mas for igual a clientDocument, match
+                  const hasDocumentMatch = clientDocument.length >= 11 && tDigits.includes(clientDocument);
+
+                  // 2. Busca por Nome (Secundária)
+                  const hasNameMatch =
+                    tClientName === clientName ||
+                    (corporateName && tClientName === corporateName) ||
+                    (clientName.length > 3 && tClientName.includes(clientName)) ||
+                    (corporateName.length > 3 && tClientName.includes(corporateName));
+
+                  const isClientMatch = hasDocumentMatch || hasNameMatch;
+
+                  const trxDate = new Date(new Date(t.transaction_date).getTime() + new Date(t.transaction_date).getTimezoneOffset() * 60000);
+                  const isMonthMatch = trxDate.getMonth() === costFilterMonth;
+                  const isYearMatch = trxDate.getFullYear() === costFilterYear;
+                  const isStatusMatch = (t.status || '').toLowerCase() === 'pago';
+
+                  if (isClientMatch) {
+                    console.log('Match Detail (Document-First):', {
+                      tClient: t.client_name,
+                      docMatch: hasDocumentMatch,
+                      nameMatch: hasNameMatch,
+                      match: isMonthMatch && isYearMatch && isStatusMatch
+                    });
+                  }
+
+                  return isClientMatch && isMonthMatch && isYearMatch && isStatusMatch;
+                })
+                .reduce((acc, curr) => acc + curr.amount, 0);
+
+              console.log('Calculated Revenue:', currentMonthRevenue);
+
+              const currentMonthCosts = costs
+                .filter(c => {
+                  const d = new Date(c.date);
+                  return d.getMonth() === costFilterMonth && d.getFullYear() === costFilterYear;
+                })
+                .reduce((acc, curr) => acc + curr.value, 0);
+
+              const realProfit = currentMonthRevenue - currentMonthCosts;
+              const margin = currentMonthRevenue > 0 ? (realProfit / currentMonthRevenue) * 100 : 0;
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Receita Mensal</h3>
+                      <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                        <TrendingUp size={18} />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentMonthRevenue)}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">Calculado (Transações Pagas)</p>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Custos ({new Date(costFilterYear, costFilterMonth).toLocaleString('default', { month: 'short' })})</h3>
+                      <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
+                        <TrendingDown size={18} />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-black text-rose-600">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentMonthCosts)}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">Despesas Operacionais</p>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Lucro Real</h3>
+                      <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                        <DollarSign size={18} />
+                      </div>
+                    </div>
+                    <div className={`text-2xl font-black ${realProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(realProfit)}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">Receita - Custos</p>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Margem</h3>
+                      <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                        <PieChart size={18} />
+                      </div>
+                    </div>
+                    <div className={`text-2xl font-black ${margin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {margin.toFixed(1)}%
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">% de Lucro</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Costs List */}
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                <div className="flex items-center space-x-4">
+                  <h3 className="font-bold text-slate-900">Detalhamento de Custos</h3>
+                  <div className="flex bg-slate-100 rounded-lg p-1">
+                    <select
+                      value={costFilterMonth}
+                      onChange={(e) => setCostFilterMonth(parseInt(e.target.value))}
+                      className="bg-transparent text-sm font-bold text-slate-600 outline-none px-2 py-1"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <option key={i} value={i}>{new Date(0, i).toLocaleString('default', { month: 'long' })}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={costFilterYear}
+                      onChange={(e) => setCostFilterYear(parseInt(e.target.value))}
+                      className="bg-transparent text-sm font-bold text-slate-600 outline-none px-2 py-1"
+                    >
+                      <option value={2024}>2024</option>
+                      <option value={2025}>2025</option>
+                      <option value={2026}>2026</option>
+                    </select>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveModal('cost')}
+                  className="flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-900/10 hover:bg-slate-800 transition-all"
+                >
+                  <Plus size={14} />
+                  <span>Novo Custo</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4">Descrição</th>
+                      <th className="px-6 py-4">Categoria</th>
+                      <th className="px-6 py-4">Data</th>
+                      <th className="px-6 py-4">Valor</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {costs
+                      .filter(c => {
+                        const d = new Date(c.date);
+                        return d.getMonth() === costFilterMonth && d.getFullYear() === costFilterYear;
+                      })
+                      .length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">
+                          Nenhum custo registrado neste período.
+                        </td>
+                      </tr>
+                    ) : (
+                      costs
+                        .filter(c => {
+                          const d = new Date(c.date);
+                          return d.getMonth() === costFilterMonth && d.getFullYear() === costFilterYear;
+                        })
+                        .map(cost => (
+                          <tr key={cost.id} className="hover:bg-slate-50/50 transition-colors group">
+                            <td className="px-6 py-4 font-medium text-slate-900">{cost.description}</td>
+                            <td className="px-6 py-4">
+                              <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">{cost.category}</span>
+                            </td>
+                            <td className="px-6 py-4 text-slate-500 text-sm">{new Date(cost.date).toLocaleDateString('pt-BR')}</td>
+                            <td className="px-6 py-4 font-bold text-slate-900">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cost.value)}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <button
+                                onClick={() => handleDeleteCost(cost.id)}
+                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
+
+      <Modal isOpen={activeModal === 'cost'} onClose={() => setActiveModal('none')} title="Adicionar Custo Operacional">
+        <form onSubmit={handleCreateCost} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Descrição</label>
+            <input
+              type="text"
+              placeholder="Ex: Servidor AWS, Licença de Software..."
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all"
+              value={newCost.description}
+              onChange={e => setNewCost({ ...newCost, description: e.target.value })}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Categoria</label>
+              <select
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all"
+                value={newCost.category}
+                onChange={e => setNewCost({ ...newCost, category: e.target.value })}
+              >
+                <option value="Infrastructure">Infraestrutura</option>
+                <option value="License">Licenças</option>
+                <option value="Labor">Mão de Obra</option>
+                <option value="Marketing">Marketing / Mídia</option>
+                <option value="Other">Outros</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Data</label>
+              <input
+                type="date"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all"
+                value={newCost.date}
+                onChange={e => setNewCost({ ...newCost, date: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Valor (R$)</label>
+            <input
+              type="text"
+              placeholder="0,00"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/5 transition-all font-mono"
+              value={newCost.value}
+              onChange={e => setNewCost({ ...newCost, value: e.target.value })}
+              required
+            />
+          </div>
+          <div className="pt-4 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setActiveModal('none')}
+              className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={modalLoading}
+              className="px-6 py-2 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20 disabled:opacity-50 flex items-center gap-2"
+            >
+              {modalLoading && <Loader2 size={16} className="animate-spin" />}
+              Adicionar Custo
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal isOpen={activeModal === 'lead-type-selection' as any} onClose={() => setActiveModal('none')} title="Tipo de Contato">
         <div className="grid grid-cols-2 gap-4 pb-4">
@@ -1624,41 +1331,9 @@ const ClientDetail: React.FC = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'webhook'} onClose={() => setActiveModal('none')} title={webhookMode === 'create' ? "Configurar Webhook" : "Editar Webhook"}>
-        <form onSubmit={handleCreateWebhook} className="space-y-4">
-          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Nome do Webhook" value={newWebhook.name} onChange={e => setNewWebhook({ ...newWebhook, name: e.target.value })} required />
-          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="URL de Destino" value={newWebhook.url} onChange={e => setNewWebhook({ ...newWebhook, url: e.target.value })} required />
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Método de Envio</label>
-              <select
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none appearance-none font-mono text-sm"
-                value={newWebhook.method}
-                onChange={e => setNewWebhook({ ...newWebhook, method: e.target.value as any })}
-              >
-                <option value="POST">POST</option>
-                <option value="GET">GET</option>
-                <option value="PUT">PUT</option>
-                <option value="DELETE">DELETE</option>
-                <option value="PATCH">PATCH</option>
-                <option value="HEAD">HEAD</option>
-              </select>
-            </div>
-            {/* Hidden Input for Type - Defaulting to Outbound */}
-            <input type="hidden" value="outbound" />
-          </div>
-          <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Salvar'}</button></div>
-        </form>
-      </Modal>
 
-      <Modal isOpen={activeModal === 'number'} onClose={() => setActiveModal('none')} title={numberMode === 'create' ? "Vincular WhatsApp" : "Editar Número"}>
-        <form onSubmit={handleSaveNumber} className="space-y-4">
-          <div className="p-4 bg-amber-50 text-amber-800 text-xs rounded-xl mb-4">Para conectar, você precisará escanear o QR Code após o cadastro.</div>
-          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Apelido do Número" value={newNumber.nickname} onChange={e => setNewNumber({ ...newNumber, nickname: e.target.value })} required />
-          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Número (Ex: 5511999999999)" value={newNumber.phone} onChange={e => setNewNumber({ ...newNumber, phone: e.target.value })} required />
-          <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Vincular'}</button></div>
-        </form>
-      </Modal>
+
+
 
       <Modal isOpen={activeModal === 'client-config'} onClose={() => setActiveModal('none')} title="Configurações do Cliente">
         <form onSubmit={handleUpdateClient} className="space-y-4">
@@ -1726,217 +1401,12 @@ const ClientDetail: React.FC = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={activeModal === 'email'} onClose={() => setActiveModal('none')} title="Vincular Conta de E-mail">
-        <form onSubmit={handleCreateEmailSender} className="space-y-4">
-          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Nome do Remetente" value={newEmail.fromName} onChange={e => setNewEmail({ ...newEmail, fromName: e.target.value })} required />
-          <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Endereço de E-mail" type="email" value={newEmail.email} onChange={e => setNewEmail({ ...newEmail, email: e.target.value })} required />
-          <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" value={newEmail.provider} onChange={e => setNewEmail({ ...newEmail, provider: e.target.value })}>
-            <option value="smtp">SMTP Personalizado</option>
-            <option value="sendgrid">SendGrid API</option>
-            <option value="aws">AWS SES</option>
-            <option value="resend">Resend</option>
-          </select>
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <p className="text-xs text-slate-500 mb-2 font-bold">Configurações de Autenticação</p>
-            <input className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none text-sm mb-2" placeholder="API Key / Senha SMTP" type="password" />
-            <input className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg outline-none text-sm" placeholder="Host (para SMTP)" disabled={newEmail.provider !== 'smtp'} />
-          </div>
-          <div className="flex justify-end pt-4"><button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">{modalLoading ? <Loader2 className="animate-spin" /> : 'Vincular'}</button></div>
-        </form>
-      </Modal>
-
-      <Modal isOpen={activeModal === 'task-create'} onClose={() => setActiveModal('none')} title="Nova Tarefa">
-        <form onSubmit={handleCreateTask} className="space-y-4">
-          <input
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-            placeholder="Título da Tarefa"
-            value={newTask.title}
-            onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-            required
-          />
-          <textarea
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none h-24"
-            placeholder="Descrição detalhada..."
-            value={newTask.description}
-            onChange={e => setNewTask({ ...newTask, description: e.target.value })}
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Data de Início</label>
-              <input
-                type="datetime-local"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
-                value={newTask.startDate}
-                onChange={e => setNewTask({ ...newTask, startDate: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Data de Vencimento</label>
-              <input
-                type="datetime-local"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
-                value={newTask.dueDate}
-                onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Status</label>
-            <select
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm appearance-none"
-              value={newTask.status}
-              onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
-            >
-              <option value="pending">Pendente</option>
-              <option value="completed">Concluída</option>
-            </select>
-          </div>
-
-          <div className="space-y-2 pt-2">
-            <label className="text-xs font-bold text-slate-500 uppercase ml-1 block">Checklist</label>
-            <div className="flex gap-2">
-              <input
-                className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
-                placeholder="Adicionar item..."
-                value={newChecklistItem}
-                onChange={e => setNewChecklistItem(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddChecklistItem())}
-              />
-              <button
-                type="button"
-                onClick={handleAddChecklistItem}
-                className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-600 transition-colors"
-              >
-                <Plus size={20} />
-              </button>
-            </div>
-            <div className="space-y-2 mt-2 max-h-40 overflow-y-auto">
-              {newTask.checklist.map((item, idx) => (
-                <div key={idx} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${item.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
-                  <button
-                    type="button"
-                    onClick={() => toggleChecklistItem(idx, false)}
-                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300 hover:border-emerald-400'}`}
-                  >
-                    {item.completed && <Check size={12} strokeWidth={3} />}
-                  </button>
-                  <span className={`text-sm flex-1 font-medium ${item.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{item.text}</span>
-                  <button type="button" onClick={() => setNewTask({ ...newTask, checklist: newTask.checklist.filter((_, i) => i !== idx) })} className="text-slate-400 hover:text-rose-500 p-1">
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">
-              {modalLoading ? <Loader2 className="animate-spin" /> : 'Criar Tarefa'}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
 
-      <Modal isOpen={activeModal === 'task-detail'} onClose={() => setActiveModal('none')} title="Detalhes da Tarefa">
-        {selectedTask && (
-          <form onSubmit={handleUpdateTask} className="space-y-4">
-            <input
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-lg"
-              value={selectedTask.title}
-              onChange={e => setSelectedTask({ ...selectedTask, title: e.target.value })}
-            />
-            <textarea
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none h-24"
-              value={selectedTask.description || ''}
-              onChange={e => setSelectedTask({ ...selectedTask, description: e.target.value })}
-              placeholder="Sem descrição"
-            />
 
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Status</label>
-              <select
-                className={`w-full px-4 py-3 border rounded-xl outline-none text-sm appearance-none font-bold ${selectedTask.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
-                value={selectedTask.status}
-                onChange={e => setSelectedTask({ ...selectedTask, status: e.target.value as 'pending' | 'completed' })}
-              >
-                <option value="pending">Pendente</option>
-                <option value="completed">Concluída</option>
-              </select>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Início</label>
-                <input
-                  type="datetime-local"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
-                  value={formatDateForInput(selectedTask.startDate)}
-                  onChange={e => setSelectedTask({ ...selectedTask, startDate: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Vencimento</label>
-                <input
-                  type="datetime-local"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
-                  value={formatDateForInput(selectedTask.dueDate)}
-                  onChange={e => setSelectedTask({ ...selectedTask, dueDate: e.target.value })}
-                />
-              </div>
-            </div>
 
-            <div className="space-y-2 pt-2">
-              <label className="text-xs font-bold text-slate-500 uppercase ml-1 block">Checklist</label>
-              <div className="flex gap-2">
-                <input
-                  className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
-                  placeholder="Novo item..."
-                  value={newChecklistItem}
-                  onChange={e => setNewChecklistItem(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddChecklistItem())}
-                />
-                <button type="button" onClick={handleAddChecklistItem} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-600">
-                  <Plus size={20} />
-                </button>
-              </div>
-              <div className="space-y-2 mt-2 max-h-40 overflow-y-auto">
-                {(selectedTask.checklist || []).map((item: any, idx: number) => (
-                  <div key={idx} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${item.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
-                    <button
-                      type="button"
-                      onClick={() => toggleChecklistItem(idx, true)}
-                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-slate-300 hover:border-emerald-400'}`}
-                    >
-                      {item.completed && <Check size={12} strokeWidth={3} />}
-                    </button>
-                    <span className={`text-sm flex-1 font-medium ${item.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{item.text}</span>
-                    <button type="button" onClick={() => setSelectedTask({ ...selectedTask, checklist: selectedTask.checklist.filter((_, i) => i !== idx) })} className="text-slate-400 hover:text-rose-500 p-1">
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={handleCompleteTask}
-                className={`px-4 py-2 rounded-xl font-bold flex items-center space-x-2 transition-colors ${selectedTask.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
-              >
-                <CheckCircle2 size={18} />
-                <span>{selectedTask.status === 'completed' ? 'Tarefa Concluída' : 'Marcar como Concluída'}</span>
-              </button>
-              <button type="submit" disabled={modalLoading} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold">
-                {modalLoading ? <Loader2 className="animate-spin" /> : 'Salvar Alterações'}
-              </button>
-
-            </div>
-          </form>
-        )}
-      </Modal>
 
       {/* Backup Modal */}
       <Modal isOpen={activeModal === 'backup'} onClose={() => setActiveModal('none')} title="Backup e Sincronização">

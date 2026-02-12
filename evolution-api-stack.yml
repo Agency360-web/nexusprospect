@@ -215,8 +215,8 @@ services:
       - ConectaRed ## Nome da rede interna
 
     ## Descomente as linhas abaixo para uso externo
-    #ports:
-    #  - 6379:6379
+    ports:
+      - 6379:6379
 
     deploy:
       placement:
