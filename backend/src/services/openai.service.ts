@@ -1,9 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
+import OpenAI from 'openai';
 
-dotenv.config();
-
-export class GeminiService {
+export class OpenAIService {
     static async generateMessage(
         apiKey: string,
         modelName: string,
@@ -12,13 +9,7 @@ export class GeminiService {
         scrapedContent: string
     ): Promise<string | null> {
         try {
-            if (!apiKey) {
-                console.error('[GeminiService] API Key is missing.');
-                return null;
-            }
-
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: modelName || 'gemini-1.5-flash' });
+            const openai = new OpenAI({ apiKey });
 
             const finalPrompt = `
 ${promptBase}
@@ -32,7 +23,7 @@ DADOS DO LEAD:
 - Site: ${leadData.site || 'N/A'}
 
 CONTEÚDO EXTRAÍDO DO SITE DO LEAD:
-${scrapedContent.substring(0, 20000)} 
+${scrapedContent.substring(0, 15000)} 
 (Conteúdo truncado se for muito longo)
 
 ---
@@ -40,14 +31,15 @@ ${scrapedContent.substring(0, 20000)}
 Com base nessas informações, crie uma sequência de mensagens de WhatsApp altamente personalizadas para prospecção deste lead. Siga rigorosamente o formato e as instruções do prompt acima. A resposta deve conter APENAS o texto da mensagem a ser enviada, sem explicações adicionais.
       `;
 
-            console.log(`[GeminiService] Generating message using ${modelName}...`);
-            const result = await model.generateContent(finalPrompt);
-            const response = await result.response;
-            const text = response.text();
+            console.log(`[OpenAIService] Generating message using ${modelName}...`);
+            const completion = await openai.chat.completions.create({
+                messages: [{ role: 'user', content: finalPrompt }],
+                model: modelName || 'gpt-3.5-turbo',
+            });
 
-            return text.trim();
+            return completion.choices[0].message.content?.trim() || null;
         } catch (error: any) {
-            console.error('[GeminiService] Error generating content:', error.message);
+            console.error('[OpenAIService] Error generating content:', error.message);
             return null;
         }
     }

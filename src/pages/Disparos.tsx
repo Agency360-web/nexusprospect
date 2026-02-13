@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Play, Pause, AlertCircle, CheckCircle, Clock, Search, RefreshCw, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 import { DispatchCampaign } from '../types/dispatch';
 
 const Disparos: React.FC = () => {
@@ -13,15 +14,41 @@ const Disparos: React.FC = () => {
     const fetchCampaigns = async (silent = false) => {
         try {
             if (!silent) setLoading(true);
-            const response = await fetch('http://localhost:3001/api/campaigns');
-            if (response.ok) {
-                const data = await response.json();
-                setCampaigns(data);
+
+            const { data, error } = await supabase
+                .from('campanhas_disparo')
+                .select('*')
+                .order('criado_em', { ascending: false });
+
+            if (error) throw error;
+
+            if (data) {
+                const mappedCampaigns: DispatchCampaign[] = data.map(c => ({
+                    id: c.id,
+                    userId: c.usuario_id,
+                    name: c.nome_campanha,
+                    status: c.status,
+                    totalLeads: c.total_leads || 0,
+                    sentCustom: c.enviados_personalizados || 0,
+                    sentDefault: c.enviados_padrao || 0,
+                    skipped: c.pulados || 0,
+                    errors: c.erros || 0,
+                    delayMinSeconds: c.delay_min_segundos,
+                    delayMaxSeconds: c.delay_max_segundos,
+                    defaultMessage: c.mensagem_padrao,
+                    whatsappInstance: c.instancia_whatsapp,
+                    createdAt: c.criado_em,
+                    updatedAt: c.atualizado_em
+                }));
+
+                setCampaigns(mappedCampaigns);
 
                 // Check if any is running to set active monitor
-                const running = data.find((c: DispatchCampaign) => c.status === 'em_andamento');
+                const running = mappedCampaigns.find(c => c.status === 'em_andamento');
                 if (running) {
                     setActiveCampaignId(running.id);
+                } else {
+                    setActiveCampaignId(null);
                 }
             }
         } catch (error) {
@@ -33,14 +60,53 @@ const Disparos: React.FC = () => {
 
     useEffect(() => {
         fetchCampaigns();
-        const interval = setInterval(() => fetchCampaigns(true), 10000); // Poll every 10s silently
+        const interval = setInterval(() => {
+            fetchCampaigns(true);
+            // Optional: periodically trigger dispatcher if active campaign exists
+            // For now, let's rely on manual or external triggers, but we can add it here to simulate "worker"
+            // if (activeCampaignId) callDispatcher(); 
+        }, 10000);
         return () => clearInterval(interval);
     }, []);
 
+
+
+    const callDispatcher = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+            await fetch(`${supabaseUrl}/functions/v1/campaign-dispatcher`, {
+                method: 'POST', // Ensure POST is used as per Edge Function logic
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': anonKey,
+                    'Content-Type': 'application/json',
+                }
+            });
+        } catch (e) {
+            console.error('Dispatcher trigger failed:', e);
+        }
+    };
+
     const handleStatusAction = async (id: string, action: 'start' | 'pause') => {
         try {
-            await fetch(`http://localhost:3001/api/campaigns/${id}/${action}`, { method: 'POST' });
-            await fetch(`http://localhost:3001/api/campaigns/${id}/${action}`, { method: 'POST' });
+            const newStatus = action === 'start' ? 'em_andamento' : 'pausado';
+
+            const { error } = await supabase
+                .from('campanhas_disparo')
+                .update({ status: newStatus })
+                .eq('id', id);
+
+            if (error) throw error;
+
+            if (action === 'start') {
+                callDispatcher();
+            }
+
             fetchCampaigns(true); // Refresh silently after action
         } catch (error) {
             console.error(`Failed to ${action} campaign`, error);

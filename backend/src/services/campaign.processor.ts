@@ -2,6 +2,7 @@ import { prisma } from './db';
 import { EvolutionService } from './evolution.service';
 import { JinaService } from './jina.service';
 import { GeminiService } from './gemini.service';
+import { OpenAIService } from './openai.service';
 
 /**
  * CampaignProcessor - Internal Loop (No Redis)
@@ -112,26 +113,65 @@ export class CampaignProcessor {
                     const aiSettings = await prisma.aiAgentSettings.findFirst({
                         where: { userId: campaign.userId! }
                     });
-                    const promptBase = aiSettings?.prompt || '';
 
-                    // Scrape logic
-                    const scrapedContent = await JinaService.scrape(lead.site);
+                    if (aiSettings && aiSettings.prompt) {
+                        const promptBase = aiSettings.prompt;
+                        const provider = aiSettings.provider || 'openai';
+                        const modelName = aiSettings.model || 'gpt-3.5-turbo';
 
-                    if (scrapedContent) {
-                        const generated = await GeminiService.generateMessage(
-                            promptBase,
-                            { name: lead.name || '', company: lead.company || '', phone: lead.phone, site: lead.site },
-                            scrapedContent
-                        );
+                        // Fetch user API Key for the selected provider
+                        const apiKeyRecord = await prisma.userApiKey.findUnique({
+                            where: {
+                                userId_provider: {
+                                    userId: campaign.userId!,
+                                    provider: provider
+                                }
+                            }
+                        });
 
-                        if (generated) {
-                            messageToSend = generated;
-                            sentType = 'personalizado';
+                        const apiKey = apiKeyRecord?.apiKey;
+
+                        if (!apiKey) {
+                            console.warn(`[CampaignProcessor] Msg creation failed: No API Key found for ${provider}`);
+                            fallbackReason = `sem_api_key_${provider}`;
                         } else {
-                            fallbackReason = 'erro_gemini';
+                            // Scrape logic
+                            const scrapedContent = await JinaService.scrape(lead.site);
+
+                            if (scrapedContent) {
+                                let generated = null;
+
+                                if (provider === 'openai') {
+                                    generated = await OpenAIService.generateMessage(
+                                        apiKey,
+                                        modelName,
+                                        promptBase,
+                                        { name: lead.name || '', company: lead.company || '', phone: lead.phone, site: lead.site },
+                                        scrapedContent
+                                    );
+                                } else if (provider === 'gemini') {
+                                    generated = await GeminiService.generateMessage(
+                                        apiKey,
+                                        modelName,
+                                        promptBase,
+                                        { name: lead.name || '', company: lead.company || '', phone: lead.phone, site: lead.site },
+                                        scrapedContent
+                                    );
+                                }
+
+                                if (generated) {
+                                    messageToSend = generated;
+                                    sentType = 'personalizado';
+                                } else {
+                                    fallbackReason = `erro_geracao_${provider}`;
+                                }
+                            } else {
+                                fallbackReason = 'erro_jina';
+                            }
                         }
                     } else {
-                        fallbackReason = 'erro_jina';
+                        // AI settings not configured
+                        fallbackReason = 'ia_nao_configurada';
                     }
                 } else {
                     fallbackReason = 'sem_site';
@@ -242,3 +282,4 @@ export class CampaignProcessor {
         }
     }
 }
+

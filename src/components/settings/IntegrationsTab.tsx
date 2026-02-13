@@ -4,6 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { CheckCircle2, XCircle, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { getGoogleAuthUrl, isGoogleCalendarConfigured } from '../../services/googleCalendar';
 import WhatsAppConnectionTab from './WhatsAppConnectionTab';
+import OpenAIIntegration from './OpenAIIntegration';
+import GeminiIntegration from './GeminiIntegration';
 
 // Google Calendar SVG Icon (official multicolor)
 const GoogleCalendarIcon = () => (
@@ -153,10 +155,10 @@ const IntegrationsTab: React.FC = () => {
                             <button
                                 onClick={handleConnect}
                                 disabled={connecting}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-[#4285F4] text-white rounded-xl font-bold text-sm hover:bg-[#3367D6] transition-all shadow-lg shadow-blue-200"
+                                className="flex items-center justify-center gap-2 w-32 px-5 py-2.5 bg-white text-emerald-600 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all shadow-sm hover:shadow-md disabled:opacity-50"
                             >
                                 {connecting ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
-                                <span>Conectar com Google</span>
+                                <span>Conectar</span>
                             </button>
                         )}
                     </div>
@@ -175,6 +177,10 @@ const IntegrationsTab: React.FC = () => {
 
             {/* WhatsApp Connection Card */}
             <WhatsAppConnectionTab />
+
+            {/* AI Integrations */}
+            <OpenAIIntegration />
+            <GeminiIntegration />
         </div>
     );
 };

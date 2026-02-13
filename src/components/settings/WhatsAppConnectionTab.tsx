@@ -285,13 +285,14 @@ const WhatsAppConnectionTab: React.FC = () => {
                                 ...
                             </button>
                         ) : !connection?.exists ? (
+
                             <button
                                 onClick={handleCreate}
                                 disabled={actionLoading}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-[#25D366] text-white rounded-xl font-bold text-sm hover:bg-[#128C7E] transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center justify-center gap-2 w-32 px-5 py-2.5 bg-white text-emerald-600 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {actionLoading ? <Loader2 size={16} className="animate-spin" /> : <Smartphone size={16} />}
-                                <span>{actionLoading ? 'Criando...' : 'Conectar WhatsApp'}</span>
+                                {actionLoading && <Loader2 size={16} className="animate-spin" />}
+                                <span>{actionLoading ? 'Conectando...' : 'Conectar'}</span>
                             </button>
                         ) : (
                             <button

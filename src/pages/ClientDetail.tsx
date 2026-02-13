@@ -85,8 +85,7 @@ const ClientDetail: React.FC = () => {
   const [costFilterMonth, setCostFilterMonth] = useState(new Date().getMonth());
   const [costFilterYear, setCostFilterYear] = useState(new Date().getFullYear());
 
-  // Backup / Sync State
-  const [backupConfig, setBackupConfig] = useState({ url: '', auto_sync: false });
+
 
   // Pagination State for Leads
   const [leadPage, setLeadPage] = useState(1);
@@ -128,144 +127,18 @@ const ClientDetail: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const handleSaveBackupConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setModalLoading(true);
-    try {
-      if (!clientId) return;
 
-      const newConfig = {
-        url: backupConfig.url,
-        auto_sync: backupConfig.auto_sync,
-        last_sync: client?.google_sheets_config?.last_sync || null
-      };
 
-      const { error } = await supabase
-        .from('clients')
-        .update({ google_sheets_config: newConfig })
-        .eq('id', clientId);
 
-      if (error) throw error;
 
-      // Update local state
-      if (client) {
-        setClient({ ...client, google_sheets_config: newConfig });
-      }
 
-      setSuccessMessage('Configuração salva com sucesso!');
-      setActiveModal('success');
-      setTimeout(() => setActiveModal('none'), 2000);
-    } catch (error) {
-      console.error('Error saving config:', error);
-      alert('Erro ao salvar configuração.');
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  const handleSyncToSheets = async (leadsToSync?: Lead[]) => {
-    if (!client?.google_sheets_config?.url) {
-      if (!leadsToSync) alert('Configure a URL do Webhook primeiro.');
-      return;
-    }
-
-    setModalLoading(true);
-    try {
-      // 1. Prepare data - if called manually (no leadsToSync), filter for unsynced leads
-      let targetLeads = leadsToSync || leads.filter(l => !l.isSynced);
-
-      if (targetLeads.length === 0) {
-        if (!leadsToSync) alert('Nenhum contato novo para sincronizar.');
-        return;
-      }
-
-      const payload = {
-        client_id: client.id,
-        client_name: client.name,
-        leads: targetLeads.map(lead => {
-          const tagsStr = (lead.tags || []).map(t => {
-            const tag = tags.find(tag => tag.id === t);
-            return tag ? tag.name : t;
-          }).join(', ');
-
-          return {
-            name: lead.name,
-            phone: lead.phone,
-            company: lead.customFields?.['empresa'] || '',
-            tags: tagsStr,
-            Status: 'Aguardando'
-          };
-        })
-      };
-
-      // 2. Send to Webhook (Google Sheets)
-      await fetch(client.google_sheets_config.url, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-
-      // 3. Update is_synced in DB for targetLeads
-      const syncedIds = targetLeads.map(l => l.id);
-      if (syncedIds.length > 0) {
-        const { error: updateError } = await supabase
-          .from('leads')
-          .update({ is_synced: true })
-          .in('id', syncedIds);
-
-        if (updateError) console.error('Error updating sync status:', updateError);
-      }
-
-      // 4. Update last_sync in DB
-      const newConfig = {
-        ...client.google_sheets_config,
-        last_sync: new Date().toISOString()
-      };
-
-      await supabase
-        .from('clients')
-        .update({ google_sheets_config: newConfig })
-        .eq('id', clientId);
-
-      if (client) {
-        setClient({ ...client, google_sheets_config: newConfig });
-      }
-
-      // Optimistic update of local leads state
-      setLeads(prev => prev.map(l =>
-        syncedIds.includes(l.id) ? { ...l, isSynced: true } : l
-      ));
-
-      setSuccessMessage('Sincronização enviada com sucesso!');
-      setActiveModal('success');
-      setTimeout(() => setActiveModal('none'), 2000);
-
-    } catch (error) {
-      console.error('Sync error:', error);
-      if (!leadsToSync) alert('Erro ao sincronizar. Verifique o console.');
-    } finally {
-      if (!leadsToSync) setModalLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeModal === 'backup' && client?.google_sheets_config) {
-      setBackupConfig({
-        url: client.google_sheets_config.url || '',
-        auto_sync: client.google_sheets_config.auto_sync || false
-      });
-    }
-  }, [activeModal, client]);
 
 
   // Bulk Actions State
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
 
   // Form State
-  const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', company: '', tags: '' });
+  const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', company: '', site: '', tags: '' });
   const [leadType, setLeadType] = useState<'whatsapp' | 'email'>('whatsapp');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -334,8 +207,9 @@ const ClientDetail: React.FC = () => {
         client_id: clientId,
         name: newLead.name,
         status: 'valid',
+        company: newLead.company,
+        company_site: newLead.site,
         tags: tagIds, // Save UUIDs
-        custom_fields: { empresa: newLead.company }
       };
 
       if (leadType === 'whatsapp') {
@@ -349,13 +223,7 @@ const ClientDetail: React.FC = () => {
 
       if (error) throw error;
       setActiveModal('none');
-      setNewLead({ name: '', phone: '', email: '', company: '', tags: '' });
-
-      // Auto Sync Check
-      if (client?.google_sheets_config?.auto_sync && client.google_sheets_config.url && insertedLead) {
-        // We do this in background with ONLY the new lead
-        handleSyncToSheets([insertedLead as unknown as Lead]);
-      }
+      setNewLead({ name: '', phone: '', email: '', company: '', site: '', tags: '' });
 
       fetchData();
     } catch (err) { console.error(err); alert('Erro ao criar lead'); }
@@ -378,6 +246,9 @@ const ClientDetail: React.FC = () => {
         const isEmail = headers.some(h => h.toLowerCase().includes('e-mail') || h.toLowerCase().includes('email'));
         const nameIdx = headers.findIndex(h => h.toLowerCase().includes('nome'));
         const contactIdx = headers.findIndex(h => h.toLowerCase().includes(isEmail ? 'e-mail' : 'telefone') || h.toLowerCase().includes(isEmail ? 'email' : 'phone'));
+
+        const companyIdx = headers.findIndex(h => h.toLowerCase().includes('empresa') || h.toLowerCase().includes('company'));
+        const siteIdx = headers.findIndex(h => h.toLowerCase().includes('site') || h.toLowerCase().includes('website') || h.toLowerCase().includes('url'));
         const tagsIdx = headers.findIndex(h => h.toLowerCase().includes('etiquetas') || h.toLowerCase().includes('tags'));
 
         if (nameIdx === -1 || contactIdx === -1) {
@@ -404,6 +275,8 @@ const ClientDetail: React.FC = () => {
           const cols = row.split(';').length > 1 ? row.split(';') : row.split(',');
           const name = cols[nameIdx]?.trim();
           const contact = cols[contactIdx]?.trim();
+          const company = companyIdx !== -1 ? cols[companyIdx]?.trim() : '';
+          const site = siteIdx !== -1 ? cols[siteIdx]?.trim() : '';
           const tagsRaw = tagsIdx !== -1 ? cols[tagsIdx]?.trim() : '';
 
           if (!name || !contact) return null;
@@ -418,6 +291,8 @@ const ClientDetail: React.FC = () => {
             client_id: clientId,
             name,
             [isEmail ? 'email' : 'phone']: contact,
+            company,
+            company_site: site,
             tags: rowTagIds,
             status: 'valid'
           };
@@ -851,13 +726,7 @@ const ClientDetail: React.FC = () => {
                 />
               </div>
               <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setActiveModal('backup')}
-                  className="flex items-center space-x-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors shadow-sm"
-                >
-                  <FileSpreadsheet size={16} className="text-emerald-600" />
-                  <span>Backup / Dados</span>
-                </button>
+
                 <button
                   onClick={() => setActiveModal('lead-type-selection' as any)}
                   className="flex items-center space-x-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-md shadow-slate-900/10"
@@ -912,6 +781,8 @@ const ClientDetail: React.FC = () => {
                         />
                       </th>
                       <th className="px-2 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Lead / Identificação</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Empresa</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Site</th>
                       <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">WhatsApp</th>
                       <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Segmentação</th>
                       <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Status</th>
@@ -942,7 +813,23 @@ const ClientDetail: React.FC = () => {
                           </td>
                           <td className="px-2 py-5">
                             <div className="font-bold text-slate-900">{lead.name}</div>
-                            <div className="text-[10px] text-slate-400 uppercase tracking-tight">{lead.customFields?.empresa}</div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="text-sm text-slate-600 font-medium">{lead.company || '-'}</div>
+                          </td>
+                          <td className="px-8 py-5">
+                            {lead.company_site ? (
+                              <a
+                                href={lead.company_site.startsWith('http') ? lead.company_site : `https://${lead.company_site}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:underline truncate max-w-[150px] block"
+                              >
+                                {lead.company_site}
+                              </a>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
                           </td>
                           <td className="px-8 py-5 font-mono text-slate-500 font-medium">
                             {lead.phone || lead.email}
@@ -1019,7 +906,7 @@ const ClientDetail: React.FC = () => {
               const currentMonthRevenue = financialTransactions
                 .filter(t => {
                   // Métodos de Normalização
-                  const normalize = (s: string) => (s || '').trim().toLowerCase();
+                  const normalize = (s: string) => (s || '').trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                   const getDigits = (s: string) => (s || '').replace(/\D/g, '');
 
                   const tClientName = normalize(t.client_name);
@@ -1040,7 +927,9 @@ const ClientDetail: React.FC = () => {
                     tClientName === clientName ||
                     (corporateName && tClientName === corporateName) ||
                     (clientName.length > 3 && tClientName.includes(clientName)) ||
-                    (corporateName.length > 3 && tClientName.includes(corporateName));
+                    (corporateName && corporateName.length > 3 && tClientName.includes(corporateName)) ||
+                    (tClientName.length > 3 && clientName.includes(tClientName));
+
 
                   const isClientMatch = hasDocumentMatch || hasNameMatch;
 
@@ -1408,86 +1297,7 @@ const ClientDetail: React.FC = () => {
 
 
 
-      {/* Backup Modal */}
-      <Modal isOpen={activeModal === 'backup'} onClose={() => setActiveModal('none')} title="Backup e Sincronização">
-        <div className="space-y-6">
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <h4 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
-              <Download size={16} />
-              Exportação Manual
-            </h4>
-            <p className="text-xs text-slate-500 mb-4">Baixe todos os leads cadastrados neste cliente em formato CSV.</p>
-            <button
-              onClick={handleDownloadCSV}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-white border border-slate-300 text-slate-900 rounded-lg text-sm font-bold hover:bg-slate-100 transition-colors"
-            >
-              <Download size={16} />
-              <span>Baixar CSV</span>
-            </button>
-          </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-2 text-xs text-slate-400 font-bold uppercase">Integração Google Sheets</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveBackupConfig} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">URL do Webhook (Google Apps Script)</label>
-              <input
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-mono"
-                placeholder="https://script.google.com/macros/s/..."
-                value={backupConfig.url}
-                onChange={e => setBackupConfig({ ...backupConfig, url: e.target.value })}
-              />
-              <p className="text-[10px] text-slate-400 mt-1 ml-1">Crie um script no Google Sheets para receber requisições POST com os dados.</p>
-            </div>
-
-            <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <input
-                type="checkbox"
-                id="auto_sync"
-                checked={backupConfig.auto_sync}
-                onChange={e => setBackupConfig({ ...backupConfig, auto_sync: e.target.checked })}
-                className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
-              />
-              <label htmlFor="auto_sync" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
-                Sincronizar automaticamente novos leads
-              </label>
-            </div>
-
-            <div className="flex justify-between items-center pt-2">
-              <div className="text-xs text-slate-400">
-                {client?.google_sheets_config?.last_sync && (
-                  <span>Última sinc: {new Date(client.google_sheets_config.last_sync).toLocaleString('pt-BR')}</span>
-                )}
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  type="button"
-                  onClick={() => handleSyncToSheets()}
-                  disabled={modalLoading || !backupConfig.url}
-                  className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl font-bold hover:bg-emerald-100 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw size={14} className={modalLoading ? "animate-spin" : ""} />
-                  <span>Sincronizar Agora</span>
-                </button>
-                <button
-                  type="submit"
-                  disabled={modalLoading}
-                  className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50"
-                >
-                  {modalLoading ? <Loader2 className="animate-spin" size={18} /> : 'Salvar Config'}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </Modal>
 
       <Modal isOpen={activeModal === 'success'} onClose={() => setActiveModal('none')} title="">
         <div className="flex flex-col items-center justify-center text-center p-6 space-y-4">

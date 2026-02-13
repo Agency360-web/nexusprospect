@@ -86,6 +86,8 @@ export interface Lead {
   name: string;
   email?: string;
   phone: string;
+  company?: string;
+  company_site?: string;
   tags: string[];
   customFields: Record<string, string>;
   status: 'valid' | 'invalid' | 'pending';

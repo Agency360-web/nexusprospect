@@ -113,12 +113,26 @@ model AiAgentSettings {
   userId         String?  @map("user_id") @db.Uuid
   agentName      String   @default("") @map("agent_name")
   prompt         String   @default("")
+  provider       String   @default("openai")
+  model          String   @default("gpt-3.5-turbo")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz
 
   @@index([organizationId])
   @@index([userId])
   @@map("ai_agent_settings")
+}
+
+model UserApiKey {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  provider  String
+  apiKey    String   @map("api_key")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@unique([userId, provider])
+  @@map("user_api_keys")
 }
 
 model WhatsappConnection {

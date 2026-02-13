@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, Save, Upload, Zap, Building2, User, Phone, MessageSquare, Clock, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
 
 const NewCampaign: React.FC = () => {
     const navigate = useNavigate();
@@ -15,18 +16,93 @@ const NewCampaign: React.FC = () => {
     const [selectedInstance, setSelectedInstance] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Import State
+    const [clients, setClients] = useState<any[]>([]);
+    const [selectedClientForImport, setSelectedClientForImport] = useState('');
+    const [importLoading, setImportLoading] = useState(false);
+
     React.useEffect(() => {
-        // Fetch instances
-        fetch('http://localhost:3001/api/whatsapp/instances')
-            .then(res => res.json())
-            .then(data => {
-                setInstances(data);
-                if (data.length > 0) {
-                    setSelectedInstance(data[0].instance);
+        // Fetch instances from Supabase Edge Function
+        const fetchInstances = async () => {
+            if (!user) return;
+
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) return;
+
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+                // Call the edge function to get status
+                const response = await fetch(`${supabaseUrl}/functions/v1/whatsapp-connection?action=status`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': anonKey,
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    // If connection exists, wrap it in an array for the selector
+                    if (data && data.exists) {
+                        setInstances([{
+                            id: data.instance,
+                            instance: data.instance,
+                            status: 'Conectado'
+                        }]);
+                        setSelectedInstance(data.instance);
+                    } else {
+                        setInstances([]);
+                    }
                 }
-            })
-            .catch(err => console.error('Failed to fetch instances:', err));
-    }, []);
+            } catch (err) {
+                console.error('Failed to fetch instances:', err);
+            }
+        };
+
+        fetchInstances();
+    }, [user]);
+
+    // Fetch Clients for Import
+    React.useEffect(() => {
+        const fetchClients = async () => {
+            if (!user) return;
+            const { data } = await supabase.from('clients').select('id, name').eq('status', 'active').order('name');
+            if (data) setClients(data);
+        };
+        fetchClients();
+    }, [user]);
+
+    const handleImportLeads = async () => {
+        if (!selectedClientForImport) return;
+        setImportLoading(true);
+        try {
+            const { data: leadsData } = await supabase
+                .from('leads')
+                .select('name, phone, company, company_site') // Use new columns
+                .eq('client_id', selectedClientForImport)
+                .eq('status', 'valid'); // Import only valid leads
+
+            if (leadsData && leadsData.length > 0) {
+                const csvLines = leadsData.map(l =>
+                    `${l.name},${l.phone},${l.company || ''},${l.company_site || ''}`
+                ).join('\n');
+
+                setLeadsText(prev => prev ? prev + '\n' + csvLines : csvLines);
+                alert(`${leadsData.length} leads importados com sucesso!`);
+                setSelectedClientForImport('');
+            } else {
+                alert('Nenhum lead válido encontrado para este cliente.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao importar leads.');
+        } finally {
+            setImportLoading(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -56,29 +132,49 @@ const NewCampaign: React.FC = () => {
         }
 
         try {
-            const response = await fetch('http://localhost:3001/api/campaigns', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name,
-                    leads,
-                    defaultMessage,
-                    delayMin,
-                    delayMax,
-                    instanceName: selectedInstance,
-                    userId: user?.id // Real user ID
-                })
-            });
-
-            if (response.ok) {
-                navigate('/disparos');
-            } else {
-                const err = await response.json();
-                alert('Erro ao criar campanha: ' + err.error);
+            if (!user) {
+                alert('Usuário não autenticado.');
+                return;
             }
-        } catch (error) {
+
+            // 1. Create Campaign
+            const { data: campaign, error: campaignError } = await supabase
+                .from('campanhas_disparo')
+                .insert({
+                    usuario_id: user.id,
+                    nome_campanha: name,
+                    mensagem_padrao: defaultMessage,
+                    delay_min_segundos: delayMin,
+                    delay_max_segundos: delayMax,
+                    instancia_whatsapp: selectedInstance,
+                    total_leads: leads.length,
+                    status: 'draft'
+                })
+                .select()
+                .single();
+
+            if (campaignError) throw campaignError;
+
+            // 2. Insert Leads
+            const leadsData = leads.map(l => ({
+                campanha_id: campaign.id,
+                nome_lead: l.name,
+                telefone: l.phone,
+                empresa: l.company,
+                site: l.site,
+                status: 'pendente'
+            }));
+
+            const { error: leadsError } = await supabase
+                .from('disparo_leads')
+                .insert(leadsData);
+
+            if (leadsError) throw leadsError;
+
+            navigate('/disparos');
+        } catch (error: any) {
             console.error(error);
-            alert('Erro de conexão ao criar campanha.');
+            alert('Erro ao criar campanha: ' + (error.message || 'Erro desconhecido'));
         } finally {
             setLoading(false);
         }
@@ -141,7 +237,37 @@ const NewCampaign: React.FC = () => {
                                     <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
                                         Nome, Telefone, Empresa, Site
                                     </span>
+
                                 </div>
+
+                                {/* Client Import UI */}
+                                <div className="p-4 bg-slate-100/50 rounded-xl border border-slate-200 mb-2">
+                                    <div className="flex flex-col md:flex-row gap-3 items-end">
+                                        <div className="w-full">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Importar de Cliente</label>
+                                            <select
+                                                value={selectedClientForImport}
+                                                onChange={(e) => setSelectedClientForImport(e.target.value)}
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-brand-500 transition-all"
+                                            >
+                                                <option value="">Selecione um cliente...</option>
+                                                {clients.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleImportLeads}
+                                            disabled={!selectedClientForImport || importLoading}
+                                            className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors shrink-0 flex items-center gap-2 h-[38px]"
+                                        >
+                                            {importLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Upload size={16} />}
+                                            <span>Importar</span>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <textarea
                                     required
                                     value={leadsText}
@@ -288,8 +414,8 @@ const NewCampaign: React.FC = () => {
                     </button>
                 </div>
 
-            </form>
-        </div>
+            </form >
+        </div >
     );
 };
 
