@@ -39,6 +39,48 @@ export class CampaignProcessor {
     }
 
     /**
+     * Start the Scheduler to check for scheduled campaigns every minute
+     */
+    static startScheduler() {
+        console.log('[CampaignProcessor] Scheduler started.');
+        // Check every 60 seconds
+        setInterval(() => {
+            this.checkScheduledCampaigns();
+        }, 60000);
+
+        // Also run immediately on start
+        this.checkScheduledCampaigns();
+    }
+
+    /**
+     * Check for campaigns that are scheduled and due
+     */
+    static async checkScheduledCampaigns() {
+        try {
+            const now = new Date();
+            const dueCampaigns = await prisma.dispatchCampaign.findMany({
+                where: {
+                    status: 'agendado',
+                    scheduledAt: { lte: now }
+                }
+            });
+
+            if (dueCampaigns.length > 0) {
+                console.log(`[CampaignProcessor] Found ${dueCampaigns.length} due campaigns.`);
+                for (const campaign of dueCampaigns) {
+                    await prisma.dispatchCampaign.update({
+                        where: { id: campaign.id },
+                        data: { status: 'em_andamento' }
+                    });
+                    this.start(campaign.id);
+                }
+            }
+        } catch (error) {
+            console.error('[CampaignProcessor] Error checking scheduled campaigns:', error);
+        }
+    }
+
+    /**
      * Resume all 'em_andamento' campaigns on server startup
      */
     static async resumeAll() {
@@ -227,7 +269,7 @@ export class CampaignProcessor {
                         }
                     });
 
-                    // Update Counters
+                    // Update Counters Atomic & Touch updatedAt for Realtime UI
                     const updateData: any = {
                         updatedAt: new Date()
                     };
@@ -253,14 +295,20 @@ export class CampaignProcessor {
                 });
                 await prisma.dispatchCampaign.update({
                     where: { id: campaignId },
-                    data: { errors: { increment: 1 } }
+                    data: {
+                        errors: { increment: 1 },
+                        updatedAt: new Date()
+                    }
                 });
             }
 
             // 6. Schedule Next Run
-            const min = campaign.delayMinSeconds || 60; // Default 1 min
-            const max = campaign.delayMaxSeconds || 180; // Default 3 min
-            const delaySeconds = Math.floor(Math.random() * (max - min + 1)) + min;
+            // 6. Schedule Next Run
+            const min = campaign.delayMinSeconds || 150;
+            const max = campaign.delayMaxSeconds || 300;
+            const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
+
+            const delaySeconds = randomNumber;
 
             console.log(`[CampaignProcessor] Campaign ${campaignId}: Next lead in ${delaySeconds}s`);
 

@@ -143,6 +143,13 @@ app.get('/api/whatsapp/instances', async (req, res) => {
     res.json(instances);
 });
 
+// Initialize Campaign Processor
+import { CampaignProcessor } from './services/campaign.processor';
+
+// Resume active and start scheduler
+CampaignProcessor.resumeAll();
+CampaignProcessor.startScheduler();
+
 app.listen(PORT, () => {
     console.log(`Backend Server running on port ${PORT}`);
 });

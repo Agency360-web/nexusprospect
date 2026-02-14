@@ -19,7 +19,64 @@ const NewCampaign: React.FC = () => {
     // Import State
     const [clients, setClients] = useState<any[]>([]);
     const [selectedClientForImport, setSelectedClientForImport] = useState('');
+    const [clientFolders, setClientFolders] = useState<any[]>([]);
+    const [selectedFolderForImport, setSelectedFolderForImport] = useState('');
     const [importLoading, setImportLoading] = useState(false);
+
+    // Tag State
+    const [availableTags, setAvailableTags] = useState<string[]>([]);
+    const [selectedTag, setSelectedTag] = useState('');
+
+    // Scheduling State
+    const [scheduledAt, setScheduledAt] = useState('');
+
+    React.useEffect(() => {
+        const fetchTags = async () => {
+            if (!user) return;
+            // Fetch distinct tags from leads
+            const { data } = await supabase.rpc('get_distinct_tags');
+            // If RPC doesn't exist, we fallback to manual fetch
+            if (!data) {
+                const { data: leads } = await supabase.from('leads').select('tags');
+                const tags = new Set<string>();
+                leads?.forEach(l => l.tags?.forEach((t: string) => tags.add(t)));
+                setAvailableTags(Array.from(tags));
+            } else {
+                setAvailableTags(data);
+            }
+        };
+        fetchTags();
+    }, [user]);
+
+    const handleImportByTag = async () => {
+        if (!selectedTag) return;
+        setImportLoading(true);
+        try {
+            const { data: leadsData } = await supabase
+                .from('leads')
+                .select('name, phone, company, custom_fields')
+                .contains('tags', [selectedTag])
+                .eq('status', 'valid');
+
+            if (leadsData && leadsData.length > 0) {
+                const csvLines = leadsData.map(l => {
+                    const site = l.custom_fields?.site || '';
+                    return `${l.name},${l.phone},${l.company || ''},${site}`
+                }).join('\n');
+
+                setLeadsText(prev => prev ? prev + '\n' + csvLines : csvLines);
+                alert(`${leadsData.length} leads importados da tag "${selectedTag}"!`);
+                setSelectedTag('');
+            } else {
+                alert('Nenhum lead encontrado com esta tag.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao importar por tag.');
+        } finally {
+            setImportLoading(false);
+        }
+    };
 
     React.useEffect(() => {
         // Fetch instances from Supabase Edge Function
@@ -66,6 +123,7 @@ const NewCampaign: React.FC = () => {
     }, [user]);
 
     // Fetch Clients for Import
+    // Fetch Clients for Import
     React.useEffect(() => {
         const fetchClients = async () => {
             if (!user) return;
@@ -75,15 +133,34 @@ const NewCampaign: React.FC = () => {
         fetchClients();
     }, [user]);
 
+    // Fetch Folders when Client Selected
+    React.useEffect(() => {
+        const fetchFolders = async () => {
+            if (!selectedClientForImport) {
+                setClientFolders([]);
+                return;
+            }
+            const { data } = await supabase.from('lead_folders').select('id, name').eq('client_id', selectedClientForImport).order('name');
+            if (data) setClientFolders(data);
+        };
+        fetchFolders();
+    }, [selectedClientForImport]);
+
     const handleImportLeads = async () => {
         if (!selectedClientForImport) return;
         setImportLoading(true);
         try {
-            const { data: leadsData } = await supabase
+            let query = supabase
                 .from('leads')
                 .select('name, phone, company, company_site') // Use new columns
                 .eq('client_id', selectedClientForImport)
                 .eq('status', 'valid'); // Import only valid leads
+
+            if (selectedFolderForImport) {
+                query = query.eq('folder_id', selectedFolderForImport);
+            }
+
+            const { data: leadsData } = await query;
 
             if (leadsData && leadsData.length > 0) {
                 const csvLines = leadsData.map(l =>
@@ -148,7 +225,8 @@ const NewCampaign: React.FC = () => {
                     delay_max_segundos: delayMax,
                     instancia_whatsapp: selectedInstance,
                     total_leads: leads.length,
-                    status: 'draft'
+                    status: scheduledAt ? 'agendado' : 'draft',
+                    agendado_para: scheduledAt ? new Date(scheduledAt).toISOString() : null
                 })
                 .select()
                 .single();
@@ -231,54 +309,87 @@ const NewCampaign: React.FC = () => {
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Lista de Leads (CSV)</label>
-                                    <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                                        Nome, Telefone, Empresa, Site
-                                    </span>
-
-                                </div>
-
+                            {/* Import Sources */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Client Import UI */}
-                                <div className="p-4 bg-slate-100/50 rounded-xl border border-slate-200 mb-2">
-                                    <div className="flex flex-col md:flex-row gap-3 items-end">
-                                        <div className="w-full">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Importar de Cliente</label>
+                                <div className="p-4 bg-slate-100/50 rounded-xl border border-slate-200">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block">Importar de Cliente</label>
+                                        <div className="flex gap-2">
                                             <select
                                                 value={selectedClientForImport}
                                                 onChange={(e) => setSelectedClientForImport(e.target.value)}
-                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-brand-500 transition-all"
+                                                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-brand-500 transition-all"
                                             >
-                                                <option value="">Selecione um cliente...</option>
+                                                <option value="">Cliente...</option>
                                                 {clients.map(c => (
                                                     <option key={c.id} value={c.id}>{c.name}</option>
                                                 ))}
                                             </select>
+                                            <select
+                                                value={selectedFolderForImport}
+                                                onChange={(e) => setSelectedFolderForImport(e.target.value)}
+                                                disabled={!selectedClientForImport}
+                                                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-brand-500 transition-all disabled:opacity-50"
+                                            >
+                                                <option value="">Todas as Pastas</option>
+                                                {clientFolders.map(f => (
+                                                    <option key={f.id} value={f.id}>{f.name}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                type="button"
+                                                onClick={handleImportLeads}
+                                                disabled={!selectedClientForImport || importLoading}
+                                                className="px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                                            >
+                                                <Upload size={16} />
+                                            </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleImportLeads}
-                                            disabled={!selectedClientForImport || importLoading}
-                                            className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors shrink-0 flex items-center gap-2 h-[38px]"
-                                        >
-                                            {importLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Upload size={16} />}
-                                            <span>Importar</span>
-                                        </button>
                                     </div>
                                 </div>
 
-                                <textarea
-                                    required
-                                    value={leadsText}
-                                    onChange={(e) => setLeadsText(e.target.value)}
-                                    placeholder={`João Silva, 5511999999999, Imobiliária X, www.imobiliariax.com.br\nMaria Souza, 5511888888888, Construtora Y, www.construtoray.com.br`}
-                                    className="w-full h-80 px-4 py-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all font-mono text-xs md:text-sm leading-relaxed text-slate-600 placeholder:text-slate-400 resize-none"
-                                />
-                                <div className="flex items-start gap-2 text-xs text-slate-400">
-                                    <Upload size={14} className="mt-0.5" />
-                                    <p>Cole os dados dos leads separados por vírgula. Um lead por linha. Certifique-se de incluir o <strong>site</strong> para a personalização via IA.</p>
+                                {/* Tag Import UI */}
+                                <div className="p-4 bg-slate-100/50 rounded-xl border border-slate-200">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block">Importar por Tag</label>
+                                        <div className="flex gap-2">
+                                            <select
+                                                value={selectedTag}
+                                                onChange={(e) => setSelectedTag(e.target.value)}
+                                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-brand-500 transition-all"
+                                            >
+                                                <option value="">Selecione...</option>
+                                                {availableTags.map(t => (
+                                                    <option key={t} value={t}>{t}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                type="button"
+                                                onClick={handleImportByTag}
+                                                disabled={!selectedTag || importLoading}
+                                                className="px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                                            >
+                                                <Upload size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Lista de Leads (CSV)</label>
+                            <textarea
+                                required
+                                value={leadsText}
+                                onChange={(e) => setLeadsText(e.target.value)}
+                                placeholder={`João Silva, 5511999999999, Imobiliária X, www.imobiliariax.com.br\nMaria Souza, 5511888888888, Construtora Y, www.construtoray.com.br`}
+                                className="w-full h-80 px-4 py-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all font-mono text-xs md:text-sm leading-relaxed text-slate-600 placeholder:text-slate-400 resize-none"
+                            />
+                            <div className="flex items-start gap-2 text-xs text-slate-400">
+                                <Upload size={14} className="mt-0.5" />
+                                <p>Cole os dados dos leads separados por vírgula. Um lead por linha. Certifique-se de incluir o <strong>site</strong> para a personalização via IA.</p>
                             </div>
                         </div>
                     </div>
@@ -384,6 +495,23 @@ const NewCampaign: React.FC = () => {
                             </p>
                         </div>
 
+                        {/* Scheduling Section */}
+                        <div className="border-t border-slate-100 pt-6 space-y-4">
+                            <div className="flex items-center gap-2">
+                                <Clock size={16} className="text-slate-400" />
+                                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Agendamento (Opcional)</label>
+                            </div>
+                            <input
+                                type="datetime-local"
+                                value={scheduledAt}
+                                onChange={(e) => setScheduledAt(e.target.value)}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-700"
+                            />
+                            <p className="text-[11px] text-slate-400 leading-tight">
+                                Deixe em branco para salvar como Rascunho e iniciar manualmente depois.
+                            </p>
+                        </div>
+
                     </div>
                 </div>
 
@@ -410,12 +538,12 @@ const NewCampaign: React.FC = () => {
                         ) : (
                             <Zap size={20} />
                         )}
-                        <span>{loading ? 'Criando Campanha...' : 'Iniciar Disparos'}</span>
+                        <span>{loading ? 'Criando Campanha...' : scheduledAt ? 'Agendar Disparo' : 'Salvar Campanha'}</span>
                     </button>
                 </div>
 
-            </form >
-        </div >
+            </form>
+        </div>
     );
 };
 

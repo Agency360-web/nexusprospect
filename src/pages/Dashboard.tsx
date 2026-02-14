@@ -1,255 +1,220 @@
-
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
-import {
-  Building2,
-  Plus,
-  ListTodo,
-  Calendar,
-  CheckSquare,
-  Square,
-  Trash2,
-  ArrowUpRight,
-  Activity,
-  AlertCircle
-} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import {
+  AlertCircle,
+  Calendar as CalendarIcon,
+  Plus,
+  Coffee,
+  CheckSquare,
+  Clock
+} from 'lucide-react';
 import GoogleCalendarWidget from '../components/GoogleCalendarWidget';
-
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [priorities, setPriorities] = useState<any[]>([]); // Overdue or Today
+  const [upcoming, setUpcoming] = useState<any[]>([]); // Next 3 days
 
-  const fetchStats = useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*, clients!inner(name, user_id)')
-        .eq('status', 'pending')
-        .eq('clients.user_id', user.id)
-        .order('due_date', { ascending: true });
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      try {
+        // 1. Fetch User's Clients (to filter tasks)
+        const { data: clientsData, error: clientsError } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('status', 'active')
+          .eq('user_id', user.id);
 
-      if (error) throw error;
-      setTasks(data || []);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-      setLoading(false);
+        if (clientsError) throw clientsError;
+        const clientIds = clientsData?.map(c => c.id) || [];
+
+        if (clientIds.length > 0) {
+          // 2. Fetch Tasks
+          const { data: tasksData, error: tasksError } = await supabase
+            .from('tasks')
+            .select('id, title, status, due_date, client_id, priority, client:clients(name)')
+            .in('client_id', clientIds)
+            .neq('status', 'completed')
+            .order('due_date', { ascending: true });
+
+          if (tasksError) throw tasksError;
+
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          const threeDaysFromNow = new Date();
+          threeDaysFromNow.setDate(today.getDate() + 3);
+
+          const priorityList: any[] = [];
+          const upcomingList: any[] = [];
+
+          tasksData?.forEach(task => {
+            const dueDate = task.due_date ? new Date(task.due_date) : null;
+
+            if (!dueDate) {
+              // No date = Priority if high priority, or backlog? Let's put in priority if high
+              if (task.priority === 'high') priorityList.push(task);
+            } else {
+              dueDate.setHours(0, 0, 0, 0);
+              if (dueDate <= today) {
+                priorityList.push(task);
+              } else if (dueDate <= threeDaysFromNow) {
+                upcomingList.push(task);
+              }
+            }
+          });
+
+          setPriorities(priorityList);
+          setUpcoming(upcomingList);
+        }
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchDashboardData();
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
 
-  const handleToggleTask = useCallback(async (id: string, currentStatus: string) => {
-    try {
-      const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: newStatus })
-        .eq('id', id);
-
-      if (error) throw error;
-      fetchStats();
-    } catch (err) {
-      console.error('Error toggling task:', err);
-    }
-  }, [fetchStats]);
-
-  const handleDeleteTask = useCallback(async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta tarefa?')) return;
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      fetchStats();
-    } catch (err) {
-      console.error('Error deleting task:', err);
-      alert('Erro ao excluir tarefa.');
-    }
-  }, [fetchStats]);
-
-  // Memoize task calculations
-  const priorityTasks = useMemo(() => {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    return tasks.filter(t => {
-      if (!t.due_date) return false;
-      const dueDate = new Date(t.due_date);
-      return dueDate <= today;
-    });
-  }, [tasks]);
-
-  const attentionTasks = useMemo(() => {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    const future = new Date();
-    future.setDate(future.getDate() + 3);
-    future.setHours(23, 59, 59, 999);
-    return tasks.filter(t => {
-      if (!t.due_date) return false;
-      const dueDate = new Date(t.due_date);
-      return dueDate > today && dueDate <= future;
-    });
-  }, [tasks]);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20">
-      {/* Welcome Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-6 md:p-8 rounded-3xl overflow-hidden relative">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
-        <div className="relative z-10 text-center md:text-left">
-          <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight">
-            Olá, {user?.user_metadata?.full_name?.split(' ')[0] || 'Usuário'} <span className="inline-block animate-wave origin-[70%_70%]">👋</span>
+    <div className="space-y-8 animate-in fade-in duration-500">
+
+      {/* 1. Dark Header Block */}
+      <div className="bg-slate-900 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-slate-200">
+        <div>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Olá, {user?.email?.split('@')[0]} 👋
           </h1>
-          <p className="text-slate-300 font-medium text-sm md:text-base">Aqui está o pulso da sua operação hoje.</p>
+          <p className="text-slate-400 font-medium">
+            Aqui está o pulso da sua operação hoje.
+          </p>
         </div>
-        <div className="relative z-10 flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => navigate('/clients')}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-slate-900 rounded-xl font-bold transition-all shadow-lg shadow-brand-900/50 hover:scale-105 active:scale-95 text-sm md:text-base"
-          >
-            <Plus size={18} />
-            <span>Novo Cliente</span>
-          </button>
-        </div>
+        <button
+          onClick={() => navigate('/clients')}
+          className="bg-[#FFD700] hover:bg-[#F4C430] text-slate-900 font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-[#FFD700]/20 transition-all flex items-center gap-2"
+        >
+          <Plus size={20} />
+          Novo Cliente
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Priorities Block */}
-        <div className="group relative overflow-hidden rounded-3xl bg-white p-5 shadow-sm border border-rose-100 transition-all hover:shadow-md hover:border-rose-200 h-[220px] flex flex-col">
-          <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-rose-50 rounded-full blur-2xl opacity-50"></div>
+      {/* 2. Task Cards Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-          <div className="relative z-10 flex items-center justify-between mb-4">
+        {/* Priorities Card */}
+        <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col h-full min-h-[300px]">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-rose-50 text-rose-500 rounded-xl">
-                <AlertCircle size={20} />
+              <div className="p-2 bg-rose-50 text-rose-500 rounded-lg">
+                <AlertCircle size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-800 leading-tight">Prioridades</h3>
-                <p className="text-xs font-medium text-slate-400">Tarefas urgentes</p>
+                <h3 className="font-bold text-slate-900 text-lg">Prioridades</h3>
+                <p className="text-slate-500 text-sm">Tarefas urgentes</p>
               </div>
             </div>
-            <div className="px-2.5 py-0.5 bg-rose-100 text-rose-600 rounded-full text-[10px] font-bold">
-              {priorityTasks.length} pendentes
-            </div>
+            <span className="bg-rose-100 text-rose-600 px-3 py-1 rounded-full text-xs font-bold">
+              {priorities.length} pendentes
+            </span>
           </div>
 
-          <div className="relative z-10 space-y-2 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            {priorityTasks.length > 0 ? (
-              priorityTasks.map(task => (
-                <div key={task.id} className="group/item bg-slate-50 hover:bg-white p-3 rounded-xl border border-transparent hover:border-rose-100 transition-all cursor-pointer">
-                  <div className="flex items-start gap-3">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleToggleTask(task.id, task.status); }}
-                      className="mt-0.5 text-slate-300 hover:text-rose-500 transition-colors"
-                    >
-                      <Square size={16} />
-                    </button>
-                    <div className="flex-1 min-w-0" onClick={() => navigate(`/clients/${task.client_id}`)}>
-                      <h4 className="font-bold text-slate-700 text-xs mb-0.5 truncate group-hover/item:text-rose-600 transition-colors">{task.title}</h4>
-                      <div className="flex items-center gap-1.5 text-[10px]">
-                        <span className="font-semibold text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded-md">
-                          {new Date(task.due_date).toLocaleDateString()}
-                        </span>
-                        <span className="text-slate-400 font-medium truncate">• {task.clients?.name}</span>
-                      </div>
+          <div className="flex-1 space-y-3">
+            {priorities.length > 0 ? (
+              priorities.map(task => (
+                <div key={task.id} onClick={() => navigate(`/clients/${task.client_id}`)} className="group flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                  <div className="mt-1 text-slate-300 group-hover:text-slate-400">
+                    <CheckSquare size={20} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-700 group-hover:text-slate-900">{task.title}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-bold text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded">
+                        {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Atrasado'}
+                      </span>
+                      <span className="text-xs text-slate-400">• {task.client?.name}</span>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/clients/${task.client_id}`); }}
-                      className="opacity-0 group-hover/item:opacity-100 p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                    >
-                      <ArrowUpRight size={14} />
-                    </button>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/50">
-                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm mb-2">
-                  <span className="text-xl">🎉</span>
-                </div>
-                <p className="text-slate-500 text-sm font-medium">Tudo em dia!</p>
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                <Coffee size={32} className="opacity-20" />
+                <p>Tudo limpo por aqui</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Attention Block */}
-        <div className="group relative overflow-hidden rounded-3xl bg-white p-5 shadow-sm border border-amber-100 transition-all hover:shadow-md hover:border-amber-200 h-[220px] flex flex-col">
-          <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-amber-50 rounded-full blur-2xl opacity-50"></div>
-
-          <div className="relative z-10 flex items-center justify-between mb-4">
+        {/* Attention Card (Upcoming) */}
+        <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col h-full min-h-[300px]">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl">
-                <Calendar size={20} />
+              <div className="p-2 bg-amber-50 text-amber-500 rounded-lg">
+                <CalendarIcon size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-800 leading-tight">Atenção</h3>
-                <p className="text-xs font-medium text-slate-400">Próximos 3 dias</p>
+                <h3 className="font-bold text-slate-900 text-lg">Atenção</h3>
+                <p className="text-slate-500 text-sm">Próximos 3 dias</p>
               </div>
             </div>
-            <div className="px-2.5 py-0.5 bg-amber-100 text-amber-600 rounded-full text-[10px] font-bold">
-              {attentionTasks.length} futuros
-            </div>
+            <span className="bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-xs font-bold">
+              {upcoming.length} futuros
+            </span>
           </div>
 
-          <div className="relative z-10 space-y-2 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            {attentionTasks.length > 0 ? (
-              attentionTasks.map(task => (
-                <div key={task.id} className="group/item bg-slate-50 hover:bg-white p-3 rounded-xl border border-transparent hover:border-amber-100 transition-all cursor-pointer">
-                  <div className="flex items-start gap-3">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleToggleTask(task.id, task.status); }}
-                      className="mt-0.5 text-slate-300 hover:text-amber-500 transition-colors"
-                    >
-                      <Square size={16} />
-                    </button>
-                    <div className="flex-1 min-w-0" onClick={() => navigate(`/clients/${task.client_id}`)}>
-                      <h4 className="font-bold text-slate-700 text-xs mb-0.5 truncate group-hover/item:text-amber-600 transition-colors">{task.title}</h4>
-                      <div className="flex items-center gap-1.5 text-[10px]">
-                        <span className="font-semibold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">
-                          {new Date(task.due_date).toLocaleDateString()}
-                        </span>
-                        <span className="text-slate-400 font-medium truncate">• {task.clients?.name}</span>
-                      </div>
+          <div className="flex-1 space-y-3">
+            {upcoming.length > 0 ? (
+              upcoming.map(task => (
+                <div key={task.id} onClick={() => navigate(`/clients/${task.client_id}`)} className="group flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100">
+                  <div className="mt-1 text-slate-300 group-hover:text-slate-400">
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-700 group-hover:text-slate-900">{task.title}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-bold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">
+                        {task.due_date && new Date(task.due_date).toLocaleDateString()}
+                      </span>
+                      <span className="text-xs text-slate-400">• {task.client?.name}</span>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/clients/${task.client_id}`); }}
-                      className="opacity-0 group-hover/item:opacity-100 p-1.5 text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                    >
-                      <ArrowUpRight size={14} />
-                    </button>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4 border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/50">
-                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm mb-2">
-                  <span className="text-xl">☕</span>
-                </div>
-                <p className="text-slate-500 text-sm font-medium">Sem tarefas próximas</p>
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                <Coffee size={32} className="opacity-20" />
+                <p>Sem tarefas próximas</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Google Calendar Widget */}
-      <GoogleCalendarWidget />
+      {/* 3. Google Calendar Widget */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+        <GoogleCalendarWidget />
+      </div>
 
     </div>
   );
 };
 
 export default Dashboard;
-

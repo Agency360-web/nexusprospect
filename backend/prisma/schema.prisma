@@ -20,6 +20,7 @@ model Client {
   transmissions Transmission[]
   campaigns Campaign[]
   emailSenders EmailSender[]
+  leadFolders LeadFolder[]
 
   @@map("clients")
 }
@@ -37,6 +38,8 @@ model Lead {
   isSynced     Boolean? @default(false) @map("is_synced")
 
   client       Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  folderId     String?  @map("folder_id") @db.Uuid
+  folder       LeadFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   @@index([clientId])
   @@map("leads")
@@ -167,6 +170,7 @@ model DispatchCampaign {
   whatsappInstance    String?   @map("instancia_whatsapp") @db.VarChar(100)
   createdAt           DateTime? @default(now()) @map("criado_em") @db.Timestamptz
   updatedAt           DateTime? @default(now()) @map("atualizado_em") @db.Timestamptz
+  scheduledAt         DateTime? @map("agendado_para") @db.Timestamptz
 
   leads               DispatchLead[]
 
@@ -195,4 +199,17 @@ model DispatchLead {
   @@index([status])
   @@index([phone])
   @@map("disparo_leads")
+}
+
+model LeadFolder {
+  id        String   @id @default(uuid()) @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  leads     Lead[]
+
+  @@index([clientId])
+  @@map("lead_folders")
 }

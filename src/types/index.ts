@@ -89,6 +89,7 @@ export interface Lead {
   company?: string;
   company_site?: string;
   tags: string[];
+  folderId?: string;
   customFields: Record<string, string>;
   status: 'valid' | 'invalid' | 'pending';
   isSynced?: boolean;
@@ -185,5 +186,12 @@ export interface Complaint {
   severity: 'low' | 'medium' | 'high';
   date: string;
   resolutionNotes?: string;
+  createdAt: string;
+}
+
+export interface LeadFolder {
+  id: string;
+  clientId: string;
+  name: string;
   createdAt: string;
 }

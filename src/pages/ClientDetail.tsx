@@ -23,9 +23,11 @@ import {
   Smartphone,
   Download,
   RefreshCw,
-  Activity
+  Activity,
+  Folder,
+  FolderInput
 } from 'lucide-react';
-import { Lead, Tag, Client, OperationalCost } from '../types';
+import { Lead, Tag, Client, OperationalCost, LeadFolder } from '../types';
 import ClientGoals from '../components/ClientGoals';
 import ClientCredentials from '../components/ClientCredentials';
 import ClientOverview from '../components/ClientOverview/ClientOverview';
@@ -58,11 +60,13 @@ const ClientDetail: React.FC = () => {
   const [client, setClient] = useState<Client | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [folders, setFolders] = useState<LeadFolder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [costs, setCosts] = useState<OperationalCost[]>([]);
   const [financialTransactions, setFinancialTransactions] = useState<Transaction[]>([]);
 
   // Modal State
-  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'success' | 'client-config' | 'backup' | 'cost'>('none');
+  const [activeModal, setActiveModal] = useState<'none' | 'lead' | 'success' | 'client-config' | 'backup' | 'cost' | 'move-leads' | 'lead-type-selection' | 'create-folder'>('none');
   const [modalLoading, setModalLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -83,10 +87,11 @@ const ClientDetail: React.FC = () => {
   // Costs State
   const [newCost, setNewCost] = useState({ description: '', category: 'Infrastructure', value: '', date: new Date().toISOString().split('T')[0] });
   const [costFilterMonth, setCostFilterMonth] = useState(new Date().getMonth());
+
   const [costFilterYear, setCostFilterYear] = useState(new Date().getFullYear());
 
-
-
+  // Folder State
+  const [newFolderName, setNewFolderName] = useState('');
   // Pagination State for Leads
   const [leadPage, setLeadPage] = useState(1);
   const leadsPerPage = 50;
@@ -210,6 +215,7 @@ const ClientDetail: React.FC = () => {
         company: newLead.company,
         company_site: newLead.site,
         tags: tagIds, // Save UUIDs
+        folder_id: (selectedFolderId && selectedFolderId !== 'uncategorized') ? selectedFolderId : null
       };
 
       if (leadType === 'whatsapp') {
@@ -294,7 +300,8 @@ const ClientDetail: React.FC = () => {
             company,
             company_site: site,
             tags: rowTagIds,
-            status: 'valid'
+            status: 'valid',
+            folder_id: (selectedFolderId && selectedFolderId !== 'uncategorized') ? selectedFolderId : null
           };
         }).filter(l => l !== null);
 
@@ -476,6 +483,70 @@ const ClientDetail: React.FC = () => {
     }
   };
 
+  const handleCreateFolder = () => {
+    setNewFolderName('');
+    setActiveModal('create-folder');
+  };
+
+  const submitCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim() || !clientId) return;
+    setModalLoading(true);
+    try {
+      const { data, error } = await supabase.from('lead_folders').insert({ client_id: clientId, name: newFolderName.trim() }).select().single();
+      if (error) throw error;
+      setFolders(prev => [...prev, { id: data.id, clientId: data.client_id, name: data.name, createdAt: data.created_at }]);
+      setActiveModal('none');
+      setSuccessMessage('Pasta criada com sucesso!');
+      setActiveModal('success');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao criar pasta');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDeleteFolder = async (id: string) => {
+    if (!confirm('Excluir esta pasta? Os leads nela ficarão sem pasta.')) return;
+    try {
+      const { error } = await supabase.from('lead_folders').delete().eq('id', id);
+      if (error) throw error;
+      setFolders(prev => prev.filter(f => f.id !== id));
+      if (selectedFolderId === id) setSelectedFolderId(null);
+    } catch (error) { console.error(error); alert('Erro ao excluir pasta'); }
+  };
+
+  const handleMoveLeads = async (folderId: string | null) => {
+    if (selectedLeads.length === 0) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('leads').update({ folder_id: folderId }).in('id', selectedLeads);
+      if (error) throw error;
+      setLeads(prev => prev.map(l => selectedLeads.includes(l.id) ? { ...l, folderId: folderId || undefined } : l));
+      setSelectedLeads([]);
+      setSuccessMessage('Leads movidos com sucesso!');
+      setActiveModal('success');
+    } catch (error) { console.error(error); alert('Erro ao mover leads'); } finally { setLoading(false); }
+  };
+
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.phone || '').includes(searchTerm) ||
+      (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.tags || []).some(tid => {
+        const tag = tags.find(t => t.id === tid);
+        return tag?.name.toLowerCase().includes(searchTerm.toLowerCase());
+      });
+
+    // If selectedFolderId is 'uncategorized', filter leads with no folder
+    if (selectedFolderId === 'uncategorized') return matchesSearch && !lead.folderId;
+    // If specific folder selected
+    if (selectedFolderId) return matchesSearch && lead.folderId === selectedFolderId;
+    // If null (All), return all
+    return matchesSearch;
+  });
+
   useEffect(() => {
     if (clientId) {
       console.log('useEffect triggered. clientId:', clientId, 'user:', user?.id);
@@ -551,7 +622,8 @@ const ClientDetail: React.FC = () => {
           tags: l.tags || [],
           customFields: l.custom_fields || {},
           status: l.status,
-          isSynced: l.is_synced
+          isSynced: l.is_synced,
+          folderId: l.folder_id
         })));
       } else {
         setLeads([]);
@@ -578,6 +650,22 @@ const ClientDetail: React.FC = () => {
         .select('*')
         .eq('client_id', clientId)
         .order('date', { ascending: false });
+
+      // Fetch Folders
+      const { data: foldersData } = await supabase
+        .from('lead_folders')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('name');
+
+      if (foldersData) {
+        setFolders(foldersData.map((f: any) => ({
+          id: f.id,
+          clientId: f.client_id,
+          name: f.name,
+          createdAt: f.created_at
+        })));
+      }
 
       if (costsData) {
         setCosts(costsData.map((c: any) => ({
@@ -713,175 +801,230 @@ const ClientDetail: React.FC = () => {
         )}
 
         {activeTab === 'leads' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-3 text-slate-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Filtrar por nome, telefone ou tag..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-slate-900/5 transition-all text-sm font-medium"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-
-                <button
-                  onClick={() => setActiveModal('lead-type-selection' as any)}
-                  className="flex items-center space-x-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-md shadow-slate-900/10"
-                >
-                  <Plus size={14} />
-                  <span>Add Lead</span>
-                </button>
-                <div onClick={() => fileInputRef.current?.click()}>
-                  <button className="p-2.5 bg-white border border-slate-200 text-slate-400 rounded-xl hover:bg-slate-50 cursor-pointer">
-                    <FileUp size={20} />
+          <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in duration-300">
+            {/* Sidebar */}
+            <div className="w-full lg:w-64 space-y-4 shrink-0">
+              <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-slate-700">Pastas</h3>
+                  <button onClick={handleCreateFolder} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors">
+                    <Plus size={16} />
                   </button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".csv"
-                    onChange={handleFileUpload}
-                  />
+                </div>
+                <div className="space-y-1">
+                  <button
+                    onClick={() => setSelectedFolderId(null)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors ${selectedFolderId === null ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Users size={14} />
+                      <span>Todos</span>
+                    </div>
+                    <span className="text-xs opacity-60">{leads.length}</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedFolderId('uncategorized')}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors ${selectedFolderId === 'uncategorized' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Folder size={14} />
+                      <span>Sem Pasta</span>
+                    </div>
+                    <span className="text-xs opacity-60">{leads.filter(l => !l.folderId).length}</span>
+                  </button>
+                  <div className="border-t border-slate-100 my-2"></div>
+                  {folders.map(folder => (
+                    <div key={folder.id} className="group flex items-center">
+                      <button
+                        onClick={() => setSelectedFolderId(folder.id)}
+                        className={`flex-1 flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors ${selectedFolderId === folder.id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        <div className="flex items-center space-x-2 truncate">
+                          <Folder size={14} />
+                          <span className="truncate">{folder.name}</span>
+                        </div>
+                        <span className="text-xs opacity-60">{leads.filter(l => l.folderId === folder.id).length}</span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }}
+                        className="p-2 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm relative">
-
-              {/* Bulk Actions Bar */}
-              {selectedLeads.length > 0 && (
-                <div className="absolute top-0 left-0 right-0 h-16 bg-slate-900 text-white flex items-center justify-between px-8 z-10 animate-in slide-in-from-top-2 duration-200">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm font-bold">{selectedLeads.length} selecionados</span>
-                    <button onClick={() => setSelectedLeads([])} className="text-xs text-slate-400 hover:text-white underline">Cancelar</button>
-                  </div>
-                  <button
-                    onClick={handleBulkDelete}
-                    className="flex items-center space-x-2 px-4 py-2 bg-rose-500 hover:bg-rose-600 rounded-xl text-xs font-bold transition-colors"
-                  >
-                    <Trash2 size={16} />
-                    <span>Excluir Selecionados</span>
-                  </button>
+            <div className="flex-1 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-3 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Filtrar por nome, telefone ou tag..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-slate-900/5 transition-all text-sm font-medium"
+                  />
                 </div>
-              )}
+                <div className="flex items-center space-x-2">
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left min-w-[800px]">
-                  <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                      <th className="px-8 py-5 w-12">
-                        <input
-                          type="checkbox"
-                          checked={leads.length > 0 && selectedLeads.length === leads.length}
-                          onChange={toggleSelectAll}
-                          className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                        />
-                      </th>
-                      <th className="px-2 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Lead / Identificação</th>
-                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Empresa</th>
-                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Site</th>
-                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">WhatsApp</th>
-                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Segmentação</th>
-                      <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Status</th>
-                      <th className="px-8 py-5 text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm">
-                    {leads
-                      .filter(lead =>
-                        lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (lead.phone || '').includes(searchTerm) ||
-                        (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (lead.tags || []).some(tid => {
-                          const tag = tags.find(t => t.id === tid);
-                          return tag?.name.toLowerCase().includes(searchTerm.toLowerCase());
-                        })
-                      )
-                      .slice((leadPage - 1) * leadsPerPage, leadPage * leadsPerPage)
-                      .map(lead => (
-                        <tr key={lead.id} className={`hover:bg-slate-50/50 transition-colors ${selectedLeads.includes(lead.id) ? 'bg-slate-50' : ''}`}>
-                          <td className="px-8 py-5">
-                            <input
-                              type="checkbox"
-                              checked={selectedLeads.includes(lead.id)}
-                              onChange={() => toggleSelectLead(lead.id)}
-                              className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                            />
-                          </td>
-                          <td className="px-2 py-5">
-                            <div className="font-bold text-slate-900">{lead.name}</div>
-                          </td>
-                          <td className="px-8 py-5">
-                            <div className="text-sm text-slate-600 font-medium">{lead.company || '-'}</div>
-                          </td>
-                          <td className="px-8 py-5">
-                            {lead.company_site ? (
-                              <a
-                                href={lead.company_site.startsWith('http') ? lead.company_site : `https://${lead.company_site}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:underline truncate max-w-[150px] block"
-                              >
-                                {lead.company_site}
-                              </a>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-8 py-5 font-mono text-slate-500 font-medium">
-                            {lead.phone || lead.email}
-                          </td>
-                          <td className="px-8 py-5">
-                            <div className="flex flex-wrap gap-1.5">
-                              {(lead.tags || []).map(tid => {
-                                const tag = tags.find(t => t.id === tid);
-                                return tag ? (
-                                  <span key={tid} className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${tag.color}`}>
-                                    {tag.name}
-                                  </span>
-                                ) : null;
-                              })}
-                            </div>
-                          </td>
-                          <td className="px-8 py-5">
-                            <span className={`inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${lead.status === 'valid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
-                              }`}>
-                              <CheckCircle2 size={10} className="mr-1" />
-                              {lead.status === 'valid' ? 'Validado' : 'Erro'}
-                            </span>
-                          </td>
-                          <td className="px-8 py-5 text-right">
-                            <button className="text-slate-300 hover:text-slate-900 transition-colors">
-                              <MoreVertical size={20} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+                  <button
+                    onClick={() => setActiveModal('lead-type-selection' as any)}
+                    className="flex items-center space-x-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-md shadow-slate-900/10"
+                  >
+                    <Plus size={14} />
+                    <span>Add Lead</span>
+                  </button>
+                  <div onClick={() => fileInputRef.current?.click()}>
+                    <button className="p-2.5 bg-white border border-slate-200 text-slate-400 rounded-xl hover:bg-slate-50 cursor-pointer">
+                      <FileUp size={20} />
+                    </button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">
-                <span>{leads.length} Contatos listados</span>
-                <div className="flex items-center space-x-4">
-                  <span className="text-slate-400">Página {leadPage} de {Math.ceil(leads.length / leadsPerPage)}</span>
-                  <div className="flex space-x-2">
+
+              <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm relative">
+
+                {/* Bulk Actions Bar */}
+                {selectedLeads.length > 0 && (
+                  <div className="absolute top-0 left-0 right-0 h-16 bg-slate-900 text-white flex items-center justify-between px-8 z-10 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm font-bold">{selectedLeads.length} selecionados</span>
+                      <button onClick={() => setSelectedLeads([])} className="text-xs text-slate-400 hover:text-white underline">Cancelar</button>
+                    </div>
                     <button
-                      onClick={() => setLeadPage(p => Math.max(1, p - 1))}
-                      disabled={leadPage === 1}
-                      className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      onClick={handleBulkDelete}
+                      className="flex items-center space-x-2 px-4 py-2 bg-rose-500 hover:bg-rose-600 rounded-xl text-xs font-bold transition-colors"
                     >
-                      Anterior
+                      <Trash2 size={16} />
+                      <span>Excluir Selecionados</span>
                     </button>
                     <button
-                      onClick={() => setLeadPage(p => Math.min(Math.ceil(leads.length / leadsPerPage), p + 1))}
-                      disabled={leadPage >= Math.ceil(leads.length / leadsPerPage)}
-                      className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      onClick={() => setActiveModal('move-leads' as any)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-bold transition-colors"
                     >
-                      Próximo
+                      <FolderInput size={16} />
+                      <span>Mover</span>
                     </button>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left min-w-[800px]">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-8 py-5 w-12">
+                          <input
+                            type="checkbox"
+                            checked={leads.length > 0 && selectedLeads.length === leads.length}
+                            onChange={toggleSelectAll}
+                            className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                          />
+                        </th>
+                        <th className="px-2 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Lead / Identificação</th>
+                        <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Empresa</th>
+                        <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Site</th>
+                        <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">WhatsApp</th>
+                        <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Segmentação</th>
+                        <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Status</th>
+                        <th className="px-8 py-5 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-sm">
+                      {filteredLeads
+                        .slice((leadPage - 1) * leadsPerPage, leadPage * leadsPerPage)
+                        .map(lead => (
+                          <tr key={lead.id} className={`hover:bg-slate-50/50 transition-colors ${selectedLeads.includes(lead.id) ? 'bg-slate-50' : ''}`}>
+                            <td className="px-8 py-5">
+                              <input
+                                type="checkbox"
+                                checked={selectedLeads.includes(lead.id)}
+                                onChange={() => toggleSelectLead(lead.id)}
+                                className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                              />
+                            </td>
+                            <td className="px-2 py-5">
+                              <div className="font-bold text-slate-900">{lead.name}</div>
+                            </td>
+                            <td className="px-8 py-5">
+                              <div className="text-sm text-slate-600 font-medium">{lead.company || '-'}</div>
+                            </td>
+                            <td className="px-8 py-5">
+                              {lead.company_site ? (
+                                <a
+                                  href={lead.company_site.startsWith('http') ? lead.company_site : `https://${lead.company_site}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline truncate max-w-[150px] block"
+                                >
+                                  {lead.company_site}
+                                </a>
+                              ) : (
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </td>
+                            <td className="px-8 py-5 font-mono text-slate-500 font-medium">
+                              {lead.phone || lead.email}
+                            </td>
+                            <td className="px-8 py-5">
+                              <div className="flex flex-wrap gap-1.5">
+                                {(lead.tags || []).map(tid => {
+                                  const tag = tags.find(t => t.id === tid);
+                                  return tag ? (
+                                    <span key={tid} className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${tag.color}`}>
+                                      {tag.name}
+                                    </span>
+                                  ) : null;
+                                })}
+                              </div>
+                            </td>
+                            <td className="px-8 py-5">
+                              <span className={`inline-flex items-center text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${lead.status === 'valid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'
+                                }`}>
+                                <CheckCircle2 size={10} className="mr-1" />
+                                {lead.status === 'valid' ? 'Validado' : 'Erro'}
+                              </span>
+                            </td>
+                            <td className="px-8 py-5 text-right">
+                              <button className="text-slate-300 hover:text-slate-900 transition-colors">
+                                <MoreVertical size={20} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                  <span>{leads.length} Contatos listados</span>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-slate-400">Página {leadPage} de {Math.ceil(leads.length / leadsPerPage)}</span>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setLeadPage(p => Math.max(1, p - 1))}
+                        disabled={leadPage === 1}
+                        className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Anterior
+                      </button>
+                      <button
+                        onClick={() => setLeadPage(p => Math.min(Math.ceil(leads.length / leadsPerPage), p + 1))}
+                        disabled={leadPage >= Math.ceil(leads.length / leadsPerPage)}
+                        className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Próximo
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1314,6 +1457,89 @@ const ClientDetail: React.FC = () => {
           </button>
         </div>
       </Modal>
+
+      {activeModal === 'move-leads' && (
+        <Modal title={`Mover ${selectedLeads.length} leads`} isOpen={true} onClose={() => setActiveModal('none')}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Selecione a Pasta de Destino</label>
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                <button
+                  onClick={() => handleMoveLeads(null)}
+                  className="w-full flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors text-left"
+                >
+                  <div className="p-2 bg-slate-200 rounded-lg text-slate-500">
+                    <FolderInput size={18} />
+                  </div>
+                  <div>
+                    <span className="block text-sm font-bold text-slate-700">Remover da Pasta</span>
+                    <span className="text-xs text-slate-500">Mover para "Sem Pasta"</span>
+                  </div>
+                </button>
+
+                {folders.map(folder => (
+                  <button
+                    key={folder.id}
+                    onClick={() => handleMoveLeads(folder.id)}
+                    className="w-full flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-brand-500 hover:shadow-sm transition-all text-left group"
+                  >
+                    <div className="p-2 bg-brand-50 text-brand-600 rounded-lg group-hover:bg-brand-100 transition-colors">
+                      <Folder size={18} />
+                    </div>
+                    <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{folder.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end pt-4">
+              <button
+                type="button"
+                onClick={() => setActiveModal('none')}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {activeModal === 'create-folder' && (
+        <Modal title="Nova Pasta" isOpen={true} onClose={() => setActiveModal('none')}>
+          <form onSubmit={submitCreateFolder} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nome da Pasta</label>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Ex: Leads Frios, Retorno Pendente..."
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all font-medium text-slate-900"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setActiveModal('none')}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={modalLoading}
+                className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-colors disabled:opacity-70 flex items-center gap-2"
+              >
+                {modalLoading && <Loader2 size={16} className="animate-spin" />}
+                <span>Criar Pasta</span>
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
     </div >
   );
 };

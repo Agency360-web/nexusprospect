@@ -2,7 +2,7 @@ export interface DispatchCampaign {
     id: string;
     userId: string;
     name: string;
-    status: 'draft' | 'em_andamento' | 'pausado' | 'concluido' | 'cancelado' | 'erro';
+    status: 'draft' | 'em_andamento' | 'pausado' | 'concluido' | 'cancelado' | 'erro' | 'agendado';
     totalLeads: number;
     sentCustom: number;
     sentDefault: number;
@@ -14,6 +14,7 @@ export interface DispatchCampaign {
     whatsappInstance: string;
     createdAt: string;
     updatedAt: string;
+    scheduledAt?: string;
 }
 
 export interface DispatchLead {
