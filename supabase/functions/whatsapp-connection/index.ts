@@ -84,7 +84,7 @@ serve(async (req: Request) => {
 
     if (!evolutionApiUrl || !evolutionApiKey) {
       return new Response(
-        JSON.stringify({ success: false, message: 'Evolution API não configurada. Defina EVOLUTION_API_URL e EVOLUTION_API_KEY nos secrets do Supabase.' }),
+        JSON.stringify({ success: false, message: 'Evolution API não configurada.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -93,17 +93,26 @@ serve(async (req: Request) => {
     const url = new URL(req.url)
     const action = url.searchParams.get('action') || 'status'
     const userId = user.id
-    const instanceName = `user-${userId}`
+
+    // Parse body if method is POST/DELETE
+    let body: any = {}
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      try {
+        body = await req.json()
+      } catch {
+        // Body might be empty
+      }
+    }
 
     // ════════════════════════════════════════════════════════════════════════
-    // ACTION: status — Check if user has a connection + live state
+    // ACTION: status — List all connections for user
     // ════════════════════════════════════════════════════════════════════════
     if (action === 'status') {
-      const { data: connection, error: dbError } = await supabaseAdmin
+      const { data: connections, error: dbError } = await supabaseAdmin
         .from('whatsapp_connections')
         .select('*')
         .eq('user_id', userId)
-        .maybeSingle()
+        .order('created_at', { ascending: true })
 
       if (dbError) {
         console.error('DB error:', dbError)
@@ -113,74 +122,87 @@ serve(async (req: Request) => {
         )
       }
 
-      if (!connection) {
+      // If no connections, return empty list
+      if (!connections || connections.length === 0) {
         return new Response(
-          JSON.stringify({ exists: false }),
+          JSON.stringify({ exists: false, connections: [] }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      // Check live state from Evolution API
-      let liveState = 'close'
-      const evoResult = await callEvolution(
-        `/instance/connectionState/${connection.instance}`,
-        evolutionApiUrl,
-        evolutionApiKey
-      )
+      // Sync status with Evolution API for EACH connection
+      // We do this in parallel to be faster
+      const updatedConnections = await Promise.all(connections.map(async (conn) => {
+        let liveState = 'close'
+        const evoResult = await callEvolution(
+          `/instance/connectionState/${conn.instance}`,
+          evolutionApiUrl,
+          evolutionApiKey
+        )
 
-      if (evoResult.ok) {
-        liveState = extractLiveState(evoResult.data)
+        if (evoResult.ok) {
+          liveState = extractLiveState(evoResult.data)
 
-        // Update DB status if changed
-        const newStatus = liveState === 'open' ? 'connected' : (liveState === 'connecting' ? 'connecting' : 'pending')
-        if (newStatus !== connection.status) {
-          await supabaseAdmin
-            .from('whatsapp_connections')
-            .update({ status: newStatus, updated_at: new Date().toISOString() })
-            .eq('user_id', userId)
+          // Update DB status if changed
+          const newStatus = liveState === 'open' ? 'connected' : (liveState === 'connecting' ? 'connecting' : 'pending')
+          if (newStatus !== conn.status) {
+             // Fire and forget update to not block response too much
+             supabaseAdmin
+              .from('whatsapp_connections')
+              .update({ status: newStatus, updated_at: new Date().toISOString() })
+              .eq('id', conn.id)
+              .then(({ error }) => { if (error) console.error('Failed to update status', error) })
+             
+             // Update local object to return correct state immediately
+             conn.status = newStatus
+          }
         }
-      }
+        
+        return {
+          ...conn,
+          live_state: liveState
+        }
+      }))
 
       return new Response(
         JSON.stringify({
           exists: true,
-          instance: connection.instance,
-          status: connection.status,
-          live_state: liveState,
-          qrcode: connection.qrcode,
-          created_at: connection.created_at,
+          connections: updatedConnections
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // ACTION: create — Create a new WhatsApp instance
+    // ACTION: create — Create a new WhatsApp instance (Limit 4)
     // ════════════════════════════════════════════════════════════════════════
     if (action === 'create') {
-      // Check if already exists in our DB (1 instance per user)
-      const { data: existing } = await supabaseAdmin
+      // 1. Check current count
+      const { count, error: countError } = await supabaseAdmin
         .from('whatsapp_connections')
-        .select('id')
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .maybeSingle()
 
-      if (existing) {
+      if (countError) {
         return new Response(
-          JSON.stringify({ success: false, message: 'Você já possui uma conexão ativa' }),
+          JSON.stringify({ success: false, message: 'Erro ao verificar conexões existentes' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (count !== null && count >= 4) {
+        return new Response(
+          JSON.stringify({ success: false, message: 'Limite de 4 conexões por usuário atingido.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      // Try to delete any orphaned instance in Evolution API first (best effort)
-      await callEvolution(
-        `/instance/delete/${instanceName}`,
-        evolutionApiUrl,
-        evolutionApiKey,
-        { method: 'DELETE' }
-      )
+      // 2. Generate Unique Instance Name
+      // Logic: user-{userId}-{shortRandom} to ensure uniqueness
+      const shortRandom = Math.random().toString(36).substring(2, 6)
+      const instanceName = `user-${userId}-${shortRandom}`
 
-      // Create instance in Evolution API
+      // 3. Create instance in Evolution API
       const evoResult = await callEvolution(
         '/instance/create',
         evolutionApiUrl,
@@ -209,7 +231,7 @@ serve(async (req: Request) => {
 
       const qrcodeBase64 = extractQRCode(evoResult.data)
 
-      // Save to DB
+      // 4. Save to DB
       const { error: insertError } = await supabaseAdmin
         .from('whatsapp_connections')
         .insert({
@@ -223,6 +245,9 @@ serve(async (req: Request) => {
 
       if (insertError) {
         console.error('DB insert error:', insertError)
+        // Rollback: try to delete created instance
+        await callEvolution(`/instance/delete/${instanceName}`, evolutionApiUrl, evolutionApiKey, { method: 'DELETE' })
+        
         return new Response(
           JSON.stringify({ success: false, message: 'Erro ao salvar conexão no banco' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -234,33 +259,43 @@ serve(async (req: Request) => {
           success: true,
           instance: instanceName,
           qrcode: qrcodeBase64,
-          message: 'Conexão criada! Escaneie o QR Code no seu WhatsApp.',
+          message: 'Nova conexão criada! Escaneie o QR Code.',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // ACTION: delete — Remove WhatsApp instance
+    // ACTION: delete — Remove specific WhatsApp instance
     // ════════════════════════════════════════════════════════════════════════
     if (action === 'delete') {
-      // Get instance name from DB
+      const instanceToDelete = body.instanceName || url.searchParams.get('instanceName')
+
+      if (!instanceToDelete) {
+        return new Response(
+          JSON.stringify({ success: false, message: 'Nome da instância obrigatório' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Verify ownership
       const { data: connection } = await supabaseAdmin
         .from('whatsapp_connections')
-        .select('instance')
+        .select('id, instance')
         .eq('user_id', userId)
+        .eq('instance', instanceToDelete)
         .maybeSingle()
 
       if (!connection) {
         return new Response(
-          JSON.stringify({ success: false, message: 'Conexão não encontrada' }),
+          JSON.stringify({ success: false, message: 'Conexão não encontrada ou não pertence a você' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
       // Delete from Evolution API (best effort)
       await callEvolution(
-        `/instance/delete/${connection.instance}`,
+        `/instance/delete/${instanceToDelete}`,
         evolutionApiUrl,
         evolutionApiKey,
         { method: 'DELETE' }
@@ -270,10 +305,9 @@ serve(async (req: Request) => {
       const { error: deleteError } = await supabaseAdmin
         .from('whatsapp_connections')
         .delete()
-        .eq('user_id', userId)
+        .eq('id', connection.id)
 
       if (deleteError) {
-        console.error('DB delete error:', deleteError)
         return new Response(
           JSON.stringify({ success: false, message: 'Erro ao remover do banco' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -287,25 +321,53 @@ serve(async (req: Request) => {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // ACTION: qr — Get fresh QR code
+    // ACTION: qr — Get fresh QR code for specific instance
     // ════════════════════════════════════════════════════════════════════════
     if (action === 'qr') {
+      const instanceToRefresh = body.instanceName || url.searchParams.get('instanceName')
+      
+      if (!instanceToRefresh) {
+        // Fallback: if user has only one connection, use that one (for backward compatibility if needed)
+        // But for multiple support, we should require it.
+        // Let's try to find the most recent 'pending' or 'connecting' one if not provided
+        const { data: latest } = await supabaseAdmin
+          .from('whatsapp_connections')
+          .select('instance')
+          .eq('user_id', userId)
+          .neq('status', 'connected') // Only want disconnected ones
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          
+        if (!latest) {
+             return new Response(
+            JSON.stringify({ success: false, message: 'Especifique a instância ou não há conexões pendentes.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        // Use the found one
+      }
+      
+      const targetInstance = instanceToRefresh 
+
+      // Verify ownership
       const { data: connection } = await supabaseAdmin
         .from('whatsapp_connections')
-        .select('instance')
+        .select('id, instance')
         .eq('user_id', userId)
+        .eq('instance', targetInstance)
         .maybeSingle()
 
       if (!connection) {
         return new Response(
-          JSON.stringify({ success: false, message: 'Nenhuma conexão encontrada' }),
+          JSON.stringify({ success: false, message: 'Conexão não encontrada' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
       // Request new QR from Evolution API
       const evoResult = await callEvolution(
-        `/instance/connect/${connection.instance}`,
+        `/instance/connect/${targetInstance}`,
         evolutionApiUrl,
         evolutionApiKey
       )
@@ -324,10 +386,10 @@ serve(async (req: Request) => {
         await supabaseAdmin
           .from('whatsapp_connections')
           .update({ qrcode: qrcodeBase64, updated_at: new Date().toISOString() })
-          .eq('user_id', userId)
+          .eq('id', connection.id)
 
         return new Response(
-          JSON.stringify({ success: true, qrcode: qrcodeBase64 }),
+          JSON.stringify({ success: true, qrcode: qrcodeBase64, instance: targetInstance }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       } else {
