@@ -3,7 +3,6 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CheckCircle2, XCircle, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { getGoogleAuthUrl, isGoogleCalendarConfigured } from '../../services/googleCalendar';
-import WhatsAppConnectionTab from './WhatsAppConnectionTab';
 import OpenAIIntegration from './OpenAIIntegration';
 import GeminiIntegration from './GeminiIntegration';
 
@@ -175,8 +174,7 @@ const IntegrationsTab: React.FC = () => {
                 )}
             </div>
 
-            {/* WhatsApp Connection Card */}
-            <WhatsAppConnectionTab />
+
 
             {/* AI Integrations */}
             <OpenAIIntegration />

@@ -27,93 +27,11 @@ export interface Client {
   defaultPaymentMethod?: string;
   defaultPaymentConditions?: string;
 
-  // Integrations
-  whatsapp_instance_url?: string;
-  whatsapp_token?: string;
-  google_sheets_config?: {
-    url?: string;
-    auto_sync?: boolean;
-    last_sync?: string;
-  };
   contract_start_date?: string;
   contract_value?: number;
 }
 
-export interface WebhookConfig {
-  id: string;
-  clientId: string;
-  name: string;
-  url: string;
-  type: string;
-  method: string;
-  headers?: Record<string, string>;
-  events: string[];
-  active: boolean;
-}
 
-export interface WhatsAppNumber {
-  id: string;
-  clientId: string;
-  nickname: string;
-  phone: string;
-  status: 'active' | 'connected' | 'disconnected';
-  qrCode?: string;
-  sentToday: number;
-  dailyLimit: number;
-}
-
-export interface EmailSender {
-  id: string;
-  clientId: string;
-  email: string;
-  provider: string;
-  fromName: string;
-  status: 'active' | 'inactive' | 'unverified';
-  dailyLimit: number;
-  sentToday: number;
-}
-
-export interface Tag {
-  id: string;
-  name: string;
-  clientId: string;
-  color: string;
-}
-
-export interface Lead {
-  id: string;
-  clientId: string;
-  name: string;
-  email?: string;
-  phone: string;
-  company?: string;
-  company_site?: string;
-  tags: string[];
-  folderId?: string;
-  customFields: Record<string, string>;
-  status: 'valid' | 'invalid' | 'pending';
-  isSynced?: boolean;
-  createdAt?: string;
-}
-
-export interface Goal {
-  id: string;
-  clientId: string;
-  month: number;
-  year: number;
-  channel: 'email' | 'whatsapp';
-  weeklyTargets: number[]; // Array of 4 (or 5) weekly targets
-  monthlyTarget: number;
-  annualTarget: number;
-}
-
-export interface GoalsMetric {
-  target: number;
-  actual: number;
-  percentage: number;
-  remaining: number;
-  status: 'pending' | 'on_track' | 'completed' | 'exceeded';
-}
 
 export interface Task {
   id: string;
@@ -189,9 +107,4 @@ export interface Complaint {
   createdAt: string;
 }
 
-export interface LeadFolder {
-  id: string;
-  clientId: string;
-  name: string;
-  createdAt: string;
-}
+

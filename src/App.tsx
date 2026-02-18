@@ -11,13 +11,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ClientManager = lazy(() => import('./pages/ClientManager'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
-const MessageDispatcher = lazy(() => import('./pages/MessageDispatcher'));
 const AdministrationDashboard = lazy(() => import('./pages/Administration'));
-const Comercial = lazy(() => import('./pages/Comercial'));
-const Prospeccao = lazy(() => import('./pages/Prospeccao'));
-const Disparos = lazy(() => import('./pages/Disparos'));
-const NewCampaign = lazy(() => import('./pages/Disparos/NewCampaign'));
-
 // Loading fallback
 const PageLoader = () => (
   <div className="flex items-center justify-center h-screen bg-slate-50">
@@ -64,41 +58,7 @@ const App: React.FC = () => {
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/dispatcher" element={
-              <ProtectedRoute>
-                <Layout>
-                  <MessageDispatcher />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/comercial" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Comercial />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/prospeccao" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Prospeccao />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/disparos" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Disparos />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/disparos/new" element={
-              <ProtectedRoute>
-                <Layout>
-                  <NewCampaign />
-                </Layout>
-              </ProtectedRoute>
-            } />
+
             <Route path="/settings" element={
               <ProtectedRoute>
                 <Layout>

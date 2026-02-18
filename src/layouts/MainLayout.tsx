@@ -12,9 +12,6 @@ import {
     DollarSign,
     Building2,
     ChevronLeft,
-    Radar,
-    Briefcase,
-    Zap,
 
 } from 'lucide-react';
 import { useRBAC } from '../hooks/useRBAC';
@@ -125,27 +122,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 isCollapsed={isCollapsed}
                             />
                         )}
-                        <SidebarItem
-                            to="/comercial"
-                            icon={<Briefcase size={20} />}
-                            label="Comercial"
-                            active={location.pathname.startsWith('/comercial')}
-                            isCollapsed={isCollapsed}
-                        />
-                        <SidebarItem
-                            to="/prospeccao"
-                            icon={<Radar size={20} />}
-                            label="Prospecção"
-                            active={location.pathname.startsWith('/prospeccao')}
-                            isCollapsed={isCollapsed}
-                        />
-                        <SidebarItem
-                            to="/disparos"
-                            icon={<Zap size={20} />}
-                            label="Disparos"
-                            active={location.pathname.startsWith('/disparos')}
-                            isCollapsed={isCollapsed}
-                        />
+
                         {/* Disparador temporariamente desativado */}
 
                     </nav>
