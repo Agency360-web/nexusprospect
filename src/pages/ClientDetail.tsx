@@ -14,11 +14,9 @@ import {
   TrendingUp,
   TrendingDown,
   PieChart,
-  Activity
 } from 'lucide-react';
 import { Client, OperationalCost } from '../types';
 import ClientCredentials from '../components/ClientCredentials';
-import ClientOverview from '../components/ClientOverview/ClientOverview';
 import { supabase } from '../services/supabase';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,7 +38,7 @@ interface Transaction {
 const ClientDetail: React.FC = () => {
   const { user } = useAuth();
   const { clientId } = useParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'credentials' | 'costs'>('overview');
+  const [activeTab, setActiveTab] = useState<'credentials' | 'costs'>('credentials');
   const [copied, setCopied] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -320,7 +318,7 @@ const ClientDetail: React.FC = () => {
 
       {/* Tabs Nav */}
       <div className="bg-white border-b border-slate-200 sticky top-16 lg:top-0 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
-        <TabButton id="overview" label="Geral" icon={Activity} />
+
         <TabButton id="credentials" label="Acessos" icon={Key} />
         <TabButton id="costs" label="Custos" icon={DollarSign} />
       </div>
@@ -328,13 +326,7 @@ const ClientDetail: React.FC = () => {
       <div className="pt-4">
 
 
-        {activeTab === 'overview' && client && (
-          <ClientOverview client={client} onUpdate={() => {
-            supabase.from('clients').select('*').eq('id', clientId!).single().then(({ data }) => {
-              if (data) setClient(data);
-            });
-          }} />
-        )}
+
 
 
         {/* Sidebar */}

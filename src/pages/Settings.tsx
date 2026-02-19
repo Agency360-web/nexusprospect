@@ -12,16 +12,14 @@ import {
   Trash2,
   Building2,
   Link2,
-  Bot
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRBAC } from '../hooks/useRBAC';
 import Modal from '../components/ui/Modal';
 import { supabase } from '../services/supabase';
 import IntegrationsTab from '../components/settings/IntegrationsTab';
-import AiAgentTab from '../components/settings/AiAgentTab';
 
-type SettingsTab = 'general' | 'organization' | 'users' | 'integrations' | 'ai-agent';
+type SettingsTab = 'general' | 'users' | 'integrations';
 
 interface Profile {
   id: string;
@@ -32,11 +30,7 @@ interface Profile {
   organization_id?: string;
 }
 
-interface Organization {
-  id: string;
-  name: string;
-  owner_id: string;
-}
+
 
 const SettingsPage: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -70,64 +64,17 @@ const SettingsPage: React.FC = () => {
   const [newUserRole, setNewUserRole] = useState('user');
   const [newUserPermissions, setNewUserPermissions] = useState<string[]>(['dashboard', 'reports']);
 
-  // Organization States
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [organizationName, setOrganizationName] = useState('');
+
 
   useEffect(() => {
     if (activeTab === 'users') {
       fetchProfiles();
     }
-    if (activeTab === 'organization') {
-      fetchOrganization();
-    }
   }, [activeTab]);
 
-  const fetchOrganization = async () => {
-    if (!user) return;
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('organization_id')
-        .eq('id', user.id)
-        .single();
 
-      if (profile?.organization_id) {
-        const { data: org } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('id', profile.organization_id)
-          .single();
 
-        if (org) {
-          setOrganization(org);
-          setOrganizationName(org.name);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching organization:', error);
-    }
-  };
 
-  const handleSaveOrganization = async () => {
-    if (!organization) return;
-    setSaveLoading(true);
-    try {
-      const { error } = await supabase
-        .from('organizations')
-        .update({ name: organizationName })
-        .eq('id', organization.id);
-
-      if (error) throw error;
-      setOrganization({ ...organization, name: organizationName });
-      alert('Nome da empresa atualizado com sucesso!');
-    } catch (error) {
-      console.error('Error updating organization:', error);
-      alert('Erro ao atualizar empresa.');
-    } finally {
-      setSaveLoading(false);
-    }
-  };
 
   const fetchProfiles = async () => {
     if (!user) return;
@@ -305,10 +252,8 @@ const SettingsPage: React.FC = () => {
           </div>
           <nav className="space-y-1">
             <TabItem id="general" label="Geral" icon={Settings} />
-            <TabItem id="organization" label="Minha Empresa" icon={Building2} />
             <TabItem id="users" label="Usuários & Acessos" icon={Users} />
             <TabItem id="integrations" label="Integrações" icon={Link2} />
-            <TabItem id="ai-agent" label="Agente IA" icon={Bot} />
 
             <div className="pt-4 border-t border-slate-200 mt-4">
               <button
@@ -358,58 +303,7 @@ const SettingsPage: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'organization' && (
-              <div className="space-y-8 max-w-2xl animate-in slide-in-from-right-2 duration-300">
-                <SectionHeader title="Minha Empresa" subtitle="Configure os dados da sua organização." />
 
-                <div className="grid grid-cols-1 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Nome da Empresa</label>
-                    <input
-                      type="text"
-                      value={organizationName}
-                      onChange={(e) => setOrganizationName(e.target.value)}
-                      placeholder="Ex: Conecta Consultoria"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-yellow-500 transition-all font-bold text-slate-900"
-                    />
-                    <p className="text-xs text-slate-400">Este nome será exibido para todos os membros da sua organização.</p>
-                  </div>
-
-                  {organization && (
-                    <div className="p-4 bg-slate-900 rounded-2xl text-white">
-                      <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-10 h-10 bg-[#ffd700] rounded-xl flex items-center justify-center">
-                          <Building2 size={20} className="text-slate-900" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold">{organization.name}</div>
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">Organização Ativa</div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-center">
-                        <div className="p-3 bg-slate-800 rounded-xl">
-                          <div className="text-lg font-bold text-[#ffd700]">{profiles.length || '—'}</div>
-                          <div className="text-[10px] text-slate-400 uppercase">Membros</div>
-                        </div>
-                        <div className="p-3 bg-slate-800 rounded-xl">
-                          <div className="text-lg font-bold text-emerald-400">Ativa</div>
-                          <div className="text-[10px] text-slate-400 uppercase">Status</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleSaveOrganization}
-                    disabled={saveLoading}
-                    className="flex items-center justify-center space-x-2 px-6 py-3 bg-[#ffd700] text-slate-900 rounded-xl font-bold shadow-lg shadow-[#ffd700]/30 hover:bg-[#f8ab15] transition-all disabled:opacity-50"
-                  >
-                    {saveLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                    <span>Salvar Alterações</span>
-                  </button>
-                </div>
-              </div>
-            )}
 
             {activeTab === 'users' && (
               <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
@@ -472,9 +366,7 @@ const SettingsPage: React.FC = () => {
               <IntegrationsTab />
             )}
 
-            {activeTab === 'ai-agent' && (
-              <AiAgentTab />
-            )}
+
           </div>
 
           {/* Footer Save Bar */}

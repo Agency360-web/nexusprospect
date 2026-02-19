@@ -3,8 +3,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CheckCircle2, XCircle, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { getGoogleAuthUrl, isGoogleCalendarConfigured } from '../../services/googleCalendar';
-import OpenAIIntegration from './OpenAIIntegration';
-import GeminiIntegration from './GeminiIntegration';
+
 
 // Google Calendar SVG Icon (official multicolor)
 const GoogleCalendarIcon = () => (
@@ -176,9 +175,7 @@ const IntegrationsTab: React.FC = () => {
 
 
 
-            {/* AI Integrations */}
-            <OpenAIIntegration />
-            <GeminiIntegration />
+
         </div>
     );
 };

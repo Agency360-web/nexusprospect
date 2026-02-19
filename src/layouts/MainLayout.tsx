@@ -95,15 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
 
                     <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                        {canAccess('dashboard') && (
-                            <SidebarItem
-                                to="/"
-                                icon={<LayoutDashboard size={20} />}
-                                label="Dashboard"
-                                active={location.pathname === '/'}
-                                isCollapsed={isCollapsed}
-                            />
-                        )}
+
                         {canAccess('admin') && (
                             <SidebarItem
                                 to="/admin"

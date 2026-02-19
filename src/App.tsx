@@ -5,7 +5,7 @@ import { ProtectedRoute } from './layouts/ProtectedRoute';
 import Layout from './layouts/MainLayout';
 
 // Lazy load pages for better performance
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+
 const Login = lazy(() => import('./pages/Login'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ClientManager = lazy(() => import('./pages/ClientManager'));
@@ -33,7 +33,7 @@ const App: React.FC = () => {
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout>
-                  <Dashboard />
+                  <ClientManager />
                 </Layout>
               </ProtectedRoute>
             } />
