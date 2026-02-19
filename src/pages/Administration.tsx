@@ -57,7 +57,7 @@ interface Transaction {
     status: 'pago' | 'pendente' | 'atrasado' | 'cancelado';
     manual_override?: boolean;
     payment_method?: string;
-    category?: 'pessoal' | 'profissional';
+    category?: 'profissional';
 }
 
 type DateRange = 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'nextMonth' | 'all' | 'custom';
@@ -88,23 +88,7 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
         }
     };
 
-    const handleMoveCategory = async (newCategory: 'pessoal' | 'profissional') => {
-        setLoading(true);
-        try {
-            const { error } = await supabase
-                .from('financial_transactions')
-                .update({ category: newCategory })
-                .eq('id', transaction.id);
 
-            if (error) throw error;
-            onUpdate();
-        } catch (err: any) {
-            alert('Erro: ' + err.message);
-        } finally {
-            setLoading(false);
-            setIsOpen(false);
-        }
-    };
 
     const [menuStyle, setMenuStyle] = useState<{ top?: number, bottom?: number, left?: number, right?: number }>({});
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -224,23 +208,7 @@ const TransactionMenu: React.FC<{ transaction: Transaction, onUpdate: () => void
 
                         <div className="h-px bg-slate-100 my-1"></div>
 
-                        {(transaction.category || 'profissional') === 'profissional' ? (
-                            <button
-                                onClick={() => handleMoveCategory('pessoal')}
-                                className="w-full text-left px-3 py-2 text-sm text-[#ffd700] hover:bg-slate-800 rounded-lg flex items-center gap-2"
-                            >
-                                <Briefcase size={14} />
-                                <span>Mover para Pessoal</span>
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => handleMoveCategory('profissional')}
-                                className="w-full text-left px-3 py-2 text-sm text-[#ffd700] hover:bg-slate-800 rounded-lg flex items-center gap-2"
-                            >
-                                <Building2 size={14} />
-                                <span>Mover para Profissional</span>
-                            </button>
-                        )}
+
                     </div>
                 </>,
                 document.body
@@ -254,7 +222,7 @@ interface TransactionModalProps {
     onClose: () => void;
     onSuccess: () => void;
     user_id: string;
-    defaultCategory: 'pessoal' | 'profissional';
+    defaultCategory: 'profissional';
     editingTransaction?: Transaction | null;
 }
 
@@ -272,7 +240,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
     useEffect(() => {
         if (editingTransaction) {
             setType(editingTransaction.amount >= 0 ? 'income' : 'expense');
-            setCategory(editingTransaction.category || 'profissional');
+            setCategory('profissional');
             setDescription(editingTransaction.description);
             setAmount(Math.abs(editingTransaction.amount).toString().replace('.', ','));
             setClientName(editingTransaction.client_name);
@@ -287,7 +255,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
         } else {
             // Reset for new transaction
             setType('income');
-            setCategory(defaultCategory);
+            setCategory('profissional');
             setDescription('');
             setAmount('');
             setClientName('');
@@ -398,22 +366,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
                         </button>
                     </div>
 
-                    <div className="flex bg-slate-100 p-1 rounded-lg">
-                        <button
-                            type="button"
-                            onClick={() => setCategory('profissional')}
-                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${category === 'profissional' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Profissional
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setCategory('pessoal')}
-                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${category === 'pessoal' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Pessoal
-                        </button>
-                    </div>
+
 
                     <div>
                         <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Descrição</label>
@@ -527,7 +480,7 @@ const AdministrationDashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'finance' | 'contracts' | 'processes'>('finance');
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-    const [dashboardScope, setDashboardScope] = useState<'pessoal' | 'profissional'>('profissional');
+
 
     // Data State
     const [storedKpis, setStoredKpis] = useState<FinancialKPIs | null>(null);
@@ -623,57 +576,74 @@ const AdministrationDashboard: React.FC = () => {
         let start = new Date(0); // Epoch
         let end = new Date(); // Now
 
+        // Helper to ensure we cover the full day
+        const getStartOfDay = (d: Date) => {
+            const newDate = new Date(d);
+            newDate.setHours(0, 0, 0, 0);
+            return newDate;
+        };
+
+        const getEndOfDay = (d: Date) => {
+            const newDate = new Date(d);
+            newDate.setHours(23, 59, 59, 999);
+            return newDate;
+        };
+
         switch (dateRange) {
             case 'today':
-                start = new Date(now.setHours(0, 0, 0, 0));
+                start = getStartOfDay(now);
+                end = getEndOfDay(now);
                 break;
             case 'last7':
-                start = new Date(now.setDate(now.getDate() - 7));
+                start = getStartOfDay(now);
+                start.setDate(now.getDate() - 7);
+                end = getEndOfDay(now);
                 break;
             case 'last30':
-                start = new Date(now.setDate(now.getDate() - 30));
+                start = getStartOfDay(now);
+                start.setDate(now.getDate() - 30);
+                end = getEndOfDay(now);
                 break;
             case 'thisMonth':
                 start = new Date(now.getFullYear(), now.getMonth(), 1);
-                end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                // Last day of current month
+                end = getEndOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0));
                 break;
             case 'lastMonth':
                 start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                end = new Date(now.getFullYear(), now.getMonth(), 0);
+                // Last day of previous month
+                end = getEndOfDay(new Date(now.getFullYear(), now.getMonth(), 0));
                 break;
             case 'nextMonth':
                 start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-                end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+                // Last day of next month
+                end = getEndOfDay(new Date(now.getFullYear(), now.getMonth() + 2, 0));
                 break;
             case 'all':
-                // Default start
+                start = new Date(0);
+                end = new Date(8640000000000000); // Max valid date
                 break;
             case 'custom':
                 // Custom range - Use APPLIED values
-                if (appliedCustomStart) start = new Date(appliedCustomStart);
-                if (appliedCustomEnd) end = new Date(appliedCustomEnd);
-                // Need to ensure end date includes end of day if it's just a date string
-                if (appliedCustomEnd) end.setHours(23, 59, 59, 999);
+                if (appliedCustomStart) start = getStartOfDay(new Date(appliedCustomStart));
+                if (appliedCustomEnd) end = getEndOfDay(new Date(appliedCustomEnd));
                 break;
         }
 
         const filtered = allTransactions.filter(t => {
+            // Adjust transaction date to handle potential timezone issues if stored as UTC but meant as local day
+            // Assuming transaction_date is ISO string. 
+            // We compare timestamps to be safe.
             const tDate = new Date(t.transaction_date);
-            return tDate >= start && tDate <= end;
+            return tDate.getTime() >= start.getTime() && tDate.getTime() <= end.getTime();
         });
 
         // Apply Dashboard Scope Filter
-        const scopedFiltered = filtered.filter(t => (t.category || 'profissional') === dashboardScope); // Default to professional for backwards compatibility
+        const scopedFiltered = filtered.filter(t => (t.category || 'profissional') === 'profissional');
 
         setFilteredTransactions(scopedFiltered);
-
-
-
-
         setCurrentPage(1); // Reset to first page on filter change
-
-
-    }, [dateRange, allTransactions, appliedCustomStart, appliedCustomEnd, dashboardScope]);
+    }, [dateRange, allTransactions, appliedCustomStart, appliedCustomEnd]);
 
     const dynamicKPIs = useMemo(() => {
         if (!filteredTransactions.length) return {
@@ -857,7 +827,7 @@ const AdministrationDashboard: React.FC = () => {
                     }}
                     onSuccess={() => { fetchFinancialData(); }}
                     user_id={user.id}
-                    defaultCategory={dashboardScope}
+                    defaultCategory="profissional"
                     editingTransaction={editingTransaction}
                 />
             )}
@@ -901,21 +871,7 @@ const AdministrationDashboard: React.FC = () => {
                                 Nova Transação
                             </button>
 
-                            {/* Scope Toggle */}
-                            <div className="flex bg-slate-100 p-1 rounded-lg">
-                                <button
-                                    onClick={() => setDashboardScope('profissional')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${dashboardScope === 'profissional' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    Profissional
-                                </button>
-                                <button
-                                    onClick={() => setDashboardScope('pessoal')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${dashboardScope === 'pessoal' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    Pessoal
-                                </button>
-                            </div>
+
 
                             <div className="relative">
                                 <button
@@ -1258,11 +1214,8 @@ const AdministrationDashboard: React.FC = () => {
                                                             <div className="text-xs text-slate-400 mt-0.5">{trx.description}</div>
                                                         </td>
                                                         <td className="px-8 py-5">
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${(trx.category || 'profissional') === 'pessoal'
-                                                                ? 'bg-purple-50 text-purple-700 border-purple-100'
-                                                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                                                                }`}>
-                                                                {trx.category || 'Profissional'}
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border bg-slate-100 text-slate-600 border-slate-200">
+                                                                Profissional
                                                             </span>
                                                         </td>
                                                         <td className="px-8 py-5 text-sm font-black text-slate-900">

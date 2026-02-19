@@ -38,7 +38,7 @@ interface Transaction {
 const ClientDetail: React.FC = () => {
   const { user } = useAuth();
   const { clientId } = useParams();
-  const [activeTab, setActiveTab] = useState<'credentials' | 'costs'>('credentials');
+  const [activeTab, setActiveTab] = useState<'credentials' | 'costs'>('costs');
   const [copied, setCopied] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
