@@ -13,6 +13,8 @@ import {
     Building2,
     ChevronLeft,
     Bot,
+    Plus,
+    Target,
 
 } from 'lucide-react';
 import { useRBAC } from '../hooks/useRBAC';
@@ -121,6 +123,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 icon={<Bot size={20} />}
                                 label="Agentes de IA"
                                 active={location.pathname.startsWith('/agents')}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
+                        {canAccess('clients') && (
+                            <SidebarItem
+                                to="/prospecting"
+                                icon={<Target size={20} />}
+                                label="Prospecção"
+                                active={location.pathname.startsWith('/prospecting')}
                                 isCollapsed={isCollapsed}
                             />
                         )}

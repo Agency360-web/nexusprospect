@@ -176,28 +176,27 @@ const AiAgents: React.FC = () => {
     }
 
     return (
-        <div className="space-y-8 animate-in slide-in-from-right-2 duration-300 max-w-4xl">
+        <div className="space-y-8 animate-in slide-in-from-right-2 duration-300 pb-20">
             {/* Header */}
-            <div className="flex flex-col md:flex-row gap-4 md:items-end justify-between border-b border-slate-200 pb-6 mb-8">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Bot size={28} className="text-[#ffd700]" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Agentes de IA</h1>
-                        <p className="text-sm text-slate-500 mt-1">
-                            Configure o comportamento e as mensagens do seu assistente virtual.
-                        </p>
-                    </div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative shadow-2xl shadow-slate-900/10 mb-8">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+                <div className="relative z-10 text-center md:text-left">
+                    <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight flex flex-col md:flex-row items-center justify-center md:justify-start gap-3">
+                        <Bot className="text-yellow-500" size={32} />
+                        Agentes de IA
+                    </h1>
+                    <p className="text-slate-300 font-medium text-sm md:text-base">
+                        Configure o comportamento e as mensagens do seu assistente virtual.
+                    </p>
                 </div>
 
-                <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm">
-                    <span className={`text-sm font-bold ${settings.is_active ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <div className="relative z-10 w-full md:w-auto flex items-center justify-center md:justify-end gap-3 bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/10 shadow-sm">
+                    <span className={`text-sm font-bold ${settings.is_active ? 'text-emerald-400' : 'text-slate-300'}`}>
                         {settings.is_active ? 'Agente Ativado' : 'Agente Desativado'}
                     </span>
                     <button
                         onClick={() => setSettings({ ...settings, is_active: !settings.is_active })}
-                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none ${settings.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none ${settings.is_active ? 'bg-emerald-500' : 'bg-white/20'}`}
                     >
                         <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 ${settings.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
