@@ -12,14 +12,16 @@ import {
   Trash2,
   Building2,
   Link2,
+  Cable,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRBAC } from '../hooks/useRBAC';
 import Modal from '../components/ui/Modal';
 import { supabase } from '../services/supabase';
 import IntegrationsTab from '../components/settings/IntegrationsTab';
+import ConnectionsTab from '../components/settings/ConnectionsTab';
 
-type SettingsTab = 'general' | 'users' | 'integrations';
+type SettingsTab = 'general' | 'users' | 'integrations' | 'connections';
 
 interface Profile {
   id: string;
@@ -254,6 +256,7 @@ const SettingsPage: React.FC = () => {
             <TabItem id="general" label="Geral" icon={Settings} />
             <TabItem id="users" label="Usuários & Acessos" icon={Users} />
             <TabItem id="integrations" label="Integrações" icon={Link2} />
+            <TabItem id="connections" label="Conexões" icon={Cable} />
 
             <div className="pt-4 border-t border-slate-200 mt-4">
               <button
@@ -364,6 +367,10 @@ const SettingsPage: React.FC = () => {
 
             {activeTab === 'integrations' && (
               <IntegrationsTab />
+            )}
+
+            {activeTab === 'connections' && (
+              <ConnectionsTab />
             )}
 
 

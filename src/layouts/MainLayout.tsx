@@ -12,6 +12,7 @@ import {
     DollarSign,
     Building2,
     ChevronLeft,
+    Bot,
 
 } from 'lucide-react';
 import { useRBAC } from '../hooks/useRBAC';
@@ -111,6 +112,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 icon={<Users size={20} />}
                                 label="Clientes"
                                 active={location.pathname.startsWith('/clients')}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
+                        {canAccess('clients') && (
+                            <SidebarItem
+                                to="/agents"
+                                icon={<Bot size={20} />}
+                                label="Agentes de IA"
+                                active={location.pathname.startsWith('/agents')}
                                 isCollapsed={isCollapsed}
                             />
                         )}

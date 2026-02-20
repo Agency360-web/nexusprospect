@@ -10,6 +10,7 @@ const Login = lazy(() => import('./pages/Login'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ClientManager = lazy(() => import('./pages/ClientManager'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail'));
+const AiAgents = lazy(() => import('./pages/AiAgents'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const AdministrationDashboard = lazy(() => import('./pages/Administration'));
 // Loading fallback
@@ -41,6 +42,13 @@ const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <ClientManager />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/agents" element={
+              <ProtectedRoute>
+                <Layout>
+                  <AiAgents />
                 </Layout>
               </ProtectedRoute>
             } />
