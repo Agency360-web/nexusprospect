@@ -804,13 +804,13 @@ const AdministrationDashboard: React.FC = () => {
     const TabButton = ({ id, label, icon: Icon }: { id: typeof activeTab, label: string, icon: any }) => (
         <button
             onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-300 font-bold text-sm ${activeTab === id
-                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 scale-105'
+            className={`flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl transition-all duration-300 font-bold text-sm ${activeTab === id
+                ? 'bg-slate-900 text-white shadow-md'
                 : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
         >
             <Icon size={18} className={activeTab === id ? 'text-brand-400' : ''} />
-            <span>{label}</span>
+            <span className="whitespace-nowrap">{label}</span>
         </button>
     );
 
@@ -850,7 +850,7 @@ const AdministrationDashboard: React.FC = () => {
             </div>
 
             {/* Tabs Nav - Premium Pills */}
-            <div className="flex p-1.5 bg-white border border-slate-200 rounded-2xl w-fit sticky top-4 z-20 shadow-sm mx-auto md:mx-0">
+            <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full sticky top-4 z-20 shadow-sm overflow-x-auto hide-scrollbar">
                 <TabButton id="finance" label="Financeiro" icon={Activity} />
                 <TabButton id="contracts" label="Gestão de Contratos" icon={FileText} />
                 <TabButton id="processes" label="Processos Operacionais" icon={Briefcase} />
