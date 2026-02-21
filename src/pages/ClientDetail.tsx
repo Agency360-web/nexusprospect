@@ -14,9 +14,11 @@ import {
   TrendingUp,
   TrendingDown,
   PieChart,
+  Users,
 } from 'lucide-react';
 import { Client, OperationalCost } from '../types';
 import ClientCredentials from '../components/ClientCredentials';
+import { ClientLeadsTab } from '../components/clients/ClientLeadsTab';
 import { supabase } from '../services/supabase';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,7 +40,7 @@ interface Transaction {
 const ClientDetail: React.FC = () => {
   const { user } = useAuth();
   const { clientId } = useParams();
-  const [activeTab, setActiveTab] = useState<'credentials' | 'costs'>('costs');
+  const [activeTab, setActiveTab] = useState<'credentials' | 'costs' | 'leads'>('costs');
   const [copied, setCopied] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -321,6 +323,7 @@ const ClientDetail: React.FC = () => {
 
         <TabButton id="credentials" label="Acessos" icon={Key} />
         <TabButton id="costs" label="Custos" icon={DollarSign} />
+        <TabButton id="leads" label="Leads" icon={Users} />
       </div>
 
       <div className="pt-4">
@@ -338,6 +341,10 @@ const ClientDetail: React.FC = () => {
 
         {activeTab === 'credentials' && (
           <ClientCredentials clientId={clientId!} />
+        )}
+
+        {activeTab === 'leads' && (
+          <ClientLeadsTab clientId={clientId!} />
         )}
 
         {activeTab === 'costs' && (

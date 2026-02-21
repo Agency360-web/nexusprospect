@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Target, Send, MessageCircle, MapPin, Instagram, Building2 } from 'lucide-react';
+import { WhatsAppCampaignForm } from '../components/prospecting/WhatsAppCampaignForm';
 
 const Prospecting: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'messages' | 'instagram_messages' | 'maps' | 'instagram' | 'cnpj'>('messages');
@@ -34,7 +35,7 @@ const Prospecting: React.FC = () => {
             </div>
 
             {/* Tabs Nav - Premium Pills */}
-            <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full sticky top-4 z-20 shadow-sm overflow-x-auto hide-scrollbar">
+            <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full shadow-sm overflow-x-auto hide-scrollbar">
                 <TabButton id="messages" label="Disparo no WhatsApp" icon={Send} />
                 <TabButton id="instagram_messages" label="Disparo no Instagram" icon={Send} />
                 <TabButton id="maps" label="Leads no Google Maps" icon={MapPin} />
@@ -44,13 +45,7 @@ const Prospecting: React.FC = () => {
 
             <div className="pt-6">
                 {activeTab === 'messages' && (
-                    <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
-                        <Send size={48} className="text-slate-200 mb-4" />
-                        <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
-                        <p className="text-slate-500 mt-2 max-w-md">
-                            As ferramentas de disparo de mensagem estarão disponíveis aqui em breve.
-                        </p>
-                    </div>
+                    <WhatsAppCampaignForm />
                 )}
 
                 {activeTab === 'instagram_messages' && (

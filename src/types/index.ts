@@ -107,4 +107,20 @@ export interface Complaint {
   createdAt: string;
 }
 
+export interface LeadFolder {
+  id: string;
+  name: string;
+  client_id: string;
+  created_at: string;
+}
 
+export interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  company?: string;
+  company_site?: string;
+  client_id?: string;
+  folder_id?: string;
+  created_at?: string;
+}

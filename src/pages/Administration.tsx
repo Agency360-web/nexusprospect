@@ -850,7 +850,7 @@ const AdministrationDashboard: React.FC = () => {
             </div>
 
             {/* Tabs Nav - Premium Pills */}
-            <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full sticky top-4 z-20 shadow-sm overflow-x-auto hide-scrollbar">
+            <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full shadow-sm overflow-x-auto hide-scrollbar">
                 <TabButton id="finance" label="Financeiro" icon={Activity} />
                 <TabButton id="contracts" label="Gestão de Contratos" icon={FileText} />
                 <TabButton id="processes" label="Processos Operacionais" icon={Briefcase} />

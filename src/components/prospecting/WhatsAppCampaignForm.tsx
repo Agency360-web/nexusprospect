@@ -1,0 +1,610 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../services/supabase';
+import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+
+export const WhatsAppCampaignForm: React.FC = () => {
+    const [campaignType, setCampaignType] = useState<'simple' | 'ai' | 'multi' | ''>('');
+    const [name, setName] = useState('');
+    const [minDelay, setMinDelay] = useState(15);
+    const [maxDelay, setMaxDelay] = useState(30);
+    const [messageDelay, setMessageDelay] = useState(5);
+    const [messageText, setMessageText] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [leads, setLeads] = useState<any[]>([]);
+    const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
+    const [planLimit, setPlanLimit] = useState<number | null>(null);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+    const { user } = useAuth();
+    const [clients, setClients] = useState<any[]>([]);
+    const [folders, setFolders] = useState<any[]>([]);
+    const [selectedClientId, setSelectedClientId] = useState<string>('');
+    const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+    const [connections, setConnections] = useState<any[]>([]);
+    const [selectedConnection, setSelectedConnection] = useState<string>('');
+
+    useEffect(() => {
+        const fetchPlanLimit = async () => {
+            try {
+                const { data, error } = await supabase.functions.invoke('whatsapp-uazapi', {
+                    body: { action: 'list' },
+                });
+                if (!error && data) {
+                    setPlanLimit(data.plan_limit || 1);
+                    if (data.connections && data.connections.length > 0) {
+                        const activeConnections = data.connections.filter((c: any) => c.status === 'connected');
+                        setConnections(activeConnections);
+                        if (activeConnections.length > 0) {
+                            setSelectedConnection(activeConnections[0].instance);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching plan limit:', err);
+            }
+        };
+        fetchPlanLimit();
+    }, []);
+
+    useEffect(() => {
+        const fetchClients = async () => {
+            if (!user) return;
+            try {
+                const { data, error } = await supabase
+                    .from('clients')
+                    .select('id, name')
+                    .eq('user_id', user.id)
+                    .order('name');
+                if (!error && data) setClients(data);
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchClients();
+    }, [user]);
+
+    useEffect(() => {
+        const fetchFoldersAndLeads = async () => {
+            if (!selectedClientId) {
+                setFolders([]);
+                setLeads([]);
+                return;
+            }
+            try {
+                const { data: folderData } = await supabase
+                    .from('lead_folders')
+                    .select('id, name')
+                    .eq('client_id', selectedClientId);
+                setFolders(folderData || []);
+
+                let query = supabase.from('leads').select('id, name, company, phone').eq('client_id', selectedClientId).order('name');
+                if (selectedFolderId) {
+                    query = query.eq('folder_id', selectedFolderId);
+                }
+                const { data: leadsData } = await query;
+                setLeads(leadsData || []);
+                setSelectedLeads([]);
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchFoldersAndLeads();
+    }, [selectedClientId, selectedFolderId]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        // Basic validation
+        if (!campaignType) {
+            alert('Por favor, selecione o tipo de disparo.');
+            return;
+        }
+        if (!name.trim()) {
+            alert('Por favor, insira o nome da campanha.');
+            return;
+        }
+        if (!selectedConnection) {
+            alert('Por favor, selecione uma instância do WhatsApp conectada.');
+            return;
+        }
+        if (selectedLeads.length === 0) {
+            alert('Por favor, selecione ao menos um lead.');
+            return;
+        }
+
+        setLoading(true);
+        setSuccess(false);
+
+        try {
+            // Retrieve session and auth info
+            const { data: { session } } = await supabase.auth.getSession();
+            const userId = session?.user?.id;
+
+            // 1. Save locally to Supabase 'campaigns' table (optional but recommended for history)
+            const { data: campaignData, error: dbError } = await supabase
+                .from('campaigns')
+                .insert([{
+                    name,
+                    status: 'active',
+                    type: 'whatsapp_marketing',
+                    user_id: userId,
+                    configuration: {
+                        campaignType,
+                        minDelay,
+                        maxDelay,
+                        messageDelay,
+                        messageText: messageText || '',
+                        selectedLeadsCount: selectedLeads.length,
+                        clientId: selectedClientId,
+                        folderId: selectedFolderId || null
+                    }
+                }])
+                .select()
+                .single();
+
+            if (dbError) {
+                console.error('Erro ao salvar campanha no banco local:', dbError);
+                // Continue to webhook even if local save fails, or you can throw
+            }
+
+            // 2. Prepare payload for N8N Webhook (JSON format)
+            const convertFileToBase64 = (file: File): Promise<string> => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = (error) => reject(error);
+                });
+            };
+
+            let fileBase64 = null;
+            let fileMimeType = null;
+            let fileName = null;
+
+            if (file) {
+                fileBase64 = await convertFileToBase64(file);
+                fileMimeType = file.type;
+                fileName = file.name;
+            }
+
+            const currentConn = connections.find(c => c.instance === selectedConnection);
+            const currentFolder = folders.find(f => f.id === selectedFolderId);
+
+            // Fetch the full details of the selected leads so N8N doesn't need to query them back
+            const fullSelectedLeads = selectedLeads
+                .map(id => leads.find(l => l.id === id))
+                .filter(Boolean); // Remove null/undefined
+
+            const payload = {
+                campaignType,
+                name,
+                minDelay,
+                maxDelay,
+                messageDelay,
+                messageText,
+                selectedLeads: fullSelectedLeads,
+                clientId: selectedClientId,
+                folderId: selectedFolderId || null,
+                folderName: currentFolder?.name || 'Todas as Pastas',
+                userId: userId || '',
+                campaignId: campaignData?.id || null,
+                file: fileBase64,
+                mimetype: fileMimeType,
+                fileName: fileName,
+                instance: selectedConnection,
+                instanceToken: currentConn?.token || null
+            };
+
+            const webhookUrl = 'https://nexus360.infra-conectamarketing.site/webhook-test/nexus-disparos';
+
+            console.log('Enviando dados para o webhook de teste...', webhookUrl);
+
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Falha no envio do webhook: ${response.statusText}`);
+            }
+
+            console.log('Webhook disparado com sucesso!', await response.text());
+
+            setSuccess(true);
+
+            // Optional: Limpa form após sucesso 
+            setTimeout(() => {
+                setSuccess(false);
+                setName('');
+                setMessageText('');
+                setSelectedLeads([]);
+                setFile(null);
+                setCampaignType('');
+                setSelectedClientId('');
+                setSelectedFolderId('');
+                // Keep the same selected instance to make it easier for subsequent campaigns
+            }, 3000);
+
+        } catch (error: any) {
+            console.error('Erro ao criar campanha:', error);
+            alert(`Houve um erro ao processar a campanha: ${error.message || 'Tente novamente.'}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleLeadSelection = (leadId: string) => {
+        setSelectedLeads(prev =>
+            prev.includes(leadId)
+                ? prev.filter(id => id !== leadId)
+                : [...prev, leadId]
+        );
+    };
+
+    const selectAllLeads = () => {
+        if (selectedLeads.length === leads.length && leads.length > 0) {
+            setSelectedLeads([]);
+        } else {
+            setSelectedLeads(leads.map(l => l.id));
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-slate-200 animate-in slide-in-from-bottom-2 duration-400">
+            <div className="mb-8">
+                <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                    <Send className="text-brand-500" size={28} />
+                    Configuração da Campanha
+                </h2>
+                <p className="text-slate-500 mt-2 font-medium">
+                    Crie uma nova campanha de disparo no WhatsApp, ajuste os detalhes e selecione seus leads.
+                </p>
+            </div>
+
+            <div className="mb-10">
+                <label className="block text-sm font-bold text-slate-700 mb-4">Selecione o Tipo de Disparo *</label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button
+                        type="button"
+                        onClick={() => setCampaignType('simple')}
+                        className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'simple' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                    >
+                        <Zap className={`mb-3 ${campaignType === 'simple' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
+                        <span className={`font-bold ${campaignType === 'simple' ? 'text-white' : 'text-slate-700'}`}>Disparo Simples</span>
+                        <span className={`text-xs text-center mt-2 ${campaignType === 'simple' ? 'text-slate-300' : 'text-slate-500'}`}>Envio de mensagens em massa padrão.</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setCampaignType('ai')}
+                        className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'ai' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                    >
+                        <Bot className={`mb-3 ${campaignType === 'ai' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
+                        <span className={`font-bold ${campaignType === 'ai' ? 'text-white' : 'text-slate-700'}`}>Disparo com IA</span>
+                        <span className={`text-xs text-center mt-2 ${campaignType === 'ai' ? 'text-slate-300' : 'text-slate-500'}`}>Envio de mensagens em massa personalizado com IA.</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (planLimit !== null && planLimit < 3) {
+                                setShowUpgradeModal(true);
+                            } else {
+                                setCampaignType('multi');
+                            }
+                        }}
+                        className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'multi' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                    >
+                        {planLimit !== null && planLimit < 3 && (
+                            <div className="absolute top-3 right-3">
+                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${campaignType === 'multi' ? 'bg-amber-500/20 text-yellow-500 border-amber-500/30' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                    PRO
+                                </span>
+                            </div>
+                        )}
+                        <Layers className={`mb-3 ${campaignType === 'multi' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
+                        <span className={`font-bold ${campaignType === 'multi' ? 'text-white' : 'text-slate-700'}`}>Disparo Multi-Instância</span>
+                        <span className={`text-xs text-center mt-2 ${campaignType === 'multi' ? 'text-slate-300' : 'text-slate-500'}`}>Distribui os envios entre vários números.</span>
+                    </button>
+                </div>
+            </div>
+
+            {campaignType && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                    {/* Instância do WhatsApp */}
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                            <Smartphone size={16} className="text-slate-400" />
+                            Instância do WhatsApp *
+                        </label>
+                        <select
+                            value={selectedConnection}
+                            onChange={(e) => setSelectedConnection(e.target.value)}
+                            required
+                            className="w-full bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
+                        >
+                            <option value="">Selecione uma instância conectada...</option>
+                            {connections.map(c => (
+                                <option key={c.instance} value={c.instance}>
+                                    {c.profile_name || c.instance} {c.phone_number ? `(${c.phone_number})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                        {connections.length === 0 && (
+                            <p className="text-xs text-red-500 mt-2 font-medium flex items-center gap-1">
+                                <AlertCircle size={12} />
+                                Nenhuma instância do WhatsApp conectada. Vá em Configurações para conectar.
+                            </p>
+                        )}
+                    </div>
+
+                    {/* 1. Nome da Campanha */}
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">1. Nome da Campanha *</label>
+                        <input
+                            type="text"
+                            required
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Ex: Oferta Black Friday 2026"
+                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
+                        />
+                    </div>
+
+                    {/* 2. Delay Mínimo e Máximo */}
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                        <label className="block text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                            <Clock size={16} className="text-slate-400" />
+                            2. Intervalo de Disparo Base (Delay Mínimo e Máximo)
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Mínimo (Segundos)</span>
+                                <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    value={minDelay}
+                                    onChange={(e) => setMinDelay(Number(e.target.value))}
+                                    className="w-full bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
+                                />
+                            </div>
+                            <div>
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Máximo (Segundos)</span>
+                                <input
+                                    type="number"
+                                    required
+                                    min={minDelay}
+                                    value={maxDelay}
+                                    onChange={(e) => setMaxDelay(Number(e.target.value))}
+                                    className="w-full bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
+                                />
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-3 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            Define o tempo aleatório de espera entre o envio para leads diferentes.
+                        </p>
+                    </div>
+
+                    {/* 4. Delay entre mensagens (mova a ordem visual pra facilitar agrupamento de tempo) */}
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">3. Delay entre as mensagens (segundos) *</label>
+                        <input
+                            type="number"
+                            required
+                            min="1"
+                            value={messageDelay}
+                            onChange={(e) => setMessageDelay(Number(e.target.value))}
+                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
+                        />
+                        <p className="text-xs text-slate-400 mt-2">
+                            Tempo de espera caso você envie mídia e texto separados para o mesmo lead.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* 3. Upload de Mídia (Opcional) */}
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">4. Mídia (Opcional)</label>
+                            <label className={`cursor-pointer border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center transition-colors h-48 ${file ? 'border-brand-400 bg-brand-50' : 'border-slate-300 hover:border-brand-400 hover:bg-slate-50'}`}>
+                                {file ? (
+                                    <div className="text-center">
+                                        <CheckCircle2 className="text-brand-500 mb-2 mx-auto" size={32} />
+                                        <span className="text-sm font-bold text-slate-800 block truncate max-w-[200px]">{file.name}</span>
+                                        <span className="text-xs text-brand-600 mt-1 block">Clique para trocar</span>
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-slate-500">
+                                        <ImageIcon className="mb-3 mx-auto" size={32} />
+                                        <span className="text-sm font-bold block mb-1">Upload de Imagem/Vídeo/Áudio</span>
+                                        <span className="text-xs text-slate-400">Formatos suportados (PNG, JPG, MP4, MP3)</span>
+                                    </div>
+                                )}
+                                <input type="file" className="hidden" accept="image/*,video/*,audio/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                            </label>
+                        </div>
+
+                        {/* 5. Caixa de texto (Opcional) */}
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                <AlignLeft size={16} className="text-slate-400" />
+                                5. Mensagem de Texto (Opcional)
+                            </label>
+                            <textarea
+                                value={messageText}
+                                onChange={(e) => setMessageText(e.target.value)}
+                                placeholder="Olá {nome}, tudo bem? Temos uma oportunidade incrível..."
+                                className="w-full h-48 bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium resize-none"
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    {/* 6. Selecionar Cliente e Pasta */}
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <Building2 size={16} className="text-slate-400" />
+                                    6. Cliente
+                                </label>
+                                <select
+                                    value={selectedClientId}
+                                    onChange={(e) => {
+                                        setSelectedClientId(e.target.value);
+                                        setSelectedFolderId('');
+                                    }}
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
+                                >
+                                    <option value="">Selecione um cliente...</option>
+                                    {clients.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <Folder size={16} className="text-slate-400" />
+                                    7. Pasta de Leads (Opcional)
+                                </label>
+                                <select
+                                    value={selectedFolderId}
+                                    onChange={(e) => setSelectedFolderId(e.target.value)}
+                                    disabled={!selectedClientId}
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium disabled:opacity-50"
+                                >
+                                    <option value="">Todas as Pastas</option>
+                                    {folders.map(f => (
+                                        <option key={f.id} value={f.id}>{f.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between mb-4 mt-6">
+                            <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                <Users size={18} className="text-slate-400" />
+                                8. Selecionar Leads ({leads.length})
+                            </label>
+                            <button
+                                type="button"
+                                onClick={selectAllLeads}
+                                className="text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 py-1.5 px-4 rounded-lg transition-colors"
+                            >
+                                {selectedLeads.length === leads.length && leads.length > 0 ? 'Desmarcar todos' : 'Selecionar todos'}
+                            </button>
+                        </div>
+
+                        <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden max-h-64 overflow-y-auto">
+                            {leads.length === 0 ? (
+                                <div className="p-8 text-center text-slate-500">
+                                    Nenhum lead encontrado.
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-slate-100">
+                                    {leads.map((lead) => (
+                                        <label key={lead.id} className="flex items-center gap-4 p-4 hover:bg-white cursor-pointer transition-colors">
+                                            <div className="flex-shrink-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedLeads.includes(lead.id)}
+                                                    onChange={() => toggleLeadSelection(lead.id)}
+                                                    className="w-5 h-5 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
+                                                />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-800">{lead.name || 'Lead sem nome'}</p>
+                                                <p className="text-xs font-semibold text-slate-400">
+                                                    {lead.company && <span className="mr-2">{lead.company}</span>}
+                                                    {lead.phone && <span>{lead.phone}</span>}
+                                                </p>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <p className="text-xs font-semibold text-slate-500 mt-2 text-right">
+                            {selectedLeads.length} de {leads.length} leads selecionados
+                        </p>
+                    </div>
+
+                    {/* 7. Criar Campanha */}
+                    <div className="pt-6 border-t border-slate-100 flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={loading || !name || !campaignType}
+                            className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-900/20"
+                        >
+                            {loading ? (
+                                <div className="w-5 h-5 relative flex items-center justify-center">
+                                    <div className="absolute inset-0 rounded-full border-2 border-white/20"></div>
+                                    <div className="absolute inset-0 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                                </div>
+                            ) : success ? (
+                                <CheckCircle2 size={20} className="text-green-400" />
+                            ) : (
+                                <Send size={20} />
+                            )}
+                            <span>{loading ? 'Criando...' : success ? 'Campanha Criada!' : 'Criar Campanha'}</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Upgrade Modal */}
+            {showUpgradeModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                <Layers className="text-amber-500" size={20} />
+                                Recurso Premium
+                            </h3>
+                            <button
+                                onClick={() => setShowUpgradeModal(false)}
+                                className="p-2 hover:bg-slate-200 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 text-center space-y-6">
+                            <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
+                                <Layers size={40} className="text-amber-500" />
+                            </div>
+                            <div className="space-y-2">
+                                <h4 className="text-xl font-black text-slate-900">Faça um Upgrade</h4>
+                                <p className="text-slate-500 text-sm">
+                                    O Disparo Multi-Instância permite distribuir suas mensagens entre vários números diferentes de forma simultânea. Para utilizar essa função, você precisa de um plano com <strong className="text-slate-700">3 ou mais instâncias</strong> conectadas.
+                                </p>
+                            </div>
+                            <div className="space-y-3 pt-4">
+                                <button
+                                    onClick={() => {
+                                        // TODO: The user will provide the link soon
+                                        window.open('https://example.com/upgrade', '_blank');
+                                        setShowUpgradeModal(false);
+                                    }}
+                                    className="w-full py-4 bg-amber-500 text-white hover:bg-amber-600 rounded-xl font-bold transition-all shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2"
+                                >
+                                    Fazer Upgrade de Plano
+                                    <ArrowRight size={18} />
+                                </button>
+                                <button
+                                    onClick={() => setShowUpgradeModal(false)}
+                                    className="w-full py-3 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </form>
+    );
+};
