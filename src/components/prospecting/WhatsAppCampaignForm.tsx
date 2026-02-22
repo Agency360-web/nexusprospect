@@ -80,7 +80,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
                     .eq('client_id', selectedClientId);
                 setFolders(folderData || []);
 
-                let query = supabase.from('leads').select('id, name, company, phone').eq('client_id', selectedClientId).order('name');
+                let query = supabase.from('leads').select('id, name, company, phone, website, address, rating, reviews, specialties').eq('client_id', selectedClientId).order('name');
                 if (selectedFolderId) {
                     query = query.eq('folder_id', selectedFolderId);
                 }

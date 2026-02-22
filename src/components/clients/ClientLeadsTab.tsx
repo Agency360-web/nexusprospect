@@ -3,6 +3,7 @@ import { supabase } from '../../services/supabase';
 import { Lead, LeadFolder } from '../../types';
 import { Folder, Users, Plus, Upload, Search, Trash2, MoreVertical, Loader2 } from 'lucide-react';
 import Modal from '../ui/Modal';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ClientLeadsTabProps {
     clientId: string;
@@ -12,6 +13,7 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
     const [folders, setFolders] = useState<LeadFolder[]>([]);
     const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
     const [leads, setLeads] = useState<Lead[]>([]);
+    const { user } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -20,7 +22,7 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
     const [modalLoading, setModalLoading] = useState(false);
 
     const [newFolderName, setNewFolderName] = useState('');
-    const [newLeadForm, setNewLeadForm] = useState({ name: '', phone: '', company: '', company_site: '' });
+    const [newLeadForm, setNewLeadForm] = useState({ name: '', phone: '', company: '', website: '' });
     const [importText, setImportText] = useState('');
 
     const fetchData = async () => {
@@ -72,7 +74,7 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
         try {
             const { data, error } = await supabase
                 .from('lead_folders')
-                .insert([{ name: newFolderName, client_id: clientId }])
+                .insert([{ name: newFolderName, client_id: clientId, user_id: user?.id }])
                 .select()
                 .single();
 
@@ -120,7 +122,7 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
 
             if (error) throw error;
 
-            setNewLeadForm({ name: '', phone: '', company: '', company_site: '' });
+            setNewLeadForm({ name: '', phone: '', company: '', website: '' });
             setActiveModal('none');
             fetchData();
         } catch (err) {
@@ -208,8 +210,8 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
                                     <button
                                         onClick={() => setActiveFolderId(folder.id)}
                                         className={`flex-1 flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-left ${activeFolderId === folder.id
-                                                ? 'bg-slate-900 text-white shadow-md'
-                                                : 'hover:bg-slate-100 text-slate-600'
+                                            ? 'bg-slate-900 text-white shadow-md'
+                                            : 'hover:bg-slate-100 text-slate-600'
                                             }`}
                                     >
                                         <Folder size={18} className={activeFolderId === folder.id ? 'text-amber-400' : 'text-slate-400'} />

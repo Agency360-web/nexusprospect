@@ -119,8 +119,13 @@ export interface Lead {
   name: string;
   phone: string;
   company?: string;
-  company_site?: string;
+  website?: string;
+  address?: string;
+  rating?: number;
+  reviews?: number;
+  specialties?: string;
   client_id?: string;
+  user_id: string;
   folder_id?: string;
   created_at?: string;
 }
