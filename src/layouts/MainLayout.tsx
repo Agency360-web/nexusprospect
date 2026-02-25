@@ -54,7 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* Mobile Top Header - Visible only on mobile */}
             <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4">
                 <div className="flex items-center space-x-2">
-                    <img src="/logo-icon.jpg" alt="Nexus" className="w-8 h-8 object-contain rounded-lg" />
+                    <img src="/nexus-logo.png" alt="Nexus" className="h-8 w-auto object-contain" />
                     <span className="font-black text-slate-900 tracking-tight">NEXUS</span>
                 </div>
                 <button
@@ -79,14 +79,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}>
                 <div className="flex flex-col h-full">
-                    <div className={`p-6 border-b border-slate-100 flex items-center transition-all duration-300 ${isCollapsed ? 'flex-col justify-center gap-2' : 'flex-row justify-between'}`}>
+                    <div className={`p-3 border-b border-slate-100 flex items-center transition-all duration-300 ${isCollapsed ? 'flex-col justify-center gap-2' : 'flex-row justify-between'}`}>
                         <div className={`flex items-center space-x-2 ${isCollapsed ? 'justify-center' : ''}`}>
                             {isCollapsed ? (
-                                <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-200">
-                                    <img src="/logo-icon.jpg" alt="Nexus" className="w-9 h-9 object-contain rounded-lg" />
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-transform duration-200">
+                                    <img src="/nexus-icon.jpg" alt="Nexus" className="w-12 h-12 object-contain rounded-lg" />
                                 </div>
                             ) : (
-                                <img src="/logo.png" alt="Conecta Marketing" className="h-28 w-auto object-contain animate-in fade-in duration-200" />
+                                <img src="/nexus-logo.png" alt="Nexus360" className="h-36 w-auto object-contain animate-in fade-in duration-200" />
                             )}
                         </div>
                         <button
