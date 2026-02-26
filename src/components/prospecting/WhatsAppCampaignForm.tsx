@@ -14,6 +14,8 @@ export const WhatsAppCampaignForm: React.FC = () => {
     const [leads, setLeads] = useState<any[]>([]);
     const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [leadsPerPage, setLeadsPerPage] = useState(20);
     const [success, setSuccess] = useState(false);
     const [planLimit, setPlanLimit] = useState<number | null>(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -88,6 +90,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
                 const { data: leadsData } = await query;
                 setLeads(leadsData || []);
                 setSelectedLeads([]);
+                setCurrentPage(1);
             } catch (err) {
                 console.error(err);
             }
@@ -561,44 +564,112 @@ export const WhatsAppCampaignForm: React.FC = () => {
                                 <Users size={18} className="text-slate-400" />
                                 8. Selecionar Leads ({leads.length})
                             </label>
-                            <button
-                                type="button"
-                                onClick={selectAllLeads}
-                                className="text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 py-1.5 px-4 rounded-lg transition-colors"
-                            >
-                                {selectedLeads.length === leads.length && leads.length > 0 ? 'Desmarcar todos' : 'Selecionar todos'}
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-0.5">
+                                    {[20, 50, 100].map(n => (
+                                        <button
+                                            key={n}
+                                            type="button"
+                                            onClick={() => { setLeadsPerPage(n); setCurrentPage(1); }}
+                                            className={`text-xs font-bold px-2.5 py-1 rounded-md transition-all ${leadsPerPage === n
+                                                    ? 'bg-white text-slate-800 shadow-sm'
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                        >
+                                            {n}
+                                        </button>
+                                    ))}
+                                    <span className="text-[10px] text-slate-400 pr-1.5">/ pág</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={selectAllLeads}
+                                    className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-lg transition-colors"
+                                >
+                                    {selectedLeads.length === leads.length && leads.length > 0 ? 'Desmarcar todos' : 'Selecionar todos'}
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden max-h-64 overflow-y-auto">
+                        <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden max-h-[520px] overflow-y-auto">
                             {leads.length === 0 ? (
                                 <div className="p-8 text-center text-slate-500">
                                     Nenhum lead encontrado.
                                 </div>
                             ) : (
                                 <div className="divide-y divide-slate-100">
-                                    {leads.map((lead) => (
-                                        <label key={lead.id} className="flex items-center gap-4 p-4 hover:bg-white cursor-pointer transition-colors">
-                                            <div className="flex-shrink-0">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedLeads.includes(lead.id)}
-                                                    onChange={() => toggleLeadSelection(lead.id)}
-                                                    className="w-5 h-5 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
-                                                />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-slate-800">{lead.name || 'Lead sem nome'}</p>
-                                                <p className="text-xs font-semibold text-slate-400">
-                                                    {lead.company && <span className="mr-2">{lead.company}</span>}
-                                                    {lead.phone && <span>{lead.phone}</span>}
-                                                </p>
-                                            </div>
-                                        </label>
-                                    ))}
+                                    {leads
+                                        .slice((currentPage - 1) * leadsPerPage, currentPage * leadsPerPage)
+                                        .map((lead) => (
+                                            <label key={lead.id} className="flex items-center gap-3 py-2 px-3 hover:bg-white cursor-pointer transition-colors">
+                                                <div className="flex-shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedLeads.includes(lead.id)}
+                                                        onChange={() => toggleLeadSelection(lead.id)}
+                                                        className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
+                                                    />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-sm text-slate-800 truncate">{lead.name || 'Lead sem nome'}</p>
+                                                    <p className="text-[11px] font-medium text-slate-400 truncate">
+                                                        {lead.company && <span className="mr-2">{lead.company}</span>}
+                                                        {lead.phone && <span>{lead.phone}</span>}
+                                                    </p>
+                                                </div>
+                                            </label>
+                                        ))}
                                 </div>
                             )}
                         </div>
+
+                        {/* Paginação */}
+                        {leads.length > leadsPerPage && (
+                            <div className="flex items-center justify-center gap-1.5 mt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    ← Anterior
+                                </button>
+                                {Array.from({ length: Math.ceil(leads.length / leadsPerPage) }, (_, i) => i + 1)
+                                    .filter(p => {
+                                        const total = Math.ceil(leads.length / leadsPerPage);
+                                        if (total <= 7) return true;
+                                        if (p === 1 || p === total) return true;
+                                        if (Math.abs(p - currentPage) <= 1) return true;
+                                        return false;
+                                    })
+                                    .map((p, idx, arr) => (
+                                        <React.Fragment key={p}>
+                                            {idx > 0 && arr[idx - 1] !== p - 1 && (
+                                                <span className="text-xs text-slate-300 px-1">…</span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentPage(p)}
+                                                className={`text-xs font-bold w-8 h-8 rounded-lg transition-all ${currentPage === p
+                                                        ? 'bg-slate-900 text-white shadow-sm'
+                                                        : 'text-slate-500 hover:bg-slate-100'
+                                                    }`}
+                                            >
+                                                {p}
+                                            </button>
+                                        </React.Fragment>
+                                    ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrentPage(p => Math.min(Math.ceil(leads.length / leadsPerPage), p + 1))}
+                                    disabled={currentPage === Math.ceil(leads.length / leadsPerPage)}
+                                    className="text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    Próximo →
+                                </button>
+                            </div>
+                        )}
+
                         <p className="text-xs font-semibold text-slate-500 mt-2 text-right">
                             {selectedLeads.length} de {leads.length} leads selecionados
                         </p>
