@@ -50,15 +50,30 @@ serve(async (req) => {
         // ACTION: CREATE INSTANCE
         // ============================
         if (action === 'create') {
-            // Check instance limit
+            // Check instance limit based on user's subscription plan
+            const { data: profile } = await supabaseAdmin
+                .from('profiles')
+                .select('plan_id')
+                .eq('id', user.id)
+                .single()
+
+            const userPlanId = profile?.plan_id || 'starter'
+
+            const { data: plan } = await supabaseAdmin
+                .from('subscription_plans')
+                .select('instance_limit')
+                .eq('id', userPlanId)
+                .single()
+
+            const planLimit = plan?.instance_limit || 1
+
             const { data: existing, error: countErr } = await supabaseAdmin
                 .from('whatsapp_connections')
-                .select('id, plan_limit')
+                .select('id')
                 .eq('user_id', user.id)
 
             if (countErr) throw new Error(`Erro ao verificar conexões: ${countErr.message}`)
 
-            const planLimit = existing?.[0]?.plan_limit || 1
             if (existing && existing.length >= planLimit) {
                 return new Response(
                     JSON.stringify({ error: `Limite de ${planLimit} instância(s) atingido. Exclua uma conexão existente ou faça upgrade do plano.` }),
@@ -101,7 +116,6 @@ serve(async (req) => {
                     token: uazapiData.token || uazapiData.instance?.token || null,
                     server_url: UAZAPI_BASE_URL,
                     status: 'disconnected',
-                    plan_limit: planLimit,
                 })
                 .select()
                 .single()
@@ -384,8 +398,21 @@ serve(async (req) => {
 
             if (listErr) throw new Error(`List error: ${listErr.message}`)
 
+            // Get plan limit from subscription_plans
+            const { data: profile } = await supabaseAdmin
+                .from('profiles')
+                .select('plan_id')
+                .eq('id', user.id)
+                .single()
+
+            const { data: plan } = await supabaseAdmin
+                .from('subscription_plans')
+                .select('instance_limit')
+                .eq('id', profile?.plan_id || 'starter')
+                .single()
+
             return new Response(
-                JSON.stringify({ success: true, connections: connections || [], plan_limit: connections?.[0]?.plan_limit || 1 }),
+                JSON.stringify({ success: true, connections: connections || [], plan_limit: plan?.instance_limit || 1 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
             )
         }

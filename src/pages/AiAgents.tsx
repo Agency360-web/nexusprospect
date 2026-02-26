@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Bot, Save, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Bot, Save, Loader2, AlertTriangle, CheckCircle2, Send, MessageCircle, RefreshCw } from 'lucide-react';
+
+type AgentType = 'dispatch' | 'support' | 'followup';
 
 interface AgentSettings {
     id?: string;
@@ -13,58 +15,59 @@ interface AgentSettings {
     temperature: number;
     provider: string;
     model: string;
-    prompt: string;
+    prompt_dispatch: string;
+    prompt_support: string;
+    prompt_followup: string;
 }
+
+const AGENT_TYPES: { id: AgentType; label: string; description: string; icon: React.ElementType }[] = [
+    { id: 'dispatch', label: 'Agente de Disparo', description: 'Personalize o agente para campanhas de envio de mensagens.', icon: Send },
+    { id: 'support', label: 'Agente de Atendimento', description: 'Personalize o agente para atendimento ao cliente via WhatsApp.', icon: MessageCircle },
+    { id: 'followup', label: 'Agente de Follow-up', description: 'Personalize o agente para acompanhamento pós-contato.', icon: RefreshCw },
+];
+
+const PROMPT_COLUMN: Record<AgentType, keyof AgentSettings> = {
+    dispatch: 'prompt_dispatch',
+    support: 'prompt_support',
+    followup: 'prompt_followup',
+};
+
+const defaultSettings: AgentSettings = {
+    is_active: false,
+    agent_name: '',
+    use_custom_initial_message: false,
+    initial_message: '',
+    language: 'pt-BR',
+    temperature: 0.7,
+    provider: 'openai',
+    model: 'gpt-3.5-turbo',
+    prompt_dispatch: '',
+    prompt_support: '',
+    prompt_followup: '',
+};
 
 const AiAgents: React.FC = () => {
     const { user } = useAuth();
+    const [selectedAgentType, setSelectedAgentType] = useState<AgentType | ''>('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-
-    const [settings, setSettings] = useState<AgentSettings>({
-        is_active: false,
-        agent_name: '',
-        use_custom_initial_message: false,
-        initial_message: '',
-        language: 'pt-BR',
-        temperature: 0.7,
-        provider: 'openai',
-        model: 'gpt-3.5-turbo',
-        prompt: ''
-    });
-
-    // Track which providers the user has API keys for
-    const [availableProviders, setAvailableProviders] = useState<string[]>([]);
+    const [settings, setSettings] = useState<AgentSettings>({ ...defaultSettings });
 
     useEffect(() => {
-        if (user) {
-            fetchSettings();
-        }
+        if (user) fetchSettings();
     }, [user]);
 
     const fetchSettings = async () => {
         try {
             setLoading(true);
-            // 1. Fetch Agent Settings
             const { data, error } = await supabase
                 .from('ai_agent_settings')
                 .select('*')
                 .eq('user_id', user!.id)
                 .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') throw error; // ignore no rows error
-
-            // 2. Fetch User API Keys to determine available providers
-            const { data: keysData, error: keysError } = await supabase
-                .from('user_api_keys')
-                .select('provider')
-                .eq('user_id', user!.id);
-
-            if (keysError) console.error("Error fetching API keys:", keysError);
-
-            const providers = keysData ? keysData.map(k => k.provider) : [];
-            setAvailableProviders(providers);
+            if (error && error.code !== 'PGRST116') throw error;
 
             if (data) {
                 setSettings({
@@ -77,7 +80,9 @@ const AiAgents: React.FC = () => {
                     temperature: data.temperature ?? 0.7,
                     provider: data.provider || 'openai',
                     model: data.model || 'gpt-3.5-turbo',
-                    prompt: data.prompt || ''
+                    prompt_dispatch: data.prompt_dispatch || '',
+                    prompt_support: data.prompt_support || '',
+                    prompt_followup: data.prompt_followup || '',
                 });
             }
         } catch (err: any) {
@@ -88,61 +93,55 @@ const AiAgents: React.FC = () => {
         }
     };
 
+    const currentPromptKey = selectedAgentType ? PROMPT_COLUMN[selectedAgentType] : null;
+    const currentPromptValue = currentPromptKey ? (settings[currentPromptKey] as string) : '';
+
+    const updatePrompt = (value: string) => {
+        if (!currentPromptKey) return;
+        setSettings(prev => ({ ...prev, [currentPromptKey]: value }));
+    };
+
     const handleSave = async () => {
-        if (!user) return;
+        if (!user || !selectedAgentType) return;
 
         try {
             setSaving(true);
             setMessage(null);
 
-            // Fetch organization_id (assuming the user has one from profiles/memberships)
-            // Just doing an upsert based on user_id might fail if organization_id is required
-            // Let's check if the user has a profile with organization_id, or if we can just update existing
+            const payload = {
+                is_active: settings.is_active,
+                agent_name: settings.agent_name,
+                use_custom_initial_message: settings.use_custom_initial_message,
+                initial_message: settings.use_custom_initial_message ? settings.initial_message : '',
+                language: settings.language,
+                temperature: settings.temperature,
+                provider: settings.provider,
+                model: settings.model,
+                prompt_dispatch: settings.prompt_dispatch,
+                prompt_support: settings.prompt_support,
+                prompt_followup: settings.prompt_followup,
+                updated_at: new Date().toISOString(),
+            };
 
             let query;
             if (settings.id) {
-                // Update
                 query = supabase
                     .from('ai_agent_settings')
-                    .update({
-                        is_active: settings.is_active,
-                        agent_name: settings.agent_name,
-                        use_custom_initial_message: settings.use_custom_initial_message,
-                        initial_message: settings.use_custom_initial_message ? settings.initial_message : '',
-                        language: settings.language,
-                        temperature: settings.temperature,
-                        provider: settings.provider,
-                        model: settings.model,
-                        prompt: settings.prompt,
-                        updated_at: new Date().toISOString()
-                    })
+                    .update(payload)
                     .eq('id', settings.id);
             } else {
-                // Insert (requires organization_id, we will get it from user profile)
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('organization_id')
                     .eq('id', user.id)
                     .single();
 
-                if (!profile?.organization_id) {
-                    throw new Error('Usuário não possui uma organização associada.');
-                }
-
                 query = supabase
                     .from('ai_agent_settings')
                     .insert({
-                        organization_id: profile.organization_id,
+                        ...payload,
+                        organization_id: profile?.organization_id || null,
                         user_id: user.id,
-                        is_active: settings.is_active,
-                        agent_name: settings.agent_name,
-                        use_custom_initial_message: settings.use_custom_initial_message,
-                        initial_message: settings.use_custom_initial_message ? settings.initial_message : '',
-                        language: settings.language,
-                        temperature: settings.temperature,
-                        provider: settings.provider,
-                        model: settings.model,
-                        prompt: settings.prompt
                     });
             }
 
@@ -150,14 +149,9 @@ const AiAgents: React.FC = () => {
             if (error) throw error;
 
             setMessage({ type: 'success', text: 'Configurações do agente salvas com sucesso!' });
-
-            // clear success message after 3 seconds
             setTimeout(() => setMessage(null), 3000);
 
-            // Refetch to get ID if it was an insert
-            if (!settings.id) {
-                fetchSettings();
-            }
+            if (!settings.id) fetchSettings();
 
         } catch (err: any) {
             console.error('Error saving agent settings:', err);
@@ -166,6 +160,8 @@ const AiAgents: React.FC = () => {
             setSaving(false);
         }
     };
+
+    const currentAgentLabel = AGENT_TYPES.find(a => a.id === selectedAgentType)?.label || 'Agente';
 
     if (loading) {
         return (
@@ -186,195 +182,179 @@ const AiAgents: React.FC = () => {
                         Agentes de IA
                     </h1>
                     <p className="text-slate-300 font-medium text-sm md:text-base">
-                        Configure o comportamento e as mensagens do seu assistente virtual.
+                        Selecione e personalize os agentes inteligentes da sua empresa.
                     </p>
-                </div>
-
-                <div className="relative z-10 w-full md:w-auto flex items-center justify-center md:justify-end gap-3 bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/10 shadow-sm">
-                    <span className={`text-sm font-bold ${settings.is_active ? 'text-emerald-400' : 'text-slate-300'}`}>
-                        {settings.is_active ? 'Agente Ativado' : 'Agente Desativado'}
-                    </span>
-                    <button
-                        onClick={() => setSettings({ ...settings, is_active: !settings.is_active })}
-                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none ${settings.is_active ? 'bg-emerald-500' : 'bg-white/20'}`}
-                    >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 ${settings.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
                 </div>
             </div>
 
-            {/* Notification */}
-            {message && (
-                <div className={`p-4 rounded-2xl border flex items-center gap-3 ${message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                    {message.type === 'success' ? <CheckCircle2 size={20} className="text-emerald-500" /> : <AlertTriangle size={20} className="text-red-500" />}
-                    <span className="text-sm font-medium">{message.text}</span>
+            {/* Main Card */}
+            <div className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-slate-200">
+                <div className="mb-8">
+                    <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                        <Bot className="text-brand-500" size={28} />
+                        Configuração do Agente
+                    </h2>
+                    <p className="text-slate-500 mt-2 font-medium">
+                        Selecione o tipo de agente que deseja personalizar e configure seu comportamento.
+                    </p>
                 </div>
-            )}
 
-            {/* Form */}
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 space-y-8">
-
-                {/* Basic Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700">Nome do Agente</label>
-                        <input
-                            type="text"
-                            value={settings.agent_name}
-                            onChange={(e) => setSettings({ ...settings, agent_name: e.target.value })}
-                            placeholder="Ex: Assistente Conecta"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700">Idioma do Agente</label>
-                        <select
-                            value={settings.language}
-                            onChange={(e) => setSettings({ ...settings, language: e.target.value })}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all"
-                        >
-                            <option value="pt-BR">Português (Brasil)</option>
-                            <option value="en-US">English (US)</option>
-                            <option value="es-ES">Español</option>
-                        </select>
+                {/* Agent Type Selector */}
+                <div className="mb-10">
+                    <label className="block text-sm font-bold text-slate-700 mb-4">Selecione o Agente *</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {AGENT_TYPES.map(({ id, label, description, icon: Icon }) => (
+                            <button
+                                key={id}
+                                type="button"
+                                onClick={() => setSelectedAgentType(selectedAgentType === id ? '' : id)}
+                                className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${selectedAgentType === id
+                                    ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1'
+                                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                    }`}
+                            >
+                                <Icon className={`mb-3 ${selectedAgentType === id ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
+                                <span className={`font-bold ${selectedAgentType === id ? 'text-white' : 'text-slate-700'}`}>{label}</span>
+                                <span className={`text-xs text-center mt-2 ${selectedAgentType === id ? 'text-slate-300' : 'text-slate-500'}`}>{description}</span>
+                            </button>
+                        ))}
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-sm font-bold text-slate-700">Mensagem Inicial Padrão</label>
-                        <p className="text-xs text-slate-500 mt-1 mb-3">Define como o agente iniciará o atendimento com o cliente.</p>
-
-                        <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                            <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-all ${!settings.use_custom_initial_message ? 'border-[#ffd700] bg-[#ffd700]/5' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
-                                <input
-                                    type="radio"
-                                    name="initialMsgType"
-                                    checked={!settings.use_custom_initial_message}
-                                    onChange={() => setSettings({ ...settings, use_custom_initial_message: false })}
-                                    className="w-4 h-4 text-[#ffd700] focus:ring-[#ffd700] border-slate-300"
-                                />
-                                <div className="ml-3">
-                                    <span className="block text-sm font-bold text-slate-900">Deixar o Agente decidir</span>
-                                    <span className="block text-xs text-slate-500">A IA vai gerar a mensagem inicial com base no prompt.</span>
-                                </div>
-                            </label>
-
-                            <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-all ${settings.use_custom_initial_message ? 'border-[#ffd700] bg-[#ffd700]/5' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
-                                <input
-                                    type="radio"
-                                    name="initialMsgType"
-                                    checked={settings.use_custom_initial_message}
-                                    onChange={() => setSettings({ ...settings, use_custom_initial_message: true })}
-                                    className="w-4 h-4 text-[#ffd700] focus:ring-[#ffd700] border-slate-300"
-                                />
-                                <div className="ml-3">
-                                    <span className="block text-sm font-bold text-slate-900">Mensagem fixa customizada</span>
-                                    <span className="block text-xs text-slate-500">O mesmo texto será enviado sempre no início.</span>
-                                </div>
-                            </label>
+                {/* Form — only shown when an agent type is selected */}
+                {selectedAgentType && (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                        {/* Active toggle */}
+                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">{currentAgentLabel}</p>
+                                <p className="text-xs text-slate-500">Ative ou desative este agente</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className={`text-sm font-bold ${settings.is_active ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                    {settings.is_active ? 'Ativado' : 'Desativado'}
+                                </span>
+                                <button
+                                    onClick={() => setSettings({ ...settings, is_active: !settings.is_active })}
+                                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none ${settings.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                >
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 ${settings.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    {settings.use_custom_initial_message && (
-                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                            <textarea
-                                value={settings.initial_message}
-                                onChange={(e) => setSettings({ ...settings, initial_message: e.target.value })}
-                                placeholder="Olá! Sou o assistente virtual. Como posso ajudar?"
-                                rows={2}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all resize-y"
-                            />
-                        </div>
-                    )}
-                </div>
+                        {/* Basic Settings */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">Nome do Agente</label>
+                                <input
+                                    type="text"
+                                    value={settings.agent_name}
+                                    onChange={(e) => setSettings({ ...settings, agent_name: e.target.value })}
+                                    placeholder="Ex: Assistente Conecta"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all"
+                                />
+                            </div>
 
-                <hr className="border-slate-100" />
-
-                {/* AI Config */}
-                <div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">Configuração da Inteligência Artificial</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-700">Provedor & Modelo</label>
-                            {availableProviders.length === 0 ? (
-                                <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl flex items-start gap-3">
-                                    <AlertTriangle size={20} className="text-orange-500 shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="text-sm font-bold text-orange-800">Nenhuma integração ativa</p>
-                                        <p className="text-xs text-orange-700 mt-1">
-                                            Você precisa configurar as chaves de API do OpenAI ou Gemini na página de <strong>Integrações</strong> antes de selecionar um modelo.
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : (
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">Idioma do Agente</label>
                                 <select
-                                    value={`${settings.provider}::${settings.model}`}
-                                    onChange={(e) => {
-                                        const [provider, model] = e.target.value.split('::');
-                                        setSettings({ ...settings, provider, model });
-                                    }}
+                                    value={settings.language}
+                                    onChange={(e) => setSettings({ ...settings, language: e.target.value })}
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all"
                                 >
-                                    {availableProviders.includes('openai') && (
-                                        <optgroup label="OpenAI">
-                                            <option value="openai::gpt-3.5-turbo">GPT-3.5 Turbo (Mais rápido)</option>
-                                            <option value="openai::gpt-4o">GPT-4o (Mais avançado)</option>
-                                        </optgroup>
-                                    )}
-                                    {availableProviders.includes('gemini') && (
-                                        <optgroup label="Google">
-                                            <option value="gemini::gemini-1.5-flash">Gemini 1.5 Flash (Rápido)</option>
-                                            <option value="gemini::gemini-1.5-pro">Gemini 1.5 Pro (Avançado)</option>
-                                        </optgroup>
-                                    )}
+                                    <option value="pt-BR">Português (Brasil)</option>
+                                    <option value="en-US">English (US)</option>
+                                    <option value="es-ES">Español</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-sm font-bold text-slate-700">Mensagem Inicial Padrão</label>
+                                <p className="text-xs text-slate-500 mt-1 mb-3">Define como o agente iniciará o atendimento com o cliente.</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <label className={`flex items-center p-5 border-2 rounded-xl cursor-pointer transition-all min-h-[80px] ${!settings.use_custom_initial_message ? 'border-[#ffd700] bg-[#ffd700]/5' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
+                                        <input
+                                            type="radio"
+                                            name="initialMsgType"
+                                            checked={!settings.use_custom_initial_message}
+                                            onChange={() => setSettings({ ...settings, use_custom_initial_message: false })}
+                                            className="w-4 h-4 text-[#ffd700] focus:ring-[#ffd700] border-slate-300 shrink-0"
+                                        />
+                                        <div className="ml-3">
+                                            <span className="block text-sm font-bold text-slate-900">Deixar o Agente decidir</span>
+                                            <span className="block text-xs text-slate-500 mt-1">A IA vai gerar a mensagem inicial com base no prompt.</span>
+                                        </div>
+                                    </label>
+
+                                    <label className={`flex items-center p-5 border-2 rounded-xl cursor-pointer transition-all min-h-[80px] ${settings.use_custom_initial_message ? 'border-[#ffd700] bg-[#ffd700]/5' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
+                                        <input
+                                            type="radio"
+                                            name="initialMsgType"
+                                            checked={settings.use_custom_initial_message}
+                                            onChange={() => setSettings({ ...settings, use_custom_initial_message: true })}
+                                            className="w-4 h-4 text-[#ffd700] focus:ring-[#ffd700] border-slate-300 shrink-0"
+                                        />
+                                        <div className="ml-3">
+                                            <span className="block text-sm font-bold text-slate-900">Mensagem fixa customizada</span>
+                                            <span className="block text-xs text-slate-500 mt-1">O mesmo texto será enviado sempre no início.</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {settings.use_custom_initial_message && (
+                                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <textarea
+                                        value={settings.initial_message}
+                                        onChange={(e) => setSettings({ ...settings, initial_message: e.target.value })}
+                                        placeholder="Olá! Sou o assistente virtual. Como posso ajudar?"
+                                        rows={2}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all resize-y"
+                                    />
+                                </div>
                             )}
                         </div>
 
+                        <hr className="border-slate-100" />
+
+                        {/* Prompt — uses the column specific to the selected agent type */}
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm font-bold text-slate-700">Temperatura: {settings.temperature}</label>
-                                <span className="text-xs text-slate-400">{settings.temperature < 0.3 ? 'Garante precisão' : settings.temperature > 0.7 ? 'Alta criatividade' : 'Equilibrado'}</span>
-                            </div>
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.1"
-                                value={settings.temperature}
-                                onChange={(e) => setSettings({ ...settings, temperature: parseFloat(e.target.value) })}
-                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#ffd700]"
+                            <label className="text-sm font-bold text-slate-700">Prompt do {currentAgentLabel} (Diretrizes e Regras)</label>
+                            <p className="text-xs text-slate-500 mb-2">Descreva detalhadamente como o agente deve se comportar, seu tom de voz, regras de negócio e informações importantes.</p>
+                            <textarea
+                                value={currentPromptValue}
+                                onChange={(e) => updatePrompt(e.target.value)}
+                                placeholder="Você é um assistente de vendas focado em conversão. Seu objetivo é..."
+                                rows={10}
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all resize-y font-mono text-sm leading-relaxed"
                             />
                         </div>
+
+                        {/* Notification */}
+                        {message && (
+                            <div className={`p-4 rounded-2xl border flex items-center gap-3 ${message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                                {message.type === 'success' ? <CheckCircle2 size={20} className="text-emerald-500" /> : <AlertTriangle size={20} className="text-red-500" />}
+                                <span className="text-sm font-medium">{message.text}</span>
+                            </div>
+                        )}
+
+                        {/* Submit */}
+                        <div className="pt-6 border-t border-slate-100 flex justify-end">
+                            <button
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="flex items-center space-x-2 px-8 py-4 bg-[#ffd700] text-slate-900 rounded-2xl font-black shadow-xl shadow-[#ffd700]/30 hover:bg-[#f8ab15] hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                            >
+                                {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+                                <span>Salvar Configurações</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
-
-                {/* Prompt */}
-                <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Prompt do Agente (Diretrizes e Regras)</label>
-                    <p className="text-xs text-slate-500 mb-2">Descreva detalhadamente como o agente deve se comportar, seu tom de voz, regras de negócio e informações importantes.</p>
-                    <textarea
-                        value={settings.prompt}
-                        onChange={(e) => setSettings({ ...settings, prompt: e.target.value })}
-                        placeholder="Você é um assistente de vendas focado em conversão. Seu objetivo é..."
-                        rows={10}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all resize-y font-mono text-sm leading-relaxed"
-                    />
-                </div>
-
-                {/* Submit */}
-                <div className="pt-4 flex justify-end">
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="flex items-center space-x-2 px-8 py-4 bg-[#ffd700] text-slate-900 rounded-2xl font-black shadow-xl shadow-[#ffd700]/30 hover:bg-[#f8ab15] hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                    >
-                        {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-                        <span>Salvar Configurações</span>
-                    </button>
-                </div>
+                )}
             </div>
         </div>
     );

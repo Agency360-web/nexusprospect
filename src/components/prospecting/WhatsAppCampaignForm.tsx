@@ -4,7 +4,7 @@ import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCi
 import { useAuth } from '../../contexts/AuthContext';
 
 export const WhatsAppCampaignForm: React.FC = () => {
-    const [campaignType, setCampaignType] = useState<'simple' | 'ai' | 'multi' | ''>('');
+    const [campaignType, setCampaignType] = useState<'simple' | 'ai' | 'multi-ai' | ''>('');
     const [name, setName] = useState('');
     const [minDelay, setMinDelay] = useState(15);
     const [maxDelay, setMaxDelay] = useState(30);
@@ -25,6 +25,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
     const [selectedFolderId, setSelectedFolderId] = useState<string>('');
     const [connections, setConnections] = useState<any[]>([]);
     const [selectedConnection, setSelectedConnection] = useState<string>('');
+    const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
 
     useEffect(() => {
         const fetchPlanLimit = async () => {
@@ -106,8 +107,12 @@ export const WhatsAppCampaignForm: React.FC = () => {
             alert('Por favor, insira o nome da campanha.');
             return;
         }
-        if (!selectedConnection) {
+        if (!selectedConnection && campaignType !== 'multi-ai') {
             alert('Por favor, selecione uma instância do WhatsApp conectada.');
+            return;
+        }
+        if (campaignType === 'multi-ai' && selectedConnections.length < 2) {
+            alert('Erro: necessário selecionar pelo menos 2 instâncias para o disparo multi.');
             return;
         }
         if (selectedLeads.length === 0) {
@@ -178,6 +183,27 @@ export const WhatsAppCampaignForm: React.FC = () => {
                 .map(id => leads.find(l => l.id === id))
                 .filter(Boolean); // Remove null/undefined
 
+            // Build instances data for the webhook
+            let instancesData;
+            if (campaignType === 'multi-ai') {
+                instancesData = selectedConnections.map(inst => {
+                    const conn = connections.find(c => c.instance === inst);
+                    return {
+                        instance: inst,
+                        token: conn?.token || null,
+                        profileName: conn?.profile_name || inst,
+                        phoneNumber: conn?.phone_number || null,
+                    };
+                });
+            } else {
+                instancesData = [{
+                    instance: selectedConnection,
+                    token: currentConn?.token || null,
+                    profileName: currentConn?.profile_name || selectedConnection,
+                    phoneNumber: currentConn?.phone_number || null,
+                }];
+            }
+
             const payload = {
                 campaignType,
                 name,
@@ -194,8 +220,12 @@ export const WhatsAppCampaignForm: React.FC = () => {
                 file: fileBase64,
                 mimetype: fileMimeType,
                 fileName: fileName,
-                instance: selectedConnection,
-                instanceToken: currentConn?.token || null
+                // Single instance (backward compatible)
+                instance: campaignType === 'multi-ai' ? instancesData[0]?.instance : selectedConnection,
+                instanceToken: campaignType === 'multi-ai' ? instancesData[0]?.token : (currentConn?.token || null),
+                // Multi-instance data
+                instances: instancesData,
+                instanceCount: instancesData.length,
             };
 
             const webhookUrl = 'https://nexus360.infra-conectamarketing.site/webhook-test/nexus-disparos';
@@ -228,6 +258,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
                 setCampaignType('');
                 setSelectedClientId('');
                 setSelectedFolderId('');
+                setSelectedConnections([]);
                 // Keep the same selected instance to make it easier for subsequent campaigns
             }, 3000);
 
@@ -290,25 +321,12 @@ export const WhatsAppCampaignForm: React.FC = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => {
-                            if (planLimit !== null && planLimit < 3) {
-                                setShowUpgradeModal(true);
-                            } else {
-                                setCampaignType('multi');
-                            }
-                        }}
-                        className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'multi' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                        onClick={() => setCampaignType('multi-ai')}
+                        className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'multi-ai' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
                     >
-                        {planLimit !== null && planLimit < 3 && (
-                            <div className="absolute top-3 right-3">
-                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${campaignType === 'multi' ? 'bg-amber-500/20 text-yellow-500 border-amber-500/30' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                                    PRO
-                                </span>
-                            </div>
-                        )}
-                        <Layers className={`mb-3 ${campaignType === 'multi' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
-                        <span className={`font-bold ${campaignType === 'multi' ? 'text-white' : 'text-slate-700'}`}>Disparo Multi-Instância</span>
-                        <span className={`text-xs text-center mt-2 ${campaignType === 'multi' ? 'text-slate-300' : 'text-slate-500'}`}>Distribui os envios entre vários números.</span>
+                        <Layers className={`mb-3 ${campaignType === 'multi-ai' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
+                        <span className={`font-bold ${campaignType === 'multi-ai' ? 'text-white' : 'text-slate-700'}`}>Multi-Instância com IA</span>
+                        <span className={`text-xs text-center mt-2 ${campaignType === 'multi-ai' ? 'text-slate-300' : 'text-slate-500'}`}>Distribui os envios com IA entre vários números.</span>
                     </button>
                 </div>
             </div>
@@ -319,21 +337,72 @@ export const WhatsAppCampaignForm: React.FC = () => {
                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                         <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                             <Smartphone size={16} className="text-slate-400" />
-                            Instância do WhatsApp *
+                            {campaignType === 'multi-ai' ? 'Instâncias do WhatsApp *' : 'Instância do WhatsApp *'}
                         </label>
-                        <select
-                            value={selectedConnection}
-                            onChange={(e) => setSelectedConnection(e.target.value)}
-                            required
-                            className="w-full bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
-                        >
-                            <option value="">Selecione uma instância conectada...</option>
-                            {connections.map(c => (
-                                <option key={c.instance} value={c.instance}>
-                                    {c.profile_name || c.instance} {c.phone_number ? `(${c.phone_number})` : ''}
-                                </option>
-                            ))}
-                        </select>
+
+                        {campaignType === 'multi-ai' ? (
+                            /* Multi-instance: checkbox list */
+                            <>
+                                {connections.length > 0 && (
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-xs font-semibold text-slate-500">
+                                            {selectedConnections.length} de {connections.length} instâncias selecionadas
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (selectedConnections.length === connections.length) {
+                                                    setSelectedConnections([]);
+                                                } else {
+                                                    setSelectedConnections(connections.map(c => c.instance));
+                                                }
+                                            }}
+                                            className="text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 py-1.5 px-3 rounded-lg transition-colors border border-slate-200"
+                                        >
+                                            {selectedConnections.length === connections.length ? 'Desmarcar todas' : 'Selecionar todas'}
+                                        </button>
+                                    </div>
+                                )}
+                                <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                                    {connections.map(c => (
+                                        <label key={c.instance} className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedConnections.includes(c.instance)}
+                                                onChange={() => {
+                                                    setSelectedConnections(prev =>
+                                                        prev.includes(c.instance)
+                                                            ? prev.filter(i => i !== c.instance)
+                                                            : [...prev, c.instance]
+                                                    );
+                                                }}
+                                                className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-slate-800">{c.profile_name || c.instance}</span>
+                                                {c.phone_number && <span className="text-xs text-slate-400 ml-2">({c.phone_number})</span>}
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            /* Single instance: dropdown */
+                            <select
+                                value={selectedConnection}
+                                onChange={(e) => setSelectedConnection(e.target.value)}
+                                required
+                                className="w-full bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
+                            >
+                                <option value="">Selecione uma instância conectada...</option>
+                                {connections.map(c => (
+                                    <option key={c.instance} value={c.instance}>
+                                        {c.profile_name || c.instance} {c.phone_number ? `(${c.phone_number})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+
                         {connections.length === 0 && (
                             <p className="text-xs text-red-500 mt-2 font-medium flex items-center gap-1">
                                 <AlertCircle size={12} />
@@ -407,33 +476,35 @@ export const WhatsAppCampaignForm: React.FC = () => {
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* 3. Upload de Mídia (Opcional) */}
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2">4. Mídia (Opcional)</label>
-                            <label className={`cursor-pointer border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center transition-colors h-48 ${file ? 'border-brand-400 bg-brand-50' : 'border-slate-300 hover:border-brand-400 hover:bg-slate-50'}`}>
-                                {file ? (
-                                    <div className="text-center">
-                                        <CheckCircle2 className="text-brand-500 mb-2 mx-auto" size={32} />
-                                        <span className="text-sm font-bold text-slate-800 block truncate max-w-[200px]">{file.name}</span>
-                                        <span className="text-xs text-brand-600 mt-1 block">Clique para trocar</span>
-                                    </div>
-                                ) : (
-                                    <div className="text-center text-slate-500">
-                                        <ImageIcon className="mb-3 mx-auto" size={32} />
-                                        <span className="text-sm font-bold block mb-1">Upload de Imagem/Vídeo/Áudio</span>
-                                        <span className="text-xs text-slate-400">Formatos suportados (PNG, JPG, MP4, MP3)</span>
-                                    </div>
-                                )}
-                                <input type="file" className="hidden" accept="image/*,video/*,audio/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                            </label>
-                        </div>
+                    <div className={`grid grid-cols-1 ${campaignType === 'simple' ? 'md:grid-cols-2' : ''} gap-8`}>
+                        {/* 3. Upload de Mídia (Opcional) — Apenas para Disparo Simples */}
+                        {campaignType === 'simple' && (
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2">4. Mídia (Opcional)</label>
+                                <label className={`cursor-pointer border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center transition-colors h-48 ${file ? 'border-brand-400 bg-brand-50' : 'border-slate-300 hover:border-brand-400 hover:bg-slate-50'}`}>
+                                    {file ? (
+                                        <div className="text-center">
+                                            <CheckCircle2 className="text-brand-500 mb-2 mx-auto" size={32} />
+                                            <span className="text-sm font-bold text-slate-800 block truncate max-w-[200px]">{file.name}</span>
+                                            <span className="text-xs text-brand-600 mt-1 block">Clique para trocar</span>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-slate-500">
+                                            <ImageIcon className="mb-3 mx-auto" size={32} />
+                                            <span className="text-sm font-bold block mb-1">Upload de Imagem/Vídeo/Áudio</span>
+                                            <span className="text-xs text-slate-400">Formatos suportados (PNG, JPG, MP4, MP3)</span>
+                                        </div>
+                                    )}
+                                    <input type="file" className="hidden" accept="image/*,video/*,audio/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                                </label>
+                            </div>
+                        )}
 
                         {/* 5. Caixa de texto (Opcional) */}
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                                 <AlignLeft size={16} className="text-slate-400" />
-                                5. Mensagem de Texto (Opcional)
+                                {campaignType === 'simple' ? '5. Mensagem de Texto (Opcional)' : '4. Mensagem de Texto (Opcional)'}
                             </label>
                             <textarea
                                 value={messageText}
