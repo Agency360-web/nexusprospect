@@ -359,10 +359,12 @@ export const WhatsAppCampaignForm: React.FC = () => {
                     </button>
                 </div>
 
-                {/* Monitoramento de Campanhas */}
-                <div className="mt-6">
-                    <CampaignMonitor />
-                </div>
+                {/* Monitoramento de Campanhas (posição padrão: tipo não selecionado) */}
+                {!campaignType && (
+                    <div className="mt-6">
+                        <CampaignMonitor />
+                    </div>
+                )}
             </div>
 
             {campaignType && (
@@ -725,6 +727,11 @@ export const WhatsAppCampaignForm: React.FC = () => {
                             )}
                             <span>{loading ? 'Criando...' : success ? 'Campanha Criada!' : 'Criar Campanha'}</span>
                         </button>
+                    </div>
+
+                    {/* Monitoramento de Campanhas (posição: após formulário) */}
+                    <div className="mt-2">
+                        <CampaignMonitor />
                     </div>
                 </div>
             )}
