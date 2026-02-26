@@ -360,7 +360,9 @@ export const WhatsAppCampaignForm: React.FC = () => {
                 </div>
 
                 {/* Monitoramento de Campanhas */}
-                <CampaignMonitor />
+                <div className="mt-6">
+                    <CampaignMonitor />
+                </div>
             </div>
 
             {campaignType && (
