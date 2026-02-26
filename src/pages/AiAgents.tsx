@@ -148,6 +148,42 @@ const AiAgents: React.FC = () => {
             const { error } = await query;
             if (error) throw error;
 
+            // Se for Agente de Atendimento, notificar o webhook do N8N com todas as instâncias
+            if (selectedAgentType === 'support') {
+                try {
+                    // Buscar todas as instâncias conectadas do usuário
+                    const { data: connections } = await supabase
+                        .from('whatsapp_connections')
+                        .select('instance, token, phone_number, profile_name, status')
+                        .eq('user_id', user.id);
+
+                    const allInstances = (connections || []).map(conn => ({
+                        instance: conn.instance,
+                        token: conn.token,
+                        phoneNumber: conn.phone_number,
+                        profileName: conn.profile_name,
+                        status: conn.status,
+                    }));
+
+                    await fetch('https://nexus360.infra-conectamarketing.site/webhook/e30ccb57-e8ed-49a4-8915-4617d43e3724', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: user.id,
+                            agentType: 'support',
+                            is_active: settings.is_active,
+                            agent_name: settings.agent_name,
+                            prompt: settings.prompt_support,
+                            language: settings.language,
+                            instances: allInstances,
+                            instanceCount: allInstances.length,
+                        }),
+                    });
+                } catch (webhookErr) {
+                    console.warn('Webhook do agente de atendimento não respondeu:', webhookErr);
+                }
+            }
+
             setMessage({ type: 'success', text: 'Configurações do agente salvas com sucesso!' });
             setTimeout(() => setMessage(null), 3000);
 
