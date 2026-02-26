@@ -347,7 +347,7 @@ const ConnectionsTab: React.FC = () => {
                 <div>
                     <h2 className="text-xl font-bold text-slate-900">Conexões</h2>
                     <p className="text-sm text-slate-500">
-                        Gerencie suas conexões WhatsApp via Uazapi.
+                        Gerencie as suas conexões de WhatsApp.
                         <span className="ml-2 text-xs text-slate-400">
                             ({connections.length}/{planLimit} instância{planLimit > 1 ? 's' : ''})
                         </span>
