@@ -228,7 +228,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
                 instanceCount: instancesData.length,
             };
 
-            const webhookUrl = 'https://nexus360.infra-conectamarketing.site/webhook-test/nexus-disparos';
+            const webhookUrl = 'https://nexus360.infra-conectamarketing.site/webhook/nexus-disparos';
 
             console.log('Enviando dados para o webhook de teste...', webhookUrl);
 
