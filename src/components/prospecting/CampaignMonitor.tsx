@@ -11,6 +11,8 @@ import {
     ChevronUp,
     Send,
     AlertCircle,
+    PartyPopper,
+    AlertTriangle,
 } from 'lucide-react';
 
 interface CampaignStats {
@@ -25,6 +27,8 @@ interface CampaignStats {
     pending: number;
 }
 
+const REFRESH_INTERVAL = 15000; // 15 segundos
+
 const CampaignMonitor: React.FC = () => {
     const { user } = useAuth();
     const [campaigns, setCampaigns] = useState<CampaignStats[]>([]);
@@ -32,6 +36,7 @@ const CampaignMonitor: React.FC = () => {
     const [expanded, setExpanded] = useState(true);
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const prevCampaignsRef = useRef<CampaignStats[]>([]);
 
     const fetchCampaigns = useCallback(async () => {
         if (!user) return;
@@ -81,14 +86,42 @@ const CampaignMonitor: React.FC = () => {
                 });
             }
 
-            const result: CampaignStats[] = campaignsData.map(c => ({
-                id: c.id,
-                name: c.name,
-                status: c.status,
-                created_at: c.created_at,
-                configuration: c.configuration,
-                ...statsMap[c.id],
-            }));
+            const result: CampaignStats[] = campaignsData.map(c => {
+                const stats = statsMap[c.id];
+
+                // Se a campanha foi marcada como 'completed' pelo n8n,
+                // qualquer pendente restante é considerado como falha
+                if (c.status === 'completed' && stats.pending > 0) {
+                    stats.failed += stats.pending;
+                    stats.pending = 0;
+                }
+
+                // Heurística: se a campanha tem mais de 30min e todos os leads foram processados 
+                // OU se não houve mudança nos pendentes por muito tempo, marcar como finalizada
+                const ageMinutes = (Date.now() - new Date(c.created_at).getTime()) / 60000;
+                const processed = stats.sent + stats.failed;
+
+                // Se campanha tem msgs e todos foram processados (sem pendentes), 
+                // marcar campanha como completed se ainda não estiver
+                if (stats.total > 0 && stats.pending === 0 && processed >= stats.total && c.status === 'active') {
+                    // Atualizar status no banco em background
+                    supabase
+                        .from('campaigns')
+                        .update({ status: 'completed' })
+                        .eq('id', c.id)
+                        .then(() => { });
+                    c.status = 'completed';
+                }
+
+                return {
+                    id: c.id,
+                    name: c.name,
+                    status: c.status,
+                    created_at: c.created_at,
+                    configuration: c.configuration,
+                    ...stats,
+                };
+            });
 
             setCampaigns(result);
             setLastUpdate(new Date());
@@ -104,9 +137,9 @@ const CampaignMonitor: React.FC = () => {
         fetchCampaigns();
     }, [fetchCampaigns]);
 
-    // Auto-refresh a cada 60 segundos
+    // Auto-refresh a cada 15 segundos
     useEffect(() => {
-        intervalRef.current = setInterval(fetchCampaigns, 60000);
+        intervalRef.current = setInterval(fetchCampaigns, REFRESH_INTERVAL);
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
@@ -118,11 +151,24 @@ const CampaignMonitor: React.FC = () => {
     };
 
     const getCampaignStatusInfo = (c: CampaignStats) => {
-        if (c.total === 0) return { label: 'Sem envios', color: 'text-slate-400', bg: 'bg-slate-100', dotColor: 'bg-slate-300' };
+        if (c.total === 0) return { label: 'Sem envios', color: 'text-slate-400', bg: 'bg-slate-100', dotColor: 'bg-slate-300', icon: AlertCircle };
+
         const processed = c.sent + c.failed;
-        if (processed >= c.total && c.failed === 0) return { label: 'Concluída', color: 'text-emerald-700', bg: 'bg-emerald-50', dotColor: 'bg-emerald-500' };
-        if (processed >= c.total && c.failed > 0) return { label: 'Concluída c/ falhas', color: 'text-amber-700', bg: 'bg-amber-50', dotColor: 'bg-amber-500' };
-        return { label: 'Em andamento', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
+        const isComplete = processed >= c.total || c.status === 'completed';
+
+        if (isComplete && c.failed === 0 && c.pending === 0) {
+            return { label: 'Finalizada ✓', color: 'text-emerald-700', bg: 'bg-emerald-50', dotColor: 'bg-emerald-500', icon: CheckCircle2 };
+        }
+        if (isComplete && c.failed > 0) {
+            return { label: `Finalizada • ${c.failed} falha${c.failed !== 1 ? 's' : ''}`, color: 'text-amber-700', bg: 'bg-amber-50', dotColor: 'bg-amber-500', icon: AlertTriangle };
+        }
+        if (c.pending > 0 && processed > 0) {
+            return { label: 'Enviando...', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse', icon: Send };
+        }
+        if (c.pending > 0 && processed === 0) {
+            return { label: 'Aguardando', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse', icon: Clock };
+        }
+        return { label: 'Em andamento', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse', icon: Send };
     };
 
     const formatDate = (dateStr: string) => {
@@ -168,7 +214,7 @@ const CampaignMonitor: React.FC = () => {
                     <div className="text-left">
                         <h3 className="text-sm font-bold text-slate-800">Monitoramento de Campanhas</h3>
                         <p className="text-[11px] text-slate-400 font-medium">
-                            Atualizado {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • Auto-refresh 60s
+                            Atualizado {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • Auto-refresh 15s
                         </p>
                     </div>
                 </div>
@@ -192,9 +238,10 @@ const CampaignMonitor: React.FC = () => {
                         const progress = getProgressPercent(c);
                         const statusInfo = getCampaignStatusInfo(c);
                         const processed = c.sent + c.failed;
+                        const isFinished = processed >= c.total && c.total > 0;
 
                         return (
-                            <div key={c.id} className="px-6 py-4 hover:bg-slate-50/50 transition-colors">
+                            <div key={c.id} className={`px-6 py-4 transition-colors ${isFinished ? 'bg-slate-50/30' : 'hover:bg-slate-50/50'}`}>
                                 {/* Row 1: Name + Status */}
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2 min-w-0">
@@ -217,7 +264,6 @@ const CampaignMonitor: React.FC = () => {
                                     <>
                                         <div className="flex items-center gap-3 mb-1.5">
                                             <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                {/* Sent (green) */}
                                                 <div className="h-full flex">
                                                     <div
                                                         className="bg-emerald-500 transition-all duration-500"
@@ -244,10 +290,12 @@ const CampaignMonitor: React.FC = () => {
                                                 <CheckCircle2 size={11} />
                                                 <span className="font-bold">{c.sent}</span> sucesso
                                             </span>
-                                            <span className="flex items-center gap-1 text-red-500">
-                                                <XCircle size={11} />
-                                                <span className="font-bold">{c.failed}</span> falha
-                                            </span>
+                                            {c.failed > 0 && (
+                                                <span className="flex items-center gap-1 text-red-500">
+                                                    <XCircle size={11} />
+                                                    <span className="font-bold">{c.failed}</span> falha{c.failed !== 1 ? 's' : ''}
+                                                </span>
+                                            )}
                                             {c.pending > 0 && (
                                                 <span className="flex items-center gap-1 text-slate-400">
                                                     <Clock size={11} />
@@ -255,6 +303,26 @@ const CampaignMonitor: React.FC = () => {
                                                 </span>
                                             )}
                                         </div>
+
+                                        {/* Finished Banner */}
+                                        {isFinished && (
+                                            <div className={`mt-3 px-3 py-2 rounded-lg text-[11px] font-bold flex items-center gap-2 ${c.failed === 0
+                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                }`}>
+                                                {c.failed === 0 ? (
+                                                    <>
+                                                        <PartyPopper size={14} />
+                                                        Campanha finalizada com sucesso! Todos os {c.sent} leads foram enviados.
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <AlertTriangle size={14} />
+                                                        Campanha finalizada. {c.sent} enviado{c.sent !== 1 ? 's' : ''} com sucesso, {c.failed} com falha.
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
                                     </>
                                 )}
 
