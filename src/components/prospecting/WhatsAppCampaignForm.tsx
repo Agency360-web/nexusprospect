@@ -332,7 +332,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button
                         type="button"
-                        onClick={() => setCampaignType('simple')}
+                        onClick={() => setCampaignType(campaignType === 'simple' ? '' : 'simple')}
                         className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'simple' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
                     >
                         <Zap className={`mb-3 ${campaignType === 'simple' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
@@ -341,7 +341,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setCampaignType('ai')}
+                        onClick={() => setCampaignType(campaignType === 'ai' ? '' : 'ai')}
                         className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'ai' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
                     >
                         <Bot className={`mb-3 ${campaignType === 'ai' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
@@ -350,7 +350,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setCampaignType('multi-ai')}
+                        onClick={() => setCampaignType(campaignType === 'multi-ai' ? '' : 'multi-ai')}
                         className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'multi-ai' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
                     >
                         <Layers className={`mb-3 ${campaignType === 'multi-ai' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
