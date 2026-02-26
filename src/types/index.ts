@@ -129,3 +129,28 @@ export interface Lead {
   folder_id?: string;
   created_at?: string;
 }
+
+export interface CampaignMessage {
+  id: string;
+  campaign_id: string;
+  lead_id: string;
+  lead_name: string | null;
+  lead_phone: string | null;
+  status: 'pending' | 'sent' | 'failed';
+  error_message: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface CampaignWithStats {
+  id: string;
+  name: string;
+  status: string;
+  type: string;
+  created_at: string;
+  configuration: any;
+  total_leads: number;
+  sent_count: number;
+  failed_count: number;
+  pending_count: number;
+}

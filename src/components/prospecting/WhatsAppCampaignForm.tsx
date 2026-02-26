@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import CampaignMonitor from './CampaignMonitor';
 
 export const WhatsAppCampaignForm: React.FC = () => {
     const [campaignType, setCampaignType] = useState<'simple' | 'ai' | 'multi-ai' | ''>('');
@@ -158,6 +159,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
                 // Continue to webhook even if local save fails, or you can throw
             }
 
+
             // 2. Prepare payload for N8N Webhook (JSON format)
             const convertFileToBase64 = (file: File): Promise<string> => {
                 return new Promise((resolve, reject) => {
@@ -185,6 +187,30 @@ export const WhatsAppCampaignForm: React.FC = () => {
             const fullSelectedLeads = selectedLeads
                 .map(id => leads.find(l => l.id === id))
                 .filter(Boolean); // Remove null/undefined
+
+            // 1.5. Inserir registros de campaign_messages com status 'pending'
+            if (campaignData?.id) {
+                const messagesToInsert = fullSelectedLeads.map((lead: any) => ({
+                    campaign_id: campaignData.id,
+                    lead_id: lead.id,
+                    lead_name: lead.name || null,
+                    lead_phone: lead.phone || null,
+                    status: 'pending',
+                }));
+
+                // Inserir em batches de 100 para evitar timeout
+                const batchSize = 100;
+                for (let i = 0; i < messagesToInsert.length; i += batchSize) {
+                    const batch = messagesToInsert.slice(i, i + batchSize);
+                    const { error: msgError } = await supabase
+                        .from('campaign_messages')
+                        .insert(batch);
+                    if (msgError) {
+                        console.error('Erro ao inserir campaign_messages (batch):', msgError);
+                    }
+                }
+                console.log(`Inseridos ${messagesToInsert.length} registros de campaign_messages como pending.`);
+            }
 
             // Build instances data for the webhook
             let instancesData;
@@ -332,6 +358,9 @@ export const WhatsAppCampaignForm: React.FC = () => {
                         <span className={`text-xs text-center mt-2 ${campaignType === 'multi-ai' ? 'text-slate-300' : 'text-slate-500'}`}>Distribui os envios com IA entre vários números.</span>
                     </button>
                 </div>
+
+                {/* Monitoramento de Campanhas */}
+                <CampaignMonitor />
             </div>
 
             {campaignType && (
@@ -572,8 +601,8 @@ export const WhatsAppCampaignForm: React.FC = () => {
                                             type="button"
                                             onClick={() => { setLeadsPerPage(n); setCurrentPage(1); }}
                                             className={`text-xs font-bold px-2.5 py-1 rounded-md transition-all ${leadsPerPage === n
-                                                    ? 'bg-white text-slate-800 shadow-sm'
-                                                    : 'text-slate-500 hover:text-slate-700'
+                                                ? 'bg-white text-slate-800 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
                                                 }`}
                                         >
                                             {n}
@@ -651,8 +680,8 @@ export const WhatsAppCampaignForm: React.FC = () => {
                                                 type="button"
                                                 onClick={() => setCurrentPage(p)}
                                                 className={`text-xs font-bold w-8 h-8 rounded-lg transition-all ${currentPage === p
-                                                        ? 'bg-slate-900 text-white shadow-sm'
-                                                        : 'text-slate-500 hover:bg-slate-100'
+                                                    ? 'bg-slate-900 text-white shadow-sm'
+                                                    : 'text-slate-500 hover:bg-slate-100'
                                                     }`}
                                             >
                                                 {p}
