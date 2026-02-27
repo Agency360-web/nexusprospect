@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Extrator Google Maps — Interface</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Fonte -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #0b0e14;
+      --bg2: #0f1117;
+      --card: #121725;
+      --muted: #9aa4b2;
+      --text: #e7ecf3;
+      --acc: #52BD85;
+      --acc2: #2dd4bf;
+      --acc3: #7c3aed;
+      --danger: #ef4444;
+      --ring: 0 0 0 4px rgba(45, 212, 191, .14);
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      /* Centraliza verticalmente */
+      align-items: center;
+      /* Centraliza horizontalmente */
+      background:
+        radial-gradient(1000px 520px at 15% -10%, #182035 0%, var(--bg) 50%, var(--bg) 100%),
+        radial-gradient(800px 420px at 110% 10%, #141a2a 0%, transparent 60%);
+      color: var(--text);
+      font: 500 15px/1.5 "Inter", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial;
+    }
+
+    /* brilho sutil de fundo */
+    .glow {
+      position: fixed;
+      inset: auto auto 10% -10%;
+      width: 520px;
+      height: 520px;
+      filter: blur(120px);
+      opacity: .18;
+      pointer-events: none;
+      background: conic-gradient(from 120deg, var(--acc) 0 20%, var(--acc2) 20% 45%, #60a5fa 45% 65%, var(--acc3) 65% 82%, var(--acc) 82% 100%);
+      border-radius: 50%;
+      animation: spin 22s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .wrap {
+      max-width: 880px;
+      margin: 44px auto;
+      padding: 0 20px
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02)),
+        linear-gradient(135deg, rgba(82, 189, 133, .5), rgba(45, 212, 191, .5));
+      display: grid;
+      place-items: center;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(255, 255, 255, .08);
+    }
+
+    .brand .title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: .2px
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .03);
+      border: 1px solid rgba(255, 255, 255, .07);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #525b66;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, .05) inset
+    }
+
+    .dot.ok {
+      background: var(--acc)
+    }
+
+    .dot.err {
+      background: var(--danger)
+    }
+
+    /* Card com borda luminosa */
+    .card {
+      position: relative;
+      background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .02));
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 18px;
+      box-shadow:
+        0 20px 60px rgba(0, 0, 0, .40),
+        inset 0 1px 0 rgba(255, 255, 255, .05);
+      padding: 22px;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: 18px;
+      pointer-events: none;
+      background: linear-gradient(120deg, rgba(82, 189, 133, .35), rgba(45, 212, 191, .15), rgba(255, 255, 255, 0), rgba(124, 58, 237, .18));
+      mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+      -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+      padding: 1px;
+      opacity: .35;
+    }
+
+    .row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      align-items: flex-end
+    }
+
+    .field {
+      flex: 1;
+      min-width: 260px
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 8px 2px
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, .10);
+      background: linear-gradient(180deg, #0e1118, #0c0f15);
+      color: var(--text);
+      outline: none;
+      transition: border .15s, box-shadow .15s, transform .08s ease;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .02);
+    }
+
+    input[type="text"]::placeholder {
+      color: #6b7280
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--acc2);
+      box-shadow: var(--ring)
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 10px
+    }
+
+    .btn {
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, .12);
+      background:
+        linear-gradient(225deg, rgba(240, 242, 255, .18) 5%, rgba(255, 255, 255, .08) 43%, rgba(255, 255, 255, .03) 68%);
+      color: #fff;
+      padding: 13px 16px;
+      border-radius: 999px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: transform .06s ease, box-shadow .15s, border-color .15s;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, .30);
+      will-change: transform;
+    }
+
+    .btn:hover {
+      box-shadow: 0 10px 26px rgba(0, 0, 0, .36)
+    }
+
+    .btn:active {
+      transform: translateY(1px)
+    }
+
+    .btn svg {
+      width: 18px;
+      height: 18px
+    }
+
+    .btn-primary {
+      background:
+        linear-gradient(90deg, rgba(82, 189, 133, .95), rgba(45, 212, 191, .92));
+      border-color: transparent;
+      box-shadow: 0 10px 30px rgba(45, 212, 191, .25), 0 0 0 1px rgba(255, 255, 255, .05) inset;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px dashed rgba(255, 255, 255, .20);
+      color: var(--muted)
+    }
+
+    .btn-danger {
+      background: transparent;
+      border: 1px solid rgba(239, 68, 68, .55);
+      color: #fecaca
+    }
+
+    .footer {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      gap: 12px;
+      flex-wrap: wrap
+    }
+
+    a {
+      color: #9ad1ff;
+      text-decoration: none
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      background: #0e141b;
+      border: 1px solid rgba(255, 255, 255, .08);
+      color: #cde7d8;
+      padding: 12px 14px;
+      border-radius: 12px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .15s, transform .15s;
+      z-index: 60;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0)
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .55);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50
+    }
+
+    .modal {
+      width: min(560px, 94vw);
+      background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .02));
+      border: 1px solid rgba(255, 255, 255, .10);
+      border-radius: 16px;
+      padding: 20px 18px 16px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, .45)
+    }
+
+    .modal header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px
+    }
+
+    .modal h3 {
+      margin: 0;
+      font-size: 18px
+    }
+
+    .modal .close {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 22px;
+      cursor: pointer
+    }
+
+    .modal .body {
+      padding: 12px 4px
+    }
+
+    .modal .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 14px
+    }
+
+    code {
+      background: #0e1118;
+      border: 1px solid rgba(255, 255, 255, .06);
+      padding: 3px 6px;
+      border-radius: 6px
+    }
+
+    /* Pequenos toques */
+    .kbd {
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, .12);
+      color: #cbd5e1
+    }
+
+    .tips {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #a1a8b3;
+      font-size: 12px;
+      margin-top: 10px
+    }
+
+    .logo-top {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 50px;
+    }
+
+    .logo-top img {
+      max-height: 80px;
+    }
+
+
+    /* Acessibilidade */
+    @media (prefers-reduced-motion: reduce) {
+      .glow {
+        animation: none
+      }
+
+      .btn,
+      .toast {
+        transition: none
+      }
+    }
+
+    /* Responsivo */
+    @media (max-width:520px) {
+      .brand .title {
+        font-size: 18px
+      }
+
+      .status {
+        font-size: 12px
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="glow" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <div class="logo-top">
+      <img src="logo.png" alt="Logo Evolua" />
+    </div>
+    <div class="header">
+      <div class="brand">
+        <div class="badge" aria-hidden="true">
+          <!-- ícone imã -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="opacity:.9">
+            <path d="M4 13a8 8 0 0 1 8-8h0a8 8 0 0 1 8 8v5" stroke-width="1.5" />
+            <path d="M8 13v5m8-5v5" stroke-width="1.5" />
+            <path d="M3 18h6m6 0h6" stroke-width="1.5" />
+          </svg>
+        </div>
+        <div class="title">Extrator Google Maps</div>
+      </div>
+
+      <div class="status" title="Estado do webhook">
+        <span class="dot" id="webhookDot"></span>
+        <span id="webhookStatus">Webhook não definido</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <label for="termInput">Termo</label>
+          <input id="termInput" type="text" placeholder="ex.: advogado em BH" autocomplete="off" />
+          <div class="hint">Dica: use “profissão + cidade”. Ex.: <code>dentista em curitiba</code></div>
+          <div class="tips">Atalho: <span class="kbd">Enter</span> para <strong>Extrair</strong></div>
+        </div>
+
+        <!-- Mantive os mesmos IDs para o JS -->
+        <button id="extractBtn" class="btn btn-primary" title="Abrir o Google Maps e iniciar a extração">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path d="M3 12h13" stroke-width="1.6" />
+            <path d="M12 5l7 7-7 7" stroke-width="1.6" />
+          </svg>
+          Extrair
+        </button>
+
+        <button id="editWebhookBtn" class="btn btn-ghost" title="Definir/editar webhook">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path d="M12 6v12m6-6H6" stroke-width="1.6" />
+          </svg>
+          Definir webhook
+        </button>
+
+        <button id="clearBtn" class="btn btn-danger" title="Apagar leads salvos">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path d="M3 6h18M8 6l1-2h6l1 2m-1 14H8a2 2 0 0 1-2-2V6h12v12a2 2 0 0 1-2 2Z" stroke-width="1.4" />
+          </svg>
+          Limpar dados
+        </button>
+      </div>
+
+      <div class="footer">
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: apenas salvar webhook -->
+  <div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal">
+      <header>
+        <h3>Configurar Webhook (somente salvar)</h3>
+        <button class="close" id="closeModalBtn" aria-label="Fechar">×</button>
+      </header>
+      <div class="body">
+        <label for="webhookInput" style="display:block;font-size:12px;color:#9aa4b2;margin:0 0 6px 2px">URL do
+          webhook</label>
+        <input id="webhookInput" type="text" placeholder="https://seu-dominio.com/webhook/receber"
+          style="width:100%;padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:#0e1118;color:#e7ecf3;outline:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)">
+        <div class="hint" style="margin-top:8px">
+          A URL será salva no <code>localStorage</code> (e no <code>chrome.storage.local</code> para o content.js).
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="cancelModalBtn">Cancelar</button>
+        <button class="btn btn-primary" id="saveWebhookBtn">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Hotkeys suaves (não interfere no seu JS) -->
+  <script>
+    // Enter foca em extrair se o campo estiver ativo
+    (function () {
+      const input = document.getElementById('termInput');
+      const btn = document.getElementById('extractBtn');
+      if (input && btn) {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            btn.click();
+          }
+        });
+      }
+    })();
+  </script>
+
+  <script src="interface.js"></script>
+</body>
+
+<footer class="footer-info">
+  <p>Desenvolvido por <a href="https://www.instagram.com/evoluawp/" target="_blank">Rick</a> - © 2025</p>
+  <p class="alert">O uso não autorizado desta ferramenta resultará em <strong>banimento imediato</strong>.</p>
+  <p>Quer revender essa ferramenta de forma legal e lucrativa? <a
+      href="https://wa.me/553191682383?text=Ol%C3%A1%2C%20tenho%20interesse%20em%20revender%20o%20Extrator%20do%Google%20Maps"
+      target="_blank">Clique aqui</a>.</p>
+</footer>
+
+<style>
+  .footer-info {
+    text-align: center;
+    margin-top: 40px;
+    padding: 18px 12px;
+    border-top: 1px solid rgba(255, 255, 255, .05);
+    color: var(--muted);
+    font-size: 13px;
+    background: transparent;
+  }
+
+  .footer-info a {
+    color: #9ad1ff;
+    text-decoration: none;
+  }
+
+  .footer-info a:hover {
+    text-decoration: underline;
+  }
+
+  .footer-info .alert {
+    color: #fecaca;
+    font-size: 13px;
+    margin: 6px 0;
+  }
+
+  .footer-info strong {
+    color: #ef4444;
+  }
+</style>
+
+</html>

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Target, Send, MessageCircle, MapPin, Instagram, Building2 } from 'lucide-react';
+import { Target, Send, MessageCircle, MapPin, Instagram, Building2, Lock } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { WhatsAppCampaignForm } from '../components/prospecting/WhatsAppCampaignForm';
 import GoogleMapsLeadSearch from '../components/prospecting/GoogleMapsLeadSearch';
 
 const Prospecting: React.FC = () => {
+    const { isStarter } = useAuth();
     const [activeTab, setActiveTab] = useState<'messages' | 'instagram_messages' | 'maps' | 'instagram' | 'cnpj'>('messages');
 
     const TabButton = ({ id, label, icon: Icon }: { id: typeof activeTab, label: string, icon: any }) => (
@@ -45,42 +47,60 @@ const Prospecting: React.FC = () => {
             </div>
 
             <div className="pt-6">
-                {activeTab === 'messages' && (
-                    <WhatsAppCampaignForm />
-                )}
-
-                {activeTab === 'instagram_messages' && (
-                    <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
-                        <Send size={48} className="text-slate-200 mb-4" />
-                        <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
+                {(isStarter && activeTab !== 'messages') ? (
+                    <div className="bg-slate-50 rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
+                        <div className="bg-slate-200 p-4 rounded-full mb-4">
+                            <Lock size={40} className="text-slate-500" />
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-800">Recurso Premium</h2>
                         <p className="text-slate-500 mt-2 max-w-md">
-                            As ferramentas de disparo de mensagem pelo Instagram estarão disponíveis aqui em breve.
+                            Esta funcionalidade é exclusiva para assinantes do <strong>Plano Pro</strong> ou superior.
+                            Faça o upgrade para desbloquear estas ferramentas de prospecção.
                         </p>
+                        <button className="mt-6 px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors">
+                            Ver Planos
+                        </button>
                     </div>
-                )}
+                ) : (
+                    <>
+                        {activeTab === 'messages' && (
+                            <WhatsAppCampaignForm />
+                        )}
 
-                {activeTab === 'maps' && (
-                    <GoogleMapsLeadSearch />
-                )}
+                        {activeTab === 'instagram_messages' && (
+                            <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
+                                <Send size={48} className="text-slate-200 mb-4" />
+                                <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
+                                <p className="text-slate-500 mt-2 max-w-md">
+                                    As ferramentas de disparo de mensagem pelo Instagram estarão disponíveis aqui em breve.
+                                </p>
+                            </div>
+                        )}
 
-                {activeTab === 'instagram' && (
-                    <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
-                        <Instagram size={48} className="text-slate-200 mb-4" />
-                        <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
-                        <p className="text-slate-500 mt-2 max-w-md">
-                            As ferramentas de busca de leads no Instagram estarão disponíveis aqui em breve.
-                        </p>
-                    </div>
-                )}
+                        {activeTab === 'maps' && (
+                            <GoogleMapsLeadSearch />
+                        )}
 
-                {activeTab === 'cnpj' && (
-                    <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
-                        <Building2 size={48} className="text-slate-200 mb-4" />
-                        <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
-                        <p className="text-slate-500 mt-2 max-w-md">
-                            As ferramentas de busca rápida de leads por CNPJ estarão disponíveis aqui em breve.
-                        </p>
-                    </div>
+                        {activeTab === 'instagram' && (
+                            <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
+                                <Instagram size={48} className="text-slate-200 mb-4" />
+                                <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
+                                <p className="text-slate-500 mt-2 max-w-md">
+                                    As ferramentas de busca de leads no Instagram estarão disponíveis aqui em breve.
+                                </p>
+                            </div>
+                        )}
+
+                        {activeTab === 'cnpj' && (
+                            <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
+                                <Building2 size={48} className="text-slate-200 mb-4" />
+                                <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
+                                <p className="text-slate-500 mt-2 max-w-md">
+                                    As ferramentas de busca rápida de leads por CNPJ estarão disponíveis aqui em breve.
+                                </p>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
-import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone } from 'lucide-react';
+import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import CampaignMonitor from './CampaignMonitor';
 
@@ -21,7 +21,7 @@ export const WhatsAppCampaignForm: React.FC = () => {
     const [planLimit, setPlanLimit] = useState<number | null>(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-    const { user } = useAuth();
+    const { user, isStarter } = useAuth();
     const [clients, setClients] = useState<any[]>([]);
     const [folders, setFolders] = useState<any[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -357,12 +357,25 @@ export const WhatsAppCampaignForm: React.FC = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setCampaignType(campaignType === 'multi-ai' ? '' : 'multi-ai')}
-                        className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'multi-ai' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                        onClick={() => {
+                            if (isStarter) return;
+                            setCampaignType(campaignType === 'multi-ai' ? '' : 'multi-ai');
+                        }}
+                        className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${isStarter ? 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-70' : campaignType === 'multi-ai' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
                     >
-                        <Layers className={`mb-3 ${campaignType === 'multi-ai' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
-                        <span className={`font-bold ${campaignType === 'multi-ai' ? 'text-white' : 'text-slate-700'}`}>Multi-Instância com IA</span>
-                        <span className={`text-xs text-center mt-2 ${campaignType === 'multi-ai' ? 'text-slate-300' : 'text-slate-500'}`}>Distribui os envios com IA entre vários números.</span>
+                        {isStarter && (
+                            <div className="absolute top-3 right-3 bg-red-100 text-red-600 p-1.5 rounded-lg flex items-center justify-center shadow-sm">
+                                <Lock size={14} />
+                            </div>
+                        )}
+                        <Layers className={`mb-3 ${isStarter ? 'text-slate-300' : campaignType === 'multi-ai' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
+                        <span className={`font-bold ${isStarter ? 'text-slate-400' : campaignType === 'multi-ai' ? 'text-white' : 'text-slate-700'}`}>Multi-Instância com IA</span>
+                        <span className={`text-xs text-center mt-2 ${isStarter ? 'text-slate-400' : campaignType === 'multi-ai' ? 'text-slate-300' : 'text-slate-500'}`}>Distribui os envios com IA entre vários números.</span>
+                        {isStarter && (
+                            <div className="mt-4 bg-slate-200 text-slate-500 text-[10px] uppercase tracking-wider font-bold py-1 px-3 rounded-full">
+                                Plano Pro
+                            </div>
+                        )}
                     </button>
                 </div>
 

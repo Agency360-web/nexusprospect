@@ -8,6 +8,7 @@ interface UserProfile {
     allowed_pages?: string[];
     full_name?: string;
     organization_id?: string;
+    plan_id?: string;
 }
 
 interface AuthContextType {
@@ -15,6 +16,8 @@ interface AuthContextType {
     user: User | null;
     profile: UserProfile | null;
     loading: boolean;
+    isAdmin: boolean;
+    isStarter: boolean;
     signOut: () => Promise<void>;
 }
 
@@ -23,6 +26,8 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     profile: null,
     loading: true,
+    isAdmin: false,
+    isStarter: true,
     signOut: async () => { },
 });
 
@@ -84,14 +89,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
     }, []);
 
+    // Helpers de plano
+    const isAdmin = useMemo(() => user?.email === 'marketing@conectaperformance.com.br', [user?.email]);
+    const isStarter = useMemo(() => {
+        if (isAdmin) return false;
+        return profile?.plan_id === 'starter' || !profile?.plan_id;
+    }, [isAdmin, profile?.plan_id]);
+
     // Memoize context value to prevent unnecessary re-renders
     const value = useMemo(() => ({
         session,
         user,
         profile,
         loading,
+        isAdmin,
+        isStarter,
         signOut
-    }), [session, user, profile, loading, signOut]);
+    }), [session, user, profile, loading, isAdmin, isStarter, signOut]);
 
     return (
         <AuthContext.Provider value={value}>

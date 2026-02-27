@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Bot, Save, Loader2, AlertTriangle, CheckCircle2, Send, MessageCircle, RefreshCw } from 'lucide-react';
+import { Bot, Save, Loader2, AlertTriangle, CheckCircle2, Send, MessageCircle, RefreshCw, Lock } from 'lucide-react';
 
 type AgentType = 'dispatch' | 'support' | 'followup';
 
@@ -47,7 +47,7 @@ const defaultSettings: AgentSettings = {
 };
 
 const AiAgents: React.FC = () => {
-    const { user } = useAuth();
+    const { user, isStarter } = useAuth();
     const [selectedAgentType, setSelectedAgentType] = useState<AgentType | ''>('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -239,21 +239,38 @@ const AiAgents: React.FC = () => {
                 <div className="mb-10">
                     <label className="block text-sm font-bold text-slate-700 mb-4">Selecione o Agente *</label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {AGENT_TYPES.map(({ id, label, description, icon: Icon }) => (
-                            <button
-                                key={id}
-                                type="button"
-                                onClick={() => setSelectedAgentType(selectedAgentType === id ? '' : id)}
-                                className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${selectedAgentType === id
-                                    ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1'
-                                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                                    }`}
-                            >
-                                <Icon className={`mb-3 ${selectedAgentType === id ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
-                                <span className={`font-bold ${selectedAgentType === id ? 'text-white' : 'text-slate-700'}`}>{label}</span>
-                                <span className={`text-xs text-center mt-2 ${selectedAgentType === id ? 'text-slate-300' : 'text-slate-500'}`}>{description}</span>
-                            </button>
-                        ))}
+                        {AGENT_TYPES.map(({ id, label, description, icon: Icon }) => {
+                            const isLocked = isStarter && (id === 'support' || id === 'followup');
+
+                            return (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => {
+                                        if (isLocked) return;
+                                        setSelectedAgentType(selectedAgentType === id ? '' : id);
+                                    }}
+                                    className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${isLocked ? 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-70' : selectedAgentType === id
+                                        ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1'
+                                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    {isLocked && (
+                                        <div className="absolute top-3 right-3 bg-red-100 text-red-600 p-1.5 rounded-lg flex items-center justify-center shadow-sm">
+                                            <Lock size={14} />
+                                        </div>
+                                    )}
+                                    <Icon className={`mb-3 ${isLocked ? 'text-slate-300' : selectedAgentType === id ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
+                                    <span className={`font-bold ${isLocked ? 'text-slate-400' : selectedAgentType === id ? 'text-white' : 'text-slate-700'}`}>{label}</span>
+                                    <span className={`text-xs text-center mt-2 ${isLocked ? 'text-slate-400' : selectedAgentType === id ? 'text-slate-300' : 'text-slate-500'}`}>{description}</span>
+                                    {isLocked && (
+                                        <div className="mt-4 bg-slate-200 text-slate-500 text-[10px] uppercase tracking-wider font-bold py-1 px-3 rounded-full">
+                                            Plano Pro
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 

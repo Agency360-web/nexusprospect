@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Autenticação — Extrator Google Maps</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        :root {
+            --bg: #0b0e14;
+            --card: #121725;
+            --text: #e7ecf3;
+            --muted: #9aa4b2;
+            --acc: #2dd4bf;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font: 500 15px/1.5 Inter, system-ui, Segoe UI, Roboto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .wrap {
+            width: 100%;
+            max-width: 520px;
+            padding: 0 18px;
+        }
+
+        .logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 18px;
+        }
+
+        .logo img {
+            max-width: 450px;
+            height: auto;
+        }
+
+        .card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .02));
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 16px;
+            padding: 22px;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: 22px
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin: 14px 0 6px;
+            text-align: left;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, .10);
+            background: #0e1118;
+            color: #fff;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--acc);
+            box-shadow: 0 0 0 4px rgba(45, 212, 191, .12);
+        }
+
+        .row {
+            display: flex;
+            justify-content: center;
+            margin-top: 18px;
+        }
+
+        .btn {
+            cursor: pointer;
+            border: 1px solid rgba(45, 212, 191, .6);
+            background: linear-gradient(90deg, #34d399, #2dd4bf);
+            color: #222222;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-weight: 700;
+            width: 100%;
+            max-width: 220px;
+            font-size: 15px;
+            letter-spacing: 0.3px;
+            text-shadow: 0 0 5px rgba(45, 212, 191, 0.7),
+                0 0 10px rgba(45, 212, 191, 0.5),
+                0 0 20px rgba(45, 212, 191, 0.4);
+            box-shadow: 0 0 8px rgba(45, 212, 191, 0.5),
+                0 0 16px rgba(45, 212, 191, 0.4),
+                0 0 32px rgba(45, 212, 191, 0.3);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .btn:hover {
+            box-shadow: 0 0 12px rgba(45, 212, 191, 0.8),
+                0 0 24px rgba(45, 212, 191, 0.7),
+                0 0 48px rgba(45, 212, 191, 0.6);
+            transform: scale(1.04);
+        }
+
+        .msg {
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--muted)
+        }
+
+        .err {
+            color: #fecaca
+        }
+
+        .ok {
+            color: #cde7d8
+        }
+
+        small {
+            color: var(--muted);
+            display: block;
+            margin-top: 10px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="logo">
+            <img id="logo" src="logo.png" alt="Logo" />
+        </div>
+        <div class="card">
+            <h3>Extrator Google Maps</h3>
+
+            <p class="msg">Digite sua chave para liberar o uso do extrator.</p><br>
+
+            <input id="apiKey" type="text" placeholder="Insira sua chave aqui..." autocomplete="off" />
+
+            <div class="row">
+                <button id="btnValidar" class="btn"> 🔐 Validar Chave</button>
+            </div>
+
+            <p id="feedback" class="msg" role="status" aria-live="polite"></p>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+</body>
+
+</html>
