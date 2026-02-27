@@ -13,6 +13,9 @@ import {
     AlertCircle,
     PartyPopper,
     AlertTriangle,
+    StopCircle,
+    Trash2,
+    Ban,
 } from 'lucide-react';
 
 interface CampaignStats {
@@ -35,14 +38,14 @@ const CampaignMonitor: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [expanded, setExpanded] = useState(true);
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const prevCampaignsRef = useRef<CampaignStats[]>([]);
 
     const fetchCampaigns = useCallback(async () => {
         if (!user) return;
 
         try {
-            // Buscar campanhas do usuário
             const { data: campaignsData, error: campError } = await supabase
                 .from('campaigns')
                 .select('id, name, status, created_at, configuration')
@@ -56,7 +59,6 @@ const CampaignMonitor: React.FC = () => {
                 return;
             }
 
-            // Buscar stats de mensagens para cada campanha
             const campaignIds = campaignsData.map(c => c.id);
 
             const { data: messagesData, error: msgError } = await supabase
@@ -68,7 +70,6 @@ const CampaignMonitor: React.FC = () => {
                 console.error('Erro ao buscar messages:', msgError);
             }
 
-            // Agregar contagens
             const statsMap: Record<string, { total: number; sent: number; failed: number; pending: number }> = {};
             campaignIds.forEach(id => {
                 statsMap[id] = { total: 0, sent: 0, failed: 0, pending: 0 };
@@ -89,22 +90,16 @@ const CampaignMonitor: React.FC = () => {
             const result: CampaignStats[] = campaignsData.map(c => {
                 const stats = statsMap[c.id];
 
-                // Se a campanha foi marcada como 'completed' pelo n8n,
-                // qualquer pendente restante é considerado como falha
-                if (c.status === 'completed' && stats.pending > 0) {
+                // Se campanha cancelada ou completed, pendentes viram falha
+                if ((c.status === 'completed' || c.status === 'cancelled') && stats.pending > 0) {
                     stats.failed += stats.pending;
                     stats.pending = 0;
                 }
 
-                // Heurística: se a campanha tem mais de 30min e todos os leads foram processados 
-                // OU se não houve mudança nos pendentes por muito tempo, marcar como finalizada
-                const ageMinutes = (Date.now() - new Date(c.created_at).getTime()) / 60000;
                 const processed = stats.sent + stats.failed;
 
-                // Se campanha tem msgs e todos foram processados (sem pendentes), 
-                // marcar campanha como completed se ainda não estiver
+                // Auto-marcar como completed se todos processados
                 if (stats.total > 0 && stats.pending === 0 && processed >= stats.total && c.status === 'active') {
-                    // Atualizar status no banco em background
                     supabase
                         .from('campaigns')
                         .update({ status: 'completed' })
@@ -137,7 +132,7 @@ const CampaignMonitor: React.FC = () => {
         fetchCampaigns();
     }, [fetchCampaigns]);
 
-    // Auto-refresh a cada 15 segundos
+    // Auto-refresh
     useEffect(() => {
         intervalRef.current = setInterval(fetchCampaigns, REFRESH_INTERVAL);
         return () => {
@@ -145,30 +140,80 @@ const CampaignMonitor: React.FC = () => {
         };
     }, [fetchCampaigns]);
 
+    // === ACTIONS ===
+
+    const handleStopCampaign = async (campaignId: string) => {
+        setActionLoading(campaignId);
+        try {
+            // 1. Marcar campanha como 'cancelled'
+            await supabase
+                .from('campaigns')
+                .update({ status: 'cancelled' })
+                .eq('id', campaignId);
+
+            // 2. Marcar todos os pendentes como 'failed'
+            await supabase
+                .from('campaign_messages')
+                .update({ status: 'failed', error_message: 'Campanha cancelada pelo usuário' })
+                .eq('campaign_id', campaignId)
+                .eq('status', 'pending');
+
+            // Refresh
+            await fetchCampaigns();
+        } catch (err) {
+            console.error('Erro ao parar campanha:', err);
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleDeleteCampaign = async (campaignId: string) => {
+        setActionLoading(campaignId);
+        try {
+            // Delete cascade vai remover campaign_messages também
+            await supabase
+                .from('campaigns')
+                .delete()
+                .eq('id', campaignId);
+
+            setConfirmDelete(null);
+            await fetchCampaigns();
+        } catch (err) {
+            console.error('Erro ao excluir campanha:', err);
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    // === HELPERS ===
+
     const getProgressPercent = (c: CampaignStats) => {
         if (c.total === 0) return 0;
         return Math.round(((c.sent + c.failed) / c.total) * 100);
     };
 
     const getCampaignStatusInfo = (c: CampaignStats) => {
-        if (c.total === 0) return { label: 'Sem envios', color: 'text-slate-400', bg: 'bg-slate-100', dotColor: 'bg-slate-300', icon: AlertCircle };
+        if (c.status === 'cancelled') {
+            return { label: 'Cancelada', color: 'text-red-700', bg: 'bg-red-50', dotColor: 'bg-red-500' };
+        }
+        if (c.total === 0) return { label: 'Sem envios', color: 'text-slate-400', bg: 'bg-slate-100', dotColor: 'bg-slate-300' };
 
         const processed = c.sent + c.failed;
         const isComplete = processed >= c.total || c.status === 'completed';
 
         if (isComplete && c.failed === 0 && c.pending === 0) {
-            return { label: 'Finalizada ✓', color: 'text-emerald-700', bg: 'bg-emerald-50', dotColor: 'bg-emerald-500', icon: CheckCircle2 };
+            return { label: 'Finalizada ✓', color: 'text-emerald-700', bg: 'bg-emerald-50', dotColor: 'bg-emerald-500' };
         }
         if (isComplete && c.failed > 0) {
-            return { label: `Finalizada • ${c.failed} falha${c.failed !== 1 ? 's' : ''}`, color: 'text-amber-700', bg: 'bg-amber-50', dotColor: 'bg-amber-500', icon: AlertTriangle };
+            return { label: `Finalizada • ${c.failed} falha${c.failed !== 1 ? 's' : ''}`, color: 'text-amber-700', bg: 'bg-amber-50', dotColor: 'bg-amber-500' };
         }
         if (c.pending > 0 && processed > 0) {
-            return { label: 'Enviando...', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse', icon: Send };
+            return { label: 'Enviando...', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
         }
         if (c.pending > 0 && processed === 0) {
-            return { label: 'Aguardando', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse', icon: Clock };
+            return { label: 'Aguardando', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
         }
-        return { label: 'Em andamento', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse', icon: Send };
+        return { label: 'Em andamento', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
     };
 
     const formatDate = (dateStr: string) => {
@@ -184,6 +229,17 @@ const CampaignMonitor: React.FC = () => {
         return '—';
     };
 
+    const isActive = (c: CampaignStats) => {
+        return c.status === 'active' && c.total > 0 && c.pending > 0;
+    };
+
+    const isFinished = (c: CampaignStats) => {
+        const processed = c.sent + c.failed;
+        return (processed >= c.total && c.total > 0) || c.status === 'completed' || c.status === 'cancelled';
+    };
+
+    // === RENDER ===
+
     if (loading) {
         return (
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -196,7 +252,7 @@ const CampaignMonitor: React.FC = () => {
     }
 
     if (campaigns.length === 0) {
-        return null; // Não mostrar nada se não tem campanhas
+        return null;
     }
 
     return (
@@ -238,11 +294,12 @@ const CampaignMonitor: React.FC = () => {
                         const progress = getProgressPercent(c);
                         const statusInfo = getCampaignStatusInfo(c);
                         const processed = c.sent + c.failed;
-                        const isFinished = processed >= c.total && c.total > 0;
+                        const finished = isFinished(c);
+                        const active = isActive(c);
 
                         return (
-                            <div key={c.id} className={`px-6 py-4 transition-colors ${isFinished ? 'bg-slate-50/30' : 'hover:bg-slate-50/50'}`}>
-                                {/* Row 1: Name + Status */}
+                            <div key={c.id} className={`px-6 py-4 transition-colors ${finished ? 'bg-slate-50/30' : 'hover:bg-slate-50/50'}`}>
+                                {/* Row 1: Name + Status + Actions */}
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <h4 className="text-sm font-bold text-slate-800 truncate">{c.name}</h4>
@@ -305,7 +362,7 @@ const CampaignMonitor: React.FC = () => {
                                         </div>
 
                                         {/* Finished Banner */}
-                                        {isFinished && (
+                                        {finished && c.status !== 'cancelled' && (
                                             <div className={`mt-3 px-3 py-2 rounded-lg text-[11px] font-bold flex items-center gap-2 ${c.failed === 0
                                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                     : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -323,6 +380,14 @@ const CampaignMonitor: React.FC = () => {
                                                 )}
                                             </div>
                                         )}
+
+                                        {/* Cancelled Banner */}
+                                        {c.status === 'cancelled' && (
+                                            <div className="mt-3 px-3 py-2 rounded-lg text-[11px] font-bold flex items-center gap-2 bg-red-50 text-red-700 border border-red-200">
+                                                <Ban size={14} />
+                                                Campanha cancelada. {c.sent} enviado{c.sent !== 1 ? 's' : ''} antes do cancelamento{c.failed > 0 ? `, ${c.failed} com falha` : ''}.
+                                            </div>
+                                        )}
                                     </>
                                 )}
 
@@ -332,6 +397,63 @@ const CampaignMonitor: React.FC = () => {
                                         Nenhum envio registrado para esta campanha.
                                     </p>
                                 )}
+
+                                {/* Action Buttons */}
+                                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-100">
+                                    {/* Parar - só mostra se campanha está ativa com pendentes */}
+                                    {active && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleStopCampaign(c.id)}
+                                            disabled={actionLoading === c.id}
+                                            className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            {actionLoading === c.id ? (
+                                                <RefreshCw size={12} className="animate-spin" />
+                                            ) : (
+                                                <StopCircle size={12} />
+                                            )}
+                                            Parar Campanha
+                                        </button>
+                                    )}
+
+                                    {/* Excluir */}
+                                    {confirmDelete === c.id ? (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] font-bold text-red-600">Tem certeza?</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDeleteCampaign(c.id)}
+                                                disabled={actionLoading === c.id}
+                                                className="flex items-center gap-1 text-[11px] font-bold text-white bg-red-500 hover:bg-red-600 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                {actionLoading === c.id ? (
+                                                    <RefreshCw size={11} className="animate-spin" />
+                                                ) : (
+                                                    <Trash2 size={11} />
+                                                )}
+                                                Sim, excluir
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setConfirmDelete(null)}
+                                                className="text-[11px] font-bold text-slate-500 hover:text-slate-700 px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+                                            >
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => setConfirmDelete(c.id)}
+                                            disabled={actionLoading === c.id}
+                                            className="flex items-center gap-1.5 text-[11px] font-bold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            <Trash2 size={12} />
+                                            Excluir
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
