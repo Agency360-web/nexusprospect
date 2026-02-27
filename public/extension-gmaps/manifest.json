@@ -1,0 +1,33 @@
+{
+    "manifest_version": 3,
+    "name": "Nexus360 — Extrator Google Maps",
+    "version": "2.0.0",
+    "description": "Extrai leads do Google Maps e envia para o Nexus360.",
+    "permissions": [
+        "tabs",
+        "storage",
+        "scripting",
+        "webNavigation",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "*://*.google.com/*",
+        "*://*.google.com.br/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_icon": {
+            "16": "icon16.png",
+            "48": "icon48.png",
+            "128": "icon128.png"
+        },
+        "default_popup": "popup.html"
+    },
+    "icons": {
+        "16": "icon16.png",
+        "48": "icon48.png",
+        "128": "icon128.png"
+    }
+}

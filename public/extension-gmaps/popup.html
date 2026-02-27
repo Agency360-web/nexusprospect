@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Nexus360 — Extrator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            width: 320px;
+            min-height: 200px;
+            background: #0f1117;
+            color: #e7ecf3;
+            font: 500 13px/1.5 Inter, system-ui, -apple-system, Segoe UI, Roboto;
+            padding: 16px;
+        }
+
+        h2 {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 11px;
+            color: #9aa4b2;
+            margin-bottom: 14px;
+        }
+
+        .status-box {
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            margin-bottom: 12px;
+        }
+
+        .status-box.ok {
+            background: rgba(82, 189, 133, .1);
+            border-color: rgba(82, 189, 133, .3);
+        }
+
+        .status-box.err {
+            background: rgba(239, 68, 68, .1);
+            border-color: rgba(239, 68, 68, .3);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .dot.ok {
+            background: #52bd85;
+        }
+
+        .dot.err {
+            background: #ef4444;
+        }
+
+        .info {
+            font-size: 11px;
+            color: #9aa4b2;
+            margin-top: 8px;
+        }
+
+        .info a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 13px;
+            transition: all .15s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #52bd85, #2dd4bf);
+            color: #0f1117;
+        }
+
+        .btn-primary:hover {
+            opacity: .9;
+        }
+
+        .btn-danger {
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, .4);
+            color: #fecaca;
+            margin-top: 8px;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, .1);
+        }
+    </style>
+</head>
+
+<body>
+    <h2>🔍 Nexus360 Extrator</h2>
+    <p class="subtitle">Extrator de Leads — Google Maps</p>
+
+    <div class="status-box" id="statusBox">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Verificando...</span>
+    </div>
+
+    <div id="authSection" style="display:none">
+        <p class="info" style="margin-bottom:10px">
+            Para conectar, acesse o <a href="https://nexusprospect.vercel.app/#/prospecting"
+                target="_blank">Nexus360</a>,
+            vá em <strong>Leads no Google Maps</strong> e clique em <strong>"Sincronizar Extensão"</strong>.
+        </p>
+    </div>
+
+    <div id="connectedSection" style="display:none">
+        <p class="info" style="margin-bottom:10px">
+            Extensão conectada! Abra o <a href="https://www.google.com/maps" target="_blank">Google Maps</a>,
+            pesquise um termo e a extração iniciará automaticamente.
+        </p>
+        <button class="btn btn-danger" id="disconnectBtn">Desconectar</button>
+    </div>
+
+    <script>
+        const statusBox = document.getElementById('statusBox');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const authSection = document.getElementById('authSection');
+        const connectedSection = document.getElementById('connectedSection');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+
+        function checkAuth() {
+            chrome.storage.local.get(['nexus360_token', 'nexus360_user_id', 'nexus360_user_email'], (res) => {
+                if (res?.nexus360_token && res?.nexus360_user_id) {
+                    statusBox.className = 'status-box ok';
+                    statusDot.className = 'dot ok';
+                    statusText.textContent = `Conectado: ${res.nexus360_user_email || 'Usuário'}`;
+                    authSection.style.display = 'none';
+                    connectedSection.style.display = 'block';
+                } else {
+                    statusBox.className = 'status-box err';
+                    statusDot.className = 'dot err';
+                    statusText.textContent = 'Não conectado';
+                    authSection.style.display = 'block';
+                    connectedSection.style.display = 'none';
+                }
+            });
+        }
+
+        disconnectBtn.addEventListener('click', () => {
+            chrome.storage.local.remove(['nexus360_token', 'nexus360_user_id', 'nexus360_user_email'], () => {
+                checkAuth();
+            });
+        });
+
+        checkAuth();
+    </script>
+</body>
+
+</html>
