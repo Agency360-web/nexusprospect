@@ -315,6 +315,13 @@ export const WhatsAppCampaignForm: React.FC = () => {
         }
     };
 
+    const selectLeadsBatch = (count: number) => {
+        // Seleciona os primeiros N leads que ainda não estão selecionados
+        const unselectedLeads = leads.filter(l => !selectedLeads.includes(l.id));
+        const toSelect = unselectedLeads.slice(0, count).map(l => l.id);
+        setSelectedLeads(prev => [...prev, ...toSelect]);
+    };
+
     return (
         <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-slate-200 animate-in slide-in-from-bottom-2 duration-400">
             <div className="mb-8">
@@ -614,13 +621,36 @@ export const WhatsAppCampaignForm: React.FC = () => {
                                     ))}
                                     <span className="text-[10px] text-slate-400 pr-1.5">/ pág</span>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={selectAllLeads}
-                                    className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-lg transition-colors"
-                                >
-                                    {selectedLeads.length === leads.length && leads.length > 0 ? 'Desmarcar todos' : 'Selecionar todos'}
-                                </button>
+                                <div className="flex items-center gap-1">
+                                    {selectedLeads.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedLeads([])}
+                                            className="text-xs font-bold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 py-1.5 px-3 rounded-lg transition-colors"
+                                        >
+                                            Desmarcar ({selectedLeads.length})
+                                        </button>
+                                    )}
+                                    {[20, 50, 100].map(n => (
+                                        <button
+                                            key={`sel-${n}`}
+                                            type="button"
+                                            onClick={() => selectLeadsBatch(n)}
+                                            disabled={selectedLeads.length >= leads.length}
+                                            className="text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 py-1.5 px-2.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                            title={`Selecionar +${n} leads`}
+                                        >
+                                            +{n}
+                                        </button>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={selectAllLeads}
+                                        className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 py-1.5 px-3 rounded-lg transition-colors"
+                                    >
+                                        {selectedLeads.length === leads.length && leads.length > 0 ? 'Todos ✓' : 'Todos'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
