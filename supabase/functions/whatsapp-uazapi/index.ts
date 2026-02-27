@@ -28,7 +28,7 @@ serve(async (req) => {
         if (!user) {
             return new Response(
                 JSON.stringify({ error: 'Não autorizado' }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
             )
         }
 
@@ -77,7 +77,7 @@ serve(async (req) => {
             if (existing && existing.length >= planLimit) {
                 return new Response(
                     JSON.stringify({ error: `Limite de ${planLimit} instância(s) atingido. Exclua uma conexão existente ou faça upgrade do plano.` }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 409 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -135,7 +135,7 @@ serve(async (req) => {
             if (!connection_id) {
                 return new Response(
                     JSON.stringify({ error: 'connection_id é obrigatório' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -150,7 +150,7 @@ serve(async (req) => {
             if (connErr || !conn) {
                 return new Response(
                     JSON.stringify({ error: 'Conexão não encontrada' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -204,7 +204,7 @@ serve(async (req) => {
             if (!connection_id) {
                 return new Response(
                     JSON.stringify({ error: 'connection_id é obrigatório' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -218,7 +218,7 @@ serve(async (req) => {
             if (connErr || !conn) {
                 return new Response(
                     JSON.stringify({ error: 'Conexão não encontrada' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -286,7 +286,7 @@ serve(async (req) => {
             if (!connection_id) {
                 return new Response(
                     JSON.stringify({ error: 'connection_id é obrigatório' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -300,7 +300,7 @@ serve(async (req) => {
             if (connErr || !conn) {
                 return new Response(
                     JSON.stringify({ error: 'Conexão não encontrada' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -340,7 +340,7 @@ serve(async (req) => {
             if (!connection_id) {
                 return new Response(
                     JSON.stringify({ error: 'connection_id é obrigatório' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -354,7 +354,7 @@ serve(async (req) => {
             if (connErr || !conn) {
                 return new Response(
                     JSON.stringify({ error: 'Conexão não encontrada' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
                 )
             }
 
@@ -420,14 +420,14 @@ serve(async (req) => {
         // Unknown action
         return new Response(
             JSON.stringify({ error: `Ação desconhecida: ${action}. Ações válidas: create, connect, disconnect, delete, status, list` }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         )
 
     } catch (error) {
         console.error('WhatsApp Uazapi Edge Function error:', error)
         return new Response(
             JSON.stringify({ error: error.message || 'Erro interno do servidor' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         )
     }
 })

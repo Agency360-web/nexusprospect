@@ -102,16 +102,25 @@ const ConnectionsTab: React.FC = () => {
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const qrPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // ─── API Helper ───
+    // ─── API Helper (fetch direto para evitar erros do SDK) ───
     const callApi = useCallback(async (action: ConnectionAction, extra: Record<string, unknown> = {}) => {
-        const { data, error } = await supabase.functions.invoke('whatsapp-uazapi', {
-            body: { action, ...extra },
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        const res = await fetch(`${supabaseUrl}/functions/v1/whatsapp-uazapi`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'apikey': anonKey,
+            },
+            body: JSON.stringify({ action, ...extra }),
         });
 
-        if (error) {
-            const errorMsg = error.context?.json?.error || error.message || 'Erro desconhecido';
-            throw new Error(errorMsg);
-        }
+        const data = await res.json();
 
         if (data?.error) {
             throw new Error(data.error);
