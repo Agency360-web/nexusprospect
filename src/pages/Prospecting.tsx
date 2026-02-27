@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Target, Send, MessageCircle, MapPin, Instagram, Building2 } from 'lucide-react';
 import { WhatsAppCampaignForm } from '../components/prospecting/WhatsAppCampaignForm';
+import GoogleMapsLeadSearch from '../components/prospecting/GoogleMapsLeadSearch';
 
 const Prospecting: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'messages' | 'instagram_messages' | 'maps' | 'instagram' | 'cnpj'>('messages');
@@ -59,13 +60,7 @@ const Prospecting: React.FC = () => {
                 )}
 
                 {activeTab === 'maps' && (
-                    <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
-                        <MapPin size={48} className="text-slate-200 mb-4" />
-                        <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
-                        <p className="text-slate-500 mt-2 max-w-md">
-                            As ferramentas de busca de leads no Google Maps estarão disponíveis aqui em breve.
-                        </p>
-                    </div>
+                    <GoogleMapsLeadSearch />
                 )}
 
                 {activeTab === 'instagram' && (
