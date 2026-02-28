@@ -218,7 +218,7 @@ const Dashboard: React.FC = () => {
                             <LayoutDashboard className="text-yellow-500" size={32} />
                             Dashboard
                         </h1>
-                        <p className="text-slate-300 font-medium w-full">Visão geral de performance de {userName}</p>
+                        <p className="text-slate-300 font-medium w-full">Métricas e visão geral da sua operação</p>
                     </div>
 
                     {/* Filter Dropdown */}
@@ -306,8 +306,8 @@ const Dashboard: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                     <div>
-                        <h2 className="text-lg font-bold text-slate-900">Evolução de Disparos</h2>
-                        <p className="text-sm text-slate-500">Volume de mensagens processadas no período selecionado</p>
+                        <h2 className="text-lg font-bold text-slate-900">Visão Geral dos Disparos</h2>
+                        <p className="text-sm text-slate-500">Volume de mensagens processadas no período selecionado.</p>
                     </div>
                 </div>
 
