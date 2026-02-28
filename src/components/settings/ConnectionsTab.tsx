@@ -102,10 +102,15 @@ const ConnectionsTab: React.FC = () => {
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const qrPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // ─── API Helper (fetch direto para evitar erros do SDK) ───
+    // ─── API Helper ───
     const callApi = useCallback(async (action: ConnectionAction, extra: Record<string, unknown> = {}) => {
+        console.log(`[ConnectionsTab] callApi: ${action}`, extra);
+
+        // Buscar sessão atual para obter o JWT
         const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
+        if (!session?.access_token) {
+            throw new Error('Sessão expirada. Faça login novamente.');
+        }
 
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -114,13 +119,24 @@ const ConnectionsTab: React.FC = () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
+                'Authorization': `Bearer ${session.access_token}`,
                 'apikey': anonKey,
             },
             body: JSON.stringify({ action, ...extra }),
         });
 
-        const data = await res.json();
+        console.log(`[ConnectionsTab] HTTP status: ${res.status}`);
+
+        // Ler body como texto primeiro para evitar erros de parse
+        const text = await res.text();
+        console.log(`[ConnectionsTab] Response body:`, text.substring(0, 500));
+
+        let data: any;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(`Resposta inválida do servidor (HTTP ${res.status}): ${text.substring(0, 200)}`);
+        }
 
         if (data?.error) {
             throw new Error(data.error);
@@ -247,7 +263,7 @@ const ConnectionsTab: React.FC = () => {
 
     // ─── Actions ───
     const handleCreate = async () => {
-        if (actionLoading) return; // prevent double click
+        if (actionLoading) return;
         setActionLoading('create');
         setError(null);
         try {

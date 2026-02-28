@@ -8,6 +8,7 @@ import Layout from './layouts/MainLayout';
 
 const Login = lazy(() => import('./pages/Login'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ClientManager = lazy(() => import('./pages/ClientManager'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail'));
 const AiAgents = lazy(() => import('./pages/AiAgents'));
@@ -35,7 +36,14 @@ const App: React.FC = () => {
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout>
-                  <ClientManager />
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
                 </Layout>
               </ProtectedRoute>
             } />
