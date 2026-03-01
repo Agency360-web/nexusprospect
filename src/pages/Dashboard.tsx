@@ -485,72 +485,88 @@ const Dashboard: React.FC = () => {
 
             {/* Tabela Inferior (Últimas Campanhas) */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-                <div className="p-6 border-b border-slate-100">
-                    <h2 className="text-lg font-bold text-slate-900">Campanhas Recentes</h2>
-                    <p className="text-sm text-slate-500">Acompanhamento detalhado das últimas execuções</p>
+                <div className="p-5 border-b border-slate-100">
+                    <h2 className="text-base font-bold text-slate-900 mb-0.5">Campanhas Recentes</h2>
+                    <p className="text-xs text-slate-500">Acompanhamento detalhado das últimas execuções</p>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[700px]">
                         <thead>
-                            <tr className="border-b border-slate-100">
-                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Campanha</th>
-                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Sucessos</th>
-                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Falhas</th>
-                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Total Leads</th>
+                            <tr className="border-b border-slate-100 bg-slate-50/50">
+                                <th className="px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Campanha</th>
+                                <th className="px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                <th className="px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Progresso (Envios / Falhas)</th>
+                                <th className="px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Taxas (%)</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {campaigns.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-500">
+                                    <td colSpan={4} className="px-5 py-8 text-center text-sm text-slate-500">
                                         Nenhuma campanha para exibir.
                                     </td>
                                 </tr>
                             ) : (
-                                campaigns.slice(0, 5).map(camp => (
-                                    <tr key={camp.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-6 py-5">
-                                            <div className="font-bold text-slate-800 text-sm mb-1">{camp.name}</div>
-                                            <div className="text-xs text-slate-400 font-medium">{new Date(camp.created_at).toLocaleDateString('pt-BR')}</div>
-                                        </td>
-                                        <td className="px-6 py-5 text-center">
-                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold tracking-wide ${camp.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60' :
-                                                    camp.status === 'active' || camp.status === 'in_progress' ? 'bg-blue-50 text-blue-600 border border-blue-200/60' :
-                                                        camp.status === 'failed' ? 'bg-rose-50 text-rose-600 border border-rose-200/60' :
-                                                            'bg-slate-100 text-slate-500 border border-slate-200/60'
-                                                }`}>
-                                                {camp.status === 'completed' ? 'Concluída' :
-                                                    camp.status === 'active' ? 'Ativa' :
-                                                        camp.status === 'in_progress' ? 'Progresso' :
-                                                            camp.status === 'failed' ? 'Falha' :
-                                                                camp.status === 'paused' ? 'Pausada' :
-                                                                    'Pendente'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-5 text-center">
-                                            <span className="inline-flex text-emerald-600 font-bold bg-emerald-50/80 px-2.5 py-1 rounded-md text-sm min-w-[32px] justify-center">
-                                                {camp.sent_count || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-5 text-center">
-                                            {camp.failed_count > 0 ? (
-                                                <span className="inline-flex text-rose-500 font-bold bg-rose-50/80 px-2.5 py-1 rounded-md text-sm min-w-[32px] justify-center">
-                                                    {camp.failed_count}
+                                campaigns.slice(0, 5).map(camp => {
+                                    const total = camp.total_leads || 0;
+                                    const sent = camp.sent_count || 0;
+                                    const failed = camp.failed_count || 0;
+
+                                    const successRate = total > 0 ? ((sent / total) * 100).toFixed(1) : '0.0';
+                                    const failRate = total > 0 ? ((failed / total) * 100).toFixed(1) : '0.0';
+
+                                    return (
+                                        <tr key={camp.id} className="hover:bg-slate-50/80 transition-colors group">
+                                            {/* 1. Nome e Data */}
+                                            <td className="px-5 py-3">
+                                                <div className="font-bold text-slate-800 text-[13px] leading-tight mb-0.5">{camp.name}</div>
+                                                <div className="text-[11px] text-slate-400 font-medium">{new Date(camp.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+                                            </td>
+
+                                            {/* 2. Status */}
+                                            <td className="px-5 py-3 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${camp.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60' :
+                                                        camp.status === 'active' || camp.status === 'in_progress' ? 'bg-blue-50 text-blue-600 border border-blue-200/60' :
+                                                            camp.status === 'failed' ? 'bg-rose-50 text-rose-600 border border-rose-200/60' :
+                                                                'bg-slate-100 text-slate-500 border border-slate-200/60'
+                                                    }`}>
+                                                    {camp.status === 'completed' ? 'Concluída' :
+                                                        camp.status === 'active' ? 'Ativa' :
+                                                            camp.status === 'in_progress' ? 'Progresso' :
+                                                                camp.status === 'failed' ? 'Falha' :
+                                                                    camp.status === 'paused' ? 'Pausada' :
+                                                                        'Pendente'}
                                                 </span>
-                                            ) : (
-                                                <span className="inline-flex text-rose-300 font-medium px-2.5 py-1 text-sm min-w-[32px] justify-center">
-                                                    0
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-5 text-right">
-                                            <span className="font-bold text-slate-800 text-sm">
-                                                {camp.total_leads || 0}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))
+                                            </td>
+
+                                            {/* 3. Envios / Falhas (Barra de Progresso) */}
+                                            <td className="px-5 py-3">
+                                                <div className="flex flex-col gap-1.5 w-full max-w-[160px] mx-auto">
+                                                    <div className="flex h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className="bg-emerald-500 transition-all duration-500" style={{ width: `${successRate}%` }}></div>
+                                                        <div className="bg-rose-400 transition-all duration-500" style={{ width: `${failRate}%` }}></div>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-[10px] font-medium">
+                                                        <span className="text-slate-500"><strong className="text-emerald-600 font-bold">{sent}</strong> env</span>
+                                                        <span className="text-slate-500"><strong className="text-rose-500 font-bold">{failed}</strong> fal</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* 4. Taxas */}
+                                            <td className="px-5 py-3 text-center">
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-[11px] min-w-[42px] text-center" title="Taxa de Sucesso">
+                                                        {successRate}%
+                                                    </span>
+                                                    <span className="text-rose-700 font-bold bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded text-[11px] min-w-[42px] text-center" title="Taxa de Falha">
+                                                        {failRate}%
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
