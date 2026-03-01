@@ -74,9 +74,9 @@ const Dashboard: React.FC = () => {
                 return;
             }
 
-            // Split campaignIds into chunks to avoid PostgREST limits on 'in' clause if there are many
+            // Split campaignIds into chunks to avoid PostgREST limits on 'in' clause and URI Too Long errors
             const campaignIds = camps.map(c => c.id);
-            const chunkSize = 200;
+            const chunkSize = 15;
             let allMessages: any[] = [];
 
             for (let i = 0; i < campaignIds.length; i += chunkSize) {
@@ -84,7 +84,8 @@ const Dashboard: React.FC = () => {
                 const { data: messagesData, error: msgError } = await supabase
                     .from('campaign_messages')
                     .select('campaign_id, status')
-                    .in('campaign_id', chunk);
+                    .in('campaign_id', chunk)
+                    .limit(100000);
 
                 if (msgError) {
                     console.error('[Dashboard] Erro ao buscar messages chunk:', msgError);
