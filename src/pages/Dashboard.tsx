@@ -39,7 +39,7 @@ const Dashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [campaigns, setCampaigns] = useState<CampaignStat[]>([]);
 
-    const [timeFilter, setTimeFilter] = useState<TimeFilter>('7');
+    const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
     const [showFilterMenu, setShowFilterMenu] = useState(false);
 
     useEffect(() => {
@@ -51,67 +51,56 @@ const Dashboard: React.FC = () => {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const { data: camps, error } = await supabase
+
+            // Step 1: Fetch campaigns (same query as CampaignMonitor)
+            const { data: campaignsData, error: campError } = await supabase
                 .from('campaigns')
-                .select(`
-                id,
-                name,
-                status,
-                created_at,
-                sent_count,
-                failed_count,
-                pending_count,
-                total_leads
-            `)
+                .select('id, name, status, created_at, configuration')
                 .eq('user_id', user!.id)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            console.log('[Dashboard] Campaigns fetched:', campaignsData?.length, 'error:', campError);
 
-            if (!camps || camps.length === 0) {
+            if (campError || !campaignsData || campaignsData.length === 0) {
+                console.log('[Dashboard] No campaigns found or error');
                 setCampaigns([]);
                 setLoading(false);
                 return;
             }
 
-            // Split campaignIds into chunks to avoid PostgREST limits on 'in' clause and URI Too Long errors
-            const campaignIds = camps.map(c => c.id);
-            const chunkSize = 15;
-            let allMessages: any[] = [];
+            // Step 2: Fetch messages for all campaigns (same as CampaignMonitor)
+            const campaignIds = campaignsData.map(c => c.id);
+            console.log('[Dashboard] Campaign IDs:', campaignIds);
 
-            for (let i = 0; i < campaignIds.length; i += chunkSize) {
-                const chunk = campaignIds.slice(i, i + chunkSize);
-                const { data: messagesData, error: msgError } = await supabase
-                    .from('campaign_messages')
-                    .select('campaign_id, status')
-                    .in('campaign_id', chunk)
-                    .limit(100000);
+            const { data: messagesData, error: msgError } = await supabase
+                .from('campaign_messages')
+                .select('campaign_id, status')
+                .in('campaign_id', campaignIds);
 
-                if (msgError) {
-                    console.error('[Dashboard] Erro ao buscar messages chunk:', msgError);
-                }
+            console.log('[Dashboard] Messages fetched:', messagesData?.length, 'error:', msgError);
 
-                if (messagesData) {
-                    allMessages = [...allMessages, ...messagesData];
-                }
-            }
-
+            // Step 3: Aggregate stats per campaign (same as CampaignMonitor)
             const statsMap: Record<string, { total: number; sent: number; failed: number; pending: number }> = {};
             campaignIds.forEach(id => {
                 statsMap[id] = { total: 0, sent: 0, failed: 0, pending: 0 };
             });
 
-            allMessages.forEach((msg: any) => {
-                const s = statsMap[msg.campaign_id];
-                if (s) {
-                    s.total++;
-                    if (msg.status === 'sent') s.sent++;
-                    else if (msg.status === 'failed') s.failed++;
-                    else s.pending++;
-                }
-            });
+            if (messagesData) {
+                messagesData.forEach((msg: any) => {
+                    const s = statsMap[msg.campaign_id];
+                    if (s) {
+                        s.total++;
+                        if (msg.status === 'sent') s.sent++;
+                        else if (msg.status === 'failed') s.failed++;
+                        else s.pending++;
+                    }
+                });
+            }
 
-            const result: CampaignStat[] = camps.map(c => {
+            console.log('[Dashboard] StatsMap:', JSON.stringify(statsMap));
+
+            // Step 4: Build result (same as CampaignMonitor)
+            const result: CampaignStat[] = campaignsData.map(c => {
                 const stats = statsMap[c.id];
 
                 // Se campanha cancelada ou completed, pendentes viram falha
@@ -127,11 +116,11 @@ const Dashboard: React.FC = () => {
                     created_at: c.created_at,
                     sent_count: stats.sent,
                     failed_count: stats.failed,
-                    pending_count: stats.pending,
-                    total_leads: stats.total
-                } as unknown as CampaignStat;
+                    total_leads: stats.total,
+                };
             });
 
+            console.log('[Dashboard] Final campaigns result:', result);
             setCampaigns(result);
         } catch (err) {
             console.error('[Dashboard] Erro ao buscar dados:', err);
