@@ -59,10 +59,10 @@ const Dashboard: React.FC = () => {
                 .eq('user_id', user!.id)
                 .order('created_at', { ascending: false });
 
-            console.log('[Dashboard] Campaigns fetched:', campaignsData?.length, 'error:', campError);
+
 
             if (campError || !campaignsData || campaignsData.length === 0) {
-                console.log('[Dashboard] No campaigns found or error');
+
                 setCampaigns([]);
                 setLoading(false);
                 return;
@@ -70,14 +70,14 @@ const Dashboard: React.FC = () => {
 
             // Step 2: Fetch messages for all campaigns (same as CampaignMonitor)
             const campaignIds = campaignsData.map(c => c.id);
-            console.log('[Dashboard] Campaign IDs:', campaignIds);
+
 
             const { data: messagesData, error: msgError } = await supabase
                 .from('campaign_messages')
                 .select('campaign_id, status')
                 .in('campaign_id', campaignIds);
 
-            console.log('[Dashboard] Messages fetched:', messagesData?.length, 'error:', msgError);
+
 
             // Step 3: Aggregate stats per campaign (same as CampaignMonitor)
             const statsMap: Record<string, { total: number; sent: number; failed: number; pending: number }> = {};
@@ -97,7 +97,7 @@ const Dashboard: React.FC = () => {
                 });
             }
 
-            console.log('[Dashboard] StatsMap:', JSON.stringify(statsMap));
+
 
             // Step 4: Build result (same as CampaignMonitor)
             const result: CampaignStat[] = campaignsData.map(c => {
@@ -120,7 +120,7 @@ const Dashboard: React.FC = () => {
                 };
             });
 
-            console.log('[Dashboard] Final campaigns result:', result);
+
             setCampaigns(result);
         } catch (err) {
             console.error('[Dashboard] Erro ao buscar dados:', err);
