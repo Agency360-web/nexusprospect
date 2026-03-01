@@ -11,13 +11,14 @@ import {
     LayoutDashboard,
 } from 'lucide-react';
 import {
-    AreaChart,
-    Area,
+    LineChart,
+    Line,
     XAxis,
     YAxis,
     CartesianGrid,
     Tooltip,
-    ResponsiveContainer
+    ResponsiveContainer,
+    Legend,
 } from 'recharts';
 
 interface CampaignStat {
@@ -375,27 +376,99 @@ const Dashboard: React.FC = () => {
                 ) : (
                     <div className="h-[350px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorSucesso" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="colorFalha" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    itemStyle={{ fontSize: '14px', fontWeight: 500 }}
+                            <LineChart data={chartData} margin={{ top: 10, right: 30, left: -10, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                                    dy={10}
                                 />
-                                <Area type="monotone" name="Sucesso" dataKey="Sucesso" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorSucesso)" />
-                                <Area type="monotone" name="Falha" dataKey="Falha" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorFalha)" />
-                            </AreaChart>
+                                <YAxis
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                                    width={45}
+                                />
+                                <Tooltip
+                                    cursor={{ stroke: '#1e293b', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                    content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                            const sucesso = payload.find(p => p.dataKey === 'Sucesso');
+                                            const falha = payload.find(p => p.dataKey === 'Falha');
+                                            return (
+                                                <div style={{
+                                                    background: '#0f172a',
+                                                    borderRadius: '10px',
+                                                    padding: '12px 16px',
+                                                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)',
+                                                    border: 'none',
+                                                    minWidth: '140px',
+                                                }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
+                                                            <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 500 }}>Sucesso</span>
+                                                            <span style={{ color: '#fff', fontSize: '14px', fontWeight: 700, marginLeft: 'auto' }}>
+                                                                {sucesso?.value || 0}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#64748b' }} />
+                                                            <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 500 }}>Falha</span>
+                                                            <span style={{ color: '#fff', fontSize: '14px', fontWeight: 700, marginLeft: 'auto' }}>
+                                                                {falha?.value || 0}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        marginTop: '8px',
+                                                        paddingTop: '8px',
+                                                        borderTop: '1px solid #334155',
+                                                        color: '#64748b',
+                                                        fontSize: '11px',
+                                                        fontWeight: 600,
+                                                        textTransform: 'uppercase' as const,
+                                                        letterSpacing: '0.05em',
+                                                    }}>
+                                                        {label}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Legend
+                                    verticalAlign="top"
+                                    align="right"
+                                    iconType="circle"
+                                    iconSize={8}
+                                    wrapperStyle={{ paddingBottom: '20px', fontSize: '13px', fontWeight: 500 }}
+                                    formatter={(value: string) => (
+                                        <span style={{ color: '#475569', marginLeft: '4px' }}>{value}</span>
+                                    )}
+                                />
+                                <Line
+                                    type="monotone"
+                                    name="Sucesso"
+                                    dataKey="Sucesso"
+                                    stroke="#10b981"
+                                    strokeWidth={2.5}
+                                    dot={false}
+                                    activeDot={{ r: 5, fill: '#10b981', stroke: '#fff', strokeWidth: 2.5 }}
+                                />
+                                <Line
+                                    type="monotone"
+                                    name="Falha"
+                                    dataKey="Falha"
+                                    stroke="#64748b"
+                                    strokeWidth={2}
+                                    dot={false}
+                                    activeDot={{ r: 5, fill: '#64748b', stroke: '#fff', strokeWidth: 2.5 }}
+                                />
+                            </LineChart>
                         </ResponsiveContainer>
                     </div>
                 )}
