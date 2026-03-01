@@ -67,7 +67,71 @@ const Dashboard: React.FC = () => {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setCampaigns((camps || []) as CampaignStat[]);
+
+            if (!camps || camps.length === 0) {
+                setCampaigns([]);
+                setLoading(false);
+                return;
+            }
+
+            // Split campaignIds into chunks to avoid PostgREST limits on 'in' clause if there are many
+            const campaignIds = camps.map(c => c.id);
+            const chunkSize = 200;
+            let allMessages: any[] = [];
+
+            for (let i = 0; i < campaignIds.length; i += chunkSize) {
+                const chunk = campaignIds.slice(i, i + chunkSize);
+                const { data: messagesData, error: msgError } = await supabase
+                    .from('campaign_messages')
+                    .select('campaign_id, status')
+                    .in('campaign_id', chunk);
+
+                if (msgError) {
+                    console.error('[Dashboard] Erro ao buscar messages chunk:', msgError);
+                }
+
+                if (messagesData) {
+                    allMessages = [...allMessages, ...messagesData];
+                }
+            }
+
+            const statsMap: Record<string, { total: number; sent: number; failed: number; pending: number }> = {};
+            campaignIds.forEach(id => {
+                statsMap[id] = { total: 0, sent: 0, failed: 0, pending: 0 };
+            });
+
+            allMessages.forEach((msg: any) => {
+                const s = statsMap[msg.campaign_id];
+                if (s) {
+                    s.total++;
+                    if (msg.status === 'sent') s.sent++;
+                    else if (msg.status === 'failed') s.failed++;
+                    else s.pending++;
+                }
+            });
+
+            const result: CampaignStat[] = camps.map(c => {
+                const stats = statsMap[c.id];
+
+                // Se campanha cancelada ou completed, pendentes viram falha
+                if ((c.status === 'completed' || c.status === 'cancelled') && stats.pending > 0) {
+                    stats.failed += stats.pending;
+                    stats.pending = 0;
+                }
+
+                return {
+                    id: c.id,
+                    name: c.name,
+                    status: c.status,
+                    created_at: c.created_at,
+                    sent_count: stats.sent,
+                    failed_count: stats.failed,
+                    pending_count: stats.pending,
+                    total_leads: stats.total
+                } as unknown as CampaignStat;
+            });
+
+            setCampaigns(result);
         } catch (err) {
             console.error('[Dashboard] Erro ao buscar dados:', err);
         } finally {
