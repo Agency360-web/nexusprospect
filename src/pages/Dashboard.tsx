@@ -384,6 +384,8 @@ const Dashboard: React.FC = () => {
                                     tickLine={false}
                                     tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
                                     dy={10}
+                                    interval={chartData.length > 10 ? Math.ceil(chartData.length / 7) - 1 : 0}
+                                    tickMargin={5}
                                 />
                                 <YAxis
                                     axisLine={false}
