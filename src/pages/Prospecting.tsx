@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Target, Send, MessageCircle, MapPin, Instagram, Building2, Lock } from 'lucide-react';
+import { Target, Send, MapPin, Instagram, Building2, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { WhatsAppCampaignForm } from '../components/prospecting/WhatsAppCampaignForm';
 import GoogleMapsLeadSearch from '../components/prospecting/GoogleMapsLeadSearch';
 
 const Prospecting: React.FC = () => {
-    const { isStarter } = useAuth();
+    const { user } = useAuth();
+    const isGlobalAdmin = user?.email === 'marketing@conectaperformance.com.br';
+
     const [activeTab, setActiveTab] = useState<'messages' | 'instagram_messages' | 'maps' | 'instagram' | 'cnpj'>('messages');
 
     const TabButton = ({ id, label, icon: Icon }: { id: typeof activeTab, label: string, icon: any }) => (
@@ -19,6 +21,26 @@ const Prospecting: React.FC = () => {
             <Icon size={18} className={activeTab === id ? 'text-brand-400' : ''} />
             <span className="whitespace-nowrap">{label}</span>
         </button>
+    );
+
+    const renderLockedTab = (title: string, desc: string, Icon: any) => (
+        <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
+            <div className="relative flex flex-col items-center justify-center p-10 md:p-16 rounded-3xl border-2 transition-all duration-300 border-slate-100 bg-slate-50 cursor-not-allowed w-full max-w-3xl mx-auto">
+                <div className="absolute top-4 right-4 md:top-6 md:right-6 bg-red-50 text-red-400 p-2 rounded-xl flex items-center justify-center shadow-sm">
+                    <Lock size={20} strokeWidth={2.5} />
+                </div>
+
+                <Icon className="mb-6 text-slate-300" size={56} strokeWidth={1.5} />
+                <h2 className="text-2xl md:text-3xl font-bold text-slate-400 tracking-tight mb-3">{title}</h2>
+                <p className="text-slate-400/90 text-sm md:text-base font-medium max-w-md mx-auto leading-relaxed">
+                    {desc}
+                </p>
+
+                <div className="mt-8 bg-slate-200/80 text-slate-500 text-xs md:text-sm uppercase tracking-wider font-bold py-1.5 px-5 rounded-full">
+                    Plano Pro
+                </div>
+            </div>
+        </div>
     );
 
     return (
@@ -47,20 +69,13 @@ const Prospecting: React.FC = () => {
             </div>
 
             <div className="pt-6">
-                {(isStarter && activeTab !== 'messages') ? (
-                    <div className="bg-slate-50 rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
-                        <div className="bg-slate-200 p-4 rounded-full mb-4">
-                            <Lock size={40} className="text-slate-500" />
-                        </div>
-                        <h2 className="text-xl font-bold text-slate-800">Recurso Premium</h2>
-                        <p className="text-slate-500 mt-2 max-w-md">
-                            Esta funcionalidade é exclusiva para assinantes do <strong>Plano Pro</strong> ou superior.
-                            Faça o upgrade para desbloquear estas ferramentas de prospecção.
-                        </p>
-                        <button className="mt-6 px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors">
-                            Ver Planos
-                        </button>
-                    </div>
+                {(!isGlobalAdmin && activeTab !== 'messages') ? (
+                    <>
+                        {activeTab === 'instagram_messages' && renderLockedTab('Disparo no Instagram', 'Distribua campanhas de mensagens em massa para seus contatos e leads direto no Instagram.', Send)}
+                        {activeTab === 'maps' && renderLockedTab('Leads no Google Maps', 'Extraia informações valiosas de negócios locais diretamente do Google Maps de forma automatizada.', MapPin)}
+                        {activeTab === 'instagram' && renderLockedTab('Leads no Instagram', 'Encontre e construa listas de contatos qualificados e perfis estratégicos da rede social.', Instagram)}
+                        {activeTab === 'cnpj' && renderLockedTab('Leads por CNPJ', 'Tenha acesso rápido a dados atualizados de empresas usando apenas o número do CNPJ.', Building2)}
+                    </>
                 ) : (
                     <>
                         {activeTab === 'messages' && (
