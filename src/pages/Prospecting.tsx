@@ -20,18 +20,18 @@ const Prospecting: React.FC = () => {
                     if (isLocked) return;
                     setActiveTab(id);
                 }}
-                className={`relative flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl transition-all duration-300 font-bold text-sm ${isLocked
+                className={`relative flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 lg:px-4 lg:py-3 rounded-xl transition-all duration-300 font-bold text-xs lg:text-sm ${isLocked
                     ? 'cursor-not-allowed text-slate-400 bg-slate-50 opacity-90'
                     : activeTab === id
                         ? 'bg-slate-900 text-white shadow-md'
                         : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                     }`}
             >
-                <Icon size={18} className={activeTab === id && !isLocked ? 'text-brand-400' : ''} />
+                <Icon size={16} className={activeTab === id && !isLocked ? 'text-brand-400' : ''} />
                 <span className="whitespace-nowrap">{label}</span>
                 {isLocked && (
-                    <div className="flex items-center gap-1 ml-1.5 bg-slate-200/70 text-slate-500 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-bold">
-                        <Lock size={10} strokeWidth={2.5} className="text-red-400" /> PRO
+                    <div className="flex items-center gap-1 ml-0.5 bg-slate-200/50 p-1.5 rounded-md text-red-400">
+                        <Lock size={12} strokeWidth={2.5} />
                     </div>
                 )}
             </button>
