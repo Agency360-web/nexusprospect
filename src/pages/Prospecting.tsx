@@ -11,7 +11,7 @@ const Prospecting: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'messages' | 'instagram_messages' | 'maps' | 'instagram' | 'cnpj'>('messages');
 
     const TabButton = ({ id, label, icon: Icon }: { id: typeof activeTab, label: string, icon: any }) => {
-        const isLocked = !isGlobalAdmin && id !== 'messages';
+        const isLocked = id !== 'messages';
 
         return (
             <button
