@@ -1,7 +1,7 @@
 import { useAuth } from '../contexts/AuthContext';
 
 // Páginas padrão para usuários sem configuração explícita
-const DEFAULT_PAGES = ['dashboard', 'admin', 'clients', 'settings', 'reports', 'transmission'];
+const DEFAULT_PAGES = ['dashboard', 'admin', 'clients', 'settings', 'reports', 'transmission', 'whatsapp-tool'];
 
 export const useRBAC = () => {
     const { profile, user } = useAuth();
