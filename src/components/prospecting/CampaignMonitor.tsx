@@ -16,6 +16,16 @@ import {
     StopCircle,
     Trash2,
     Ban,
+    Eye,
+    X,
+    Image as ImageIcon,
+    AlignLeft,
+    Zap,
+    Bot,
+    Layers,
+    Users,
+    Timer,
+    Smartphone
 } from 'lucide-react';
 
 interface CampaignStats {
@@ -40,6 +50,7 @@ const CampaignMonitor: React.FC = () => {
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+    const [detailsCampaign, setDetailsCampaign] = useState<CampaignStats | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const fetchCampaigns = useCallback(async () => {
@@ -364,8 +375,8 @@ const CampaignMonitor: React.FC = () => {
                                         {/* Finished Banner */}
                                         {finished && c.status !== 'cancelled' && (
                                             <div className={`mt-3 px-3 py-2 rounded-lg text-[11px] font-bold flex items-center gap-2 ${c.failed === 0
-                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
                                                 }`}>
                                                 {c.failed === 0 ? (
                                                     <>
@@ -400,6 +411,16 @@ const CampaignMonitor: React.FC = () => {
 
                                 {/* Action Buttons */}
                                 <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-100">
+                                    {/* Ver Detalhes */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setDetailsCampaign(c)}
+                                        className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                        <Eye size={12} />
+                                        Ver Detalhes
+                                    </button>
+
                                     {/* Parar - só mostra se campanha está ativa com pendentes */}
                                     {active && (
                                         <button
@@ -459,6 +480,226 @@ const CampaignMonitor: React.FC = () => {
                     })}
                 </div>
             )}
+
+            {/* ============ MODAL DE DETALHES DA CAMPANHA ============ */}
+            {detailsCampaign && (() => {
+                const dc = detailsCampaign;
+                const config = dc.configuration || {};
+                const statusInfo = getCampaignStatusInfo(dc);
+                const progress = getProgressPercent(dc);
+                const processed = dc.sent + dc.failed;
+                const successRate = dc.total > 0 ? ((dc.sent / dc.total) * 100).toFixed(1) : '0';
+
+                const typeLabel = config.campaignType === 'simple' ? 'Disparo Simples'
+                    : config.campaignType === 'ai' ? 'Disparo com IA'
+                        : config.campaignType === 'multi-ai' ? 'Multi-Instância com IA' : 'N/A';
+
+                const TypeIcon = config.campaignType === 'simple' ? Zap
+                    : config.campaignType === 'ai' ? Bot
+                        : config.campaignType === 'multi-ai' ? Layers : Zap;
+
+                const isImage = config.mediaType?.startsWith('image/');
+                const isVideo = config.mediaType?.startsWith('video/');
+                const isAudio = config.mediaType?.startsWith('audio/');
+
+                return (
+                    <div
+                        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+                        onClick={() => setDetailsCampaign(null)}
+                    >
+                        <div
+                            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Modal Header */}
+                            <div className="px-6 py-5 border-b border-slate-100 bg-slate-900 text-white relative">
+                                <button
+                                    onClick={() => setDetailsCampaign(null)}
+                                    className="absolute top-4 right-4 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
+                                        <TypeIcon size={20} className="text-yellow-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black tracking-tight">{dc.name}</h3>
+                                        <p className="text-xs text-slate-400 font-medium">{typeLabel} • {formatDate(dc.created_at)}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-3">
+                                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusInfo.bg} ${statusInfo.color}`}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`} />
+                                        {statusInfo.label}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="overflow-y-auto max-h-[calc(85vh-130px)] p-6 space-y-5">
+
+                                {/* Estatísticas */}
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                        <Activity size={13} />
+                                        Estatísticas
+                                    </h4>
+                                    <div className="grid grid-cols-4 gap-3">
+                                        <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+                                            <p className="text-xl font-black text-slate-800">{dc.total}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Total</p>
+                                        </div>
+                                        <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100">
+                                            <p className="text-xl font-black text-emerald-600">{dc.sent}</p>
+                                            <p className="text-[10px] font-bold text-emerald-500 uppercase mt-0.5">Enviados</p>
+                                        </div>
+                                        <div className="bg-red-50 rounded-xl p-3 text-center border border-red-100">
+                                            <p className="text-xl font-black text-red-600">{dc.failed}</p>
+                                            <p className="text-[10px] font-bold text-red-400 uppercase mt-0.5">Falhas</p>
+                                        </div>
+                                        <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100">
+                                            <p className="text-xl font-black text-blue-600">{dc.pending}</p>
+                                            <p className="text-[10px] font-bold text-blue-400 uppercase mt-0.5">Pendentes</p>
+                                        </div>
+                                    </div>
+                                    {dc.total > 0 && (
+                                        <div className="mt-3">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-[11px] font-bold text-slate-500">Progresso</span>
+                                                <span className="text-[11px] font-bold text-slate-700">{progress}% • Taxa de sucesso: {successRate}%</span>
+                                            </div>
+                                            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full flex">
+                                                    <div
+                                                        className="bg-emerald-500 transition-all duration-500"
+                                                        style={{ width: `${dc.total > 0 ? (dc.sent / dc.total) * 100 : 0}%` }}
+                                                    />
+                                                    <div
+                                                        className="bg-red-400 transition-all duration-500"
+                                                        style={{ width: `${dc.total > 0 ? (dc.failed / dc.total) * 100 : 0}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Instância Utilizada */}
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                        <Smartphone size={13} />
+                                        {config.campaignType === 'multi-ai' ? 'Instâncias Utilizadas' : 'Instância Utilizada'}
+                                    </h4>
+                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        {config.campaignType === 'multi-ai' && config.selectedConnections?.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {config.selectedConnections.map((conn: string, idx: number) => (
+                                                    <span key={idx} className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
+                                                        {conn}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 shadow-sm">
+                                                {config.selectedConnection || 'Instância não informada (Campanha antiga)'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Mensagem de Texto */}
+                                {config.messageText && (
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                            <AlignLeft size={13} />
+                                            Mensagem de Texto
+                                        </h4>
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                            <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">
+                                                {config.messageText}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Mídia */}
+                                {config.mediaUrl && (
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                            <ImageIcon size={13} />
+                                            Mídia Anexada
+                                        </h4>
+                                        <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+                                            {isImage && (
+                                                <img
+                                                    src={config.mediaUrl}
+                                                    alt={config.mediaName || 'Mídia da campanha'}
+                                                    className="w-full max-h-80 object-contain bg-slate-100"
+                                                />
+                                            )}
+                                            {isVideo && (
+                                                <video
+                                                    src={config.mediaUrl}
+                                                    controls
+                                                    className="w-full max-h-80"
+                                                />
+                                            )}
+                                            {isAudio && (
+                                                <div className="p-4">
+                                                    <audio src={config.mediaUrl} controls className="w-full" />
+                                                </div>
+                                            )}
+                                            <div className="px-4 py-2.5 border-t border-slate-100 flex items-center justify-between">
+                                                <span className="text-xs font-bold text-slate-600 truncate">{config.mediaName || 'Arquivo'}</span>
+                                                <span className="text-[10px] font-medium text-slate-400 uppercase">{config.mediaType}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Sem conteúdo */}
+                                {!config.messageText && !config.mediaUrl && (
+                                    <div className="bg-slate-50 rounded-xl p-6 text-center border border-slate-100">
+                                        <AlignLeft size={24} className="text-slate-300 mx-auto mb-2" />
+                                        <p className="text-sm font-medium text-slate-400">Nenhum conteúdo de texto ou mídia registrado para esta campanha.</p>
+                                    </div>
+                                )}
+
+                                {/* Configurações de Disparo */}
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                        <Timer size={13} />
+                                        Configurações de Disparo
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Delay Mínimo</p>
+                                            <p className="text-sm font-black text-slate-800">{config.minDelay || '—'}s</p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Delay Máximo</p>
+                                            <p className="text-sm font-black text-slate-800">{config.maxDelay || '—'}s</p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Delay entre Mensagens</p>
+                                            <p className="text-sm font-black text-slate-800">{config.messageDelay || '—'}s</p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                                <Users size={10} />
+                                                Leads Selecionados
+                                            </p>
+                                            <p className="text-sm font-black text-slate-800">{config.selectedLeadsCount || dc.total || '—'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 };

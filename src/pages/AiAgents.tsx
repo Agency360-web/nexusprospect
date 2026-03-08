@@ -3,11 +3,12 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Bot, Save, Loader2, AlertTriangle, CheckCircle2, Send, MessageCircle, RefreshCw, Lock } from 'lucide-react';
 
-type AgentType = 'dispatch' | 'support' | 'followup';
+type AgentType = 'dispatch' | 'support';
 
 interface AgentSettings {
     id?: string;
-    is_active: boolean;
+    is_active_dispatch: boolean;
+    is_active_support: boolean;
     agent_name: string;
     use_custom_initial_message: boolean;
     initial_message: string;
@@ -23,17 +24,16 @@ interface AgentSettings {
 const AGENT_TYPES: { id: AgentType; label: string; description: string; icon: React.ElementType }[] = [
     { id: 'dispatch', label: 'Agente de Disparo', description: 'Personalize o agente para campanhas de envio de mensagens.', icon: Send },
     { id: 'support', label: 'Agente de Atendimento', description: 'Personalize o agente para atendimento ao cliente via WhatsApp.', icon: MessageCircle },
-    { id: 'followup', label: 'Agente de Follow-up', description: 'Personalize o agente para acompanhamento pós-contato.', icon: RefreshCw },
 ];
 
 const PROMPT_COLUMN: Record<AgentType, keyof AgentSettings> = {
     dispatch: 'prompt_dispatch',
     support: 'prompt_support',
-    followup: 'prompt_followup',
 };
 
 const defaultSettings: AgentSettings = {
-    is_active: false,
+    is_active_dispatch: false,
+    is_active_support: false,
     agent_name: '',
     use_custom_initial_message: false,
     initial_message: '',
@@ -72,7 +72,8 @@ const AiAgents: React.FC = () => {
             if (data) {
                 setSettings({
                     id: data.id,
-                    is_active: data.is_active || false,
+                    is_active_dispatch: data.is_active_dispatch || false,
+                    is_active_support: data.is_active_support || false,
                     agent_name: data.agent_name || '',
                     use_custom_initial_message: data.use_custom_initial_message || false,
                     initial_message: data.initial_message || '',
@@ -101,6 +102,10 @@ const AiAgents: React.FC = () => {
         setSettings(prev => ({ ...prev, [currentPromptKey]: value }));
     };
 
+    const currentActiveKey: keyof AgentSettings | null =
+        selectedAgentType === 'dispatch' ? 'is_active_dispatch' :
+            selectedAgentType === 'support' ? 'is_active_support' : null;
+
     const handleSave = async () => {
         if (!user || !selectedAgentType) return;
 
@@ -109,7 +114,8 @@ const AiAgents: React.FC = () => {
             setMessage(null);
 
             const payload = {
-                is_active: settings.is_active,
+                is_active_dispatch: settings.is_active_dispatch,
+                is_active_support: settings.is_active_support,
                 agent_name: settings.agent_name,
                 use_custom_initial_message: settings.use_custom_initial_message,
                 initial_message: settings.use_custom_initial_message ? settings.initial_message : '',
@@ -171,7 +177,7 @@ const AiAgents: React.FC = () => {
                         body: JSON.stringify({
                             userId: user.id,
                             agentType: 'support',
-                            is_active: settings.is_active,
+                            is_active: settings.is_active_support,
                             agent_name: settings.agent_name,
                             prompt: settings.prompt_support,
                             language: settings.language,
@@ -238,9 +244,9 @@ const AiAgents: React.FC = () => {
                 {/* Agent Type Selector */}
                 <div className="mb-10">
                     <label className="block text-sm font-bold text-slate-700 mb-4">Selecione o Agente *</label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {AGENT_TYPES.map(({ id, label, description, icon: Icon }) => {
-                            const isLocked = isStarter && id === 'followup';
+                            const isLocked = false;
 
                             return (
                                 <button
@@ -283,17 +289,18 @@ const AiAgents: React.FC = () => {
                                 <p className="text-sm font-bold text-slate-800">{currentAgentLabel}</p>
                                 <p className="text-xs text-slate-500">Ative ou desative este agente</p>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <span className={`text-sm font-bold ${settings.is_active ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                    {settings.is_active ? 'Ativado' : 'Desativado'}
-                                </span>
-                                <button
-                                    onClick={() => setSettings({ ...settings, is_active: !settings.is_active })}
-                                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none ${settings.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                                >
-                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 ${settings.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                            </div>
+                            <button
+                                onClick={() => {
+                                    if (currentActiveKey) {
+                                        setSettings(prev => ({ ...prev, [currentActiveKey]: !prev[currentActiveKey] as boolean }));
+                                    }
+                                }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${currentActiveKey && settings[currentActiveKey] ? 'bg-green-500' : 'bg-slate-300'
+                                    }`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ${currentActiveKey && settings[currentActiveKey] ? 'translate-x-6' : 'translate-x-1'
+                                    }`} />
+                            </button>
                         </div>
 
                         {/* Basic Settings */}

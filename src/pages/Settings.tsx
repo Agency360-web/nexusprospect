@@ -63,7 +63,7 @@ const SettingsPage: React.FC = () => {
           </div>
           <nav className="space-y-1">
             <TabItem id="integrations" label="Integrações" icon={Link2} />
-            <TabItem id="connections" label="Conexões" icon={Cable} />
+            <TabItem id="connections" label="Conexão do WhatsApp" icon={Cable} />
 
             <div className="pt-4 border-t border-slate-200 mt-4">
               <button

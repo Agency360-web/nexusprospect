@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
-    Send,
     Settings,
     Menu,
     X,
@@ -145,15 +144,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 isCollapsed={isCollapsed}
                             />
                         )}
-                        {canAccess('clients') && (
-                            <SidebarItem
-                                to="/whatsapp-tool"
-                                icon={<Send size={20} />}
-                                label="WhatsApp Tool"
-                                active={location.pathname.startsWith('/whatsapp-tool')}
-                                isCollapsed={isCollapsed}
-                            />
-                        )}
+
+
 
                         {/* Disparador temporariamente desativado */}
 

@@ -13,7 +13,6 @@ const ClientManager = lazy(() => import('./pages/ClientManager'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail'));
 const AiAgents = lazy(() => import('./pages/AiAgents'));
 const Prospecting = lazy(() => import('./pages/Prospecting'));
-const WhatsAppTool = lazy(() => import('./pages/WhatsAppTool'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const AdministrationDashboard = lazy(() => import('./pages/Administration'));
 // Loading fallback
@@ -66,13 +65,6 @@ const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <Prospecting />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/whatsapp-tool" element={
-              <ProtectedRoute>
-                <Layout>
-                  <WhatsAppTool />
                 </Layout>
               </ProtectedRoute>
             } />

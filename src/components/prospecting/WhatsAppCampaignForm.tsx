@@ -148,7 +148,9 @@ export const WhatsAppCampaignForm: React.FC = () => {
                         messageText: messageText || '',
                         selectedLeadsCount: selectedLeads.length,
                         clientId: selectedClientId,
-                        folderId: selectedFolderId || null
+                        folderId: selectedFolderId || null,
+                        selectedConnection,
+                        selectedConnections
                     }
                 }])
                 .select()
@@ -157,6 +159,47 @@ export const WhatsAppCampaignForm: React.FC = () => {
             if (dbError) {
                 console.error('Erro ao salvar campanha no banco local:', dbError);
                 // Continue to webhook even if local save fails, or you can throw
+            }
+
+            // 1.1. Upload de mídia para Supabase Storage (independente do webhook)
+            // Fire-and-forget: não bloqueia o envio do webhook
+            if (file && campaignData?.id) {
+                const uploadMediaToStorage = async () => {
+                    try {
+                        const fileExt = file.name.split('.').pop();
+                        const storagePath = `${userId}/${campaignData.id}/${Date.now()}.${fileExt}`;
+
+                        const { error: uploadError } = await supabase.storage
+                            .from('campaign-media')
+                            .upload(storagePath, file);
+
+                        if (uploadError) {
+                            console.warn('Erro ao fazer upload da mídia da campanha (não crítico):', uploadError);
+                            return;
+                        }
+
+                        const { data: { publicUrl } } = supabase.storage
+                            .from('campaign-media')
+                            .getPublicUrl(storagePath);
+
+                        // Atualizar configuration da campanha com a URL da mídia
+                        await supabase
+                            .from('campaigns')
+                            .update({
+                                configuration: {
+                                    ...campaignData.configuration,
+                                    mediaUrl: publicUrl,
+                                    mediaType: file.type,
+                                    mediaName: file.name,
+                                }
+                            })
+                            .eq('id', campaignData.id);
+                    } catch (err) {
+                        console.warn('Falha no upload de mídia para Storage (não crítico):', err);
+                    }
+                };
+                // Executar em paralelo sem bloquear o fluxo principal
+                uploadMediaToStorage();
             }
 
 
@@ -320,6 +363,21 @@ export const WhatsAppCampaignForm: React.FC = () => {
         const unselectedLeads = leads.filter(l => !selectedLeads.includes(l.id));
         const toSelect = unselectedLeads.slice(0, count).map(l => l.id);
         setSelectedLeads(prev => [...prev, ...toSelect]);
+    };
+
+    const currentPageLeads = leads.slice((currentPage - 1) * leadsPerPage, currentPage * leadsPerPage);
+    const currentPageLeadIds = currentPageLeads.map(l => l.id);
+    const allCurrentPageSelected = currentPageLeads.length > 0 && currentPageLeadIds.every(id => selectedLeads.includes(id));
+
+    const toggleSelectCurrentPage = () => {
+        if (allCurrentPageSelected) {
+            // Desmarcar apenas os leads da página atual
+            setSelectedLeads(prev => prev.filter(id => !currentPageLeadIds.includes(id)));
+        } else {
+            // Marcar os leads da página atual que ainda não estão selecionados
+            const toAdd = currentPageLeadIds.filter(id => !selectedLeads.includes(id));
+            setSelectedLeads(prev => [...prev, ...toAdd]);
+        }
     };
 
     return (
@@ -644,6 +702,25 @@ export const WhatsAppCampaignForm: React.FC = () => {
                                             Desmarcar ({selectedLeads.length})
                                         </button>
                                     )}
+                                    <div className="relative group/page">
+                                        <button
+                                            type="button"
+                                            onClick={toggleSelectCurrentPage}
+                                            className={`text-xs font-bold py-1.5 px-3 rounded-lg transition-colors ${allCurrentPageSelected
+                                                ? 'text-amber-700 bg-amber-100 hover:bg-amber-200'
+                                                : 'text-blue-700 bg-blue-50 hover:bg-blue-100'
+                                                }`}
+                                        >
+                                            {allCurrentPageSelected ? `Página ${currentPage} ✓` : `Página ${currentPage}`}
+                                        </button>
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-medium rounded-lg whitespace-nowrap opacity-0 invisible group-hover/page:opacity-100 group-hover/page:visible transition-all duration-200 pointer-events-none shadow-lg z-50">
+                                            {allCurrentPageSelected
+                                                ? 'Clique para desmarcar os leads desta página'
+                                                : `Selecionar apenas os ${currentPageLeads.length} leads visíveis nesta página`
+                                            }
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                        </div>
+                                    </div>
                                     {[20, 50, 100].map(n => (
                                         <button
                                             key={`sel-${n}`}

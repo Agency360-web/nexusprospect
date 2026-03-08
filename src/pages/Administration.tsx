@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import {
     Calendar,
     Download,
-    FileText,
     DollarSign,
     TrendingUp,
     AlertCircle,
@@ -19,8 +18,6 @@ import {
     Activity,
     CheckCircle2,
     Clock,
-    Briefcase,
-    Scale,
     Building2,
     Plus,
     ChevronDown,
@@ -31,8 +28,6 @@ import {
     Edit2
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import ContractManager from '../components/ContractManager';
-import OperationalProcesses from './OperationalProcesses';
 
 // Interfaces
 interface FinancialKPIs {
@@ -477,7 +472,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, on
 
 const AdministrationDashboard: React.FC = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'finance' | 'contracts' | 'processes'>('finance');
+    const [activeTab, setActiveTab] = useState<'finance'>('finance');
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
@@ -849,12 +844,6 @@ const AdministrationDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Tabs Nav - Premium Pills */}
-            <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full shadow-sm overflow-x-auto hide-scrollbar">
-                <TabButton id="finance" label="Financeiro" icon={Activity} />
-                <TabButton id="contracts" label="Gestão de Contratos" icon={FileText} />
-                <TabButton id="processes" label="Processos Operacionais" icon={Briefcase} />
-            </div>
 
             <div className="pt-6">
                 {/* Finance Tab (Default) */}
@@ -974,7 +963,7 @@ const AdministrationDashboard: React.FC = () => {
                         </div>
 
                         {/* Metric Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             {/* Revenue (Dynamic) */}
                             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
                                 <div className="flex items-center justify-between mb-4">
@@ -1052,23 +1041,6 @@ const AdministrationDashboard: React.FC = () => {
                             </div>
 
                             {/* Overdue (Dynamic) */}
-                            <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-110 transition-transform">
-                                        <AlertTriangle size={20} />
-                                    </div>
-                                    <span className="text-[10px] font-black uppercase text-purple-600 bg-purple-50 px-2 py-1 rounded-full">Atenção</span>
-                                </div>
-                                <div>
-                                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Em Atraso</h3>
-                                    <div className="text-2xl font-black text-rose-500 tracking-tight">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dynamicKPIs.overdue)}
-                                    </div>
-                                </div>
-                                <div className="h-1 w-full bg-purple-100 mt-4 rounded-full overflow-hidden">
-                                    <div className="h-full bg-purple-500 w-1/4"></div>
-                                </div>
-                            </div>
                         </div>
 
                         {/* Main Grid: Chart & Table */}
@@ -1296,19 +1268,7 @@ const AdministrationDashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Contracts Tab */}
-                {activeTab === 'contracts' && (
-                    <div className="animate-in slide-in-from-bottom-2 duration-300">
-                        <ContractManager />
-                    </div>
-                )}
 
-                {/* Operational Processes Tab */}
-                {activeTab === 'processes' && (
-                    <div className="animate-in slide-in-from-bottom-2 duration-300">
-                        <OperationalProcesses />
-                    </div>
-                )}
             </div>
 
         </div >
