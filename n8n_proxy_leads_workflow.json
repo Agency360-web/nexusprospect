@@ -1,0 +1,63 @@
+{
+  "name": "Proxy de Leads (Mascarar Supabase)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prospecting-leads",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook Extensoes",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "proxy-leads-nexus"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://vdwhijmbelfnmpodpptn.supabase.co/functions/v1/webhook-leads?userId=' + $json.query.u }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "name": "Enviar para Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Extensoes": {
+      "main": [
+        [
+          {
+            "node": "Enviar para Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

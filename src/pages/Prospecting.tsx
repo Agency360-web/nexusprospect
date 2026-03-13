@@ -1,40 +1,36 @@
-import React, { useState } from 'react';
-import { Target, Send, MapPin, Instagram, Building2, Lock } from 'lucide-react';
+import React from 'react';
+import { Target, Send, MapPin, Instagram, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { WhatsAppCampaignForm } from '../components/prospecting/WhatsAppCampaignForm';
-import GoogleMapsLeadSearch from '../components/prospecting/GoogleMapsLeadSearch';
+import { useLocation, Link, Outlet } from 'react-router-dom';
 
 const Prospecting: React.FC = () => {
     const { user } = useAuth();
-    const isGlobalAdmin = user?.email === 'marketing@conectaperformance.com.br';
+    const location = useLocation();
 
-    const [activeTab, setActiveTab] = useState<'messages' | 'maps' | 'instagram' | 'cnpj'>('messages');
+    // Determina qual aba está ativa com base na URL
+    const getActiveTab = () => {
+        const path = location.pathname;
+        if (path.includes('/maps')) return 'maps';
+        if (path.includes('/instagram')) return 'instagram';
+        if (path.includes('/cnpj')) return 'cnpj';
+        return 'messages';
+    };
 
-    const TabButton = ({ id, label, icon: Icon }: { id: typeof activeTab, label: string, icon: any }) => {
-        const isLocked = id !== 'messages' && id !== 'maps';
+    const activeTab = getActiveTab();
 
+    const TabButton = ({ id, label, icon: Icon, to }: { id: string, label: string, icon: any, to: string }) => {
         return (
-            <button
-                type="button"
-                onClick={() => {
-                    if (isLocked) return;
-                    setActiveTab(id);
-                }}
-                className={`relative flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 lg:px-4 lg:py-3 rounded-xl transition-all duration-300 font-bold text-xs lg:text-sm ${isLocked
-                    ? 'cursor-not-allowed text-slate-400 bg-slate-50 opacity-90'
-                    : activeTab === id
+            <Link
+                to={to}
+                className={`relative flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 lg:px-4 lg:py-3 rounded-xl transition-all duration-300 font-bold text-xs lg:text-sm ${
+                    activeTab === id
                         ? 'bg-slate-900 text-white shadow-md'
                         : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                     }`}
             >
-                <Icon size={16} className={activeTab === id && !isLocked ? 'text-brand-400' : ''} />
+                <Icon size={16} className={activeTab === id ? 'text-brand-400' : ''} />
                 <span className="whitespace-nowrap">{label}</span>
-                {isLocked && (
-                    <div className="flex items-center gap-1 ml-0.5 bg-slate-200/50 p-1.5 rounded-md text-red-400">
-                        <Lock size={12} strokeWidth={2.5} />
-                    </div>
-                )}
-            </button>
+            </Link>
         );
     };
 
@@ -56,42 +52,15 @@ const Prospecting: React.FC = () => {
 
             {/* Tabs Nav - Premium Pills */}
             <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full shadow-sm overflow-x-auto hide-scrollbar">
-                <TabButton id="messages" label="Disparo no WhatsApp" icon={Send} />
-                <TabButton id="maps" label="Leads no Google Maps" icon={MapPin} />
-                <TabButton id="instagram" label="Leads no Instagram" icon={Instagram} />
-                <TabButton id="cnpj" label="Leads por CNPJ" icon={Building2} />
+                <TabButton id="messages" to="/prospecting/messages" label="Disparo no WhatsApp" icon={Send} />
+                <TabButton id="maps" to="/prospecting/maps" label="Leads no Google Maps" icon={MapPin} />
+                <TabButton id="instagram" to="/prospecting/instagram" label="Leads no Instagram" icon={Instagram} />
+                <TabButton id="cnpj" to="/prospecting/cnpj" label="Leads por CNPJ" icon={Building2} />
             </div>
 
             <div className="pt-6">
-                {activeTab === 'messages' && (
-                    <WhatsAppCampaignForm />
-                )}
-
-
-
-                {activeTab === 'maps' && (
-                    <GoogleMapsLeadSearch />
-                )}
-
-                {activeTab === 'instagram' && (
-                    <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
-                        <Instagram size={48} className="text-slate-200 mb-4" />
-                        <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
-                        <p className="text-slate-500 mt-2 max-w-md">
-                            As ferramentas de busca de leads no Instagram estarão disponíveis aqui em breve.
-                        </p>
-                    </div>
-                )}
-
-                {activeTab === 'cnpj' && (
-                    <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom-2 duration-300">
-                        <Building2 size={48} className="text-slate-200 mb-4" />
-                        <h2 className="text-xl font-bold text-slate-700">Em Breve</h2>
-                        <p className="text-slate-500 mt-2 max-w-md">
-                            As ferramentas de busca rápida de leads por CNPJ estarão disponíveis aqui em breve.
-                        </p>
-                    </div>
-                )}
+                {/* Aqui os componentes das abas serão renderizados (ver App.tsx) */}
+                <Outlet />
             </div>
         </div>
     );

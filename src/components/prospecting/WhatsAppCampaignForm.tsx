@@ -4,7 +4,7 @@ import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCi
 import { useAuth } from '../../contexts/AuthContext';
 import CampaignMonitor from './CampaignMonitor';
 
-export const WhatsAppCampaignForm: React.FC = () => {
+const WhatsAppCampaignForm: React.FC = () => {
     const [campaignType, setCampaignType] = useState<'simple' | 'ai' | 'multi-ai' | ''>('');
     const [name, setName] = useState('');
     const [minDelay, setMinDelay] = useState(15);
@@ -908,3 +908,5 @@ export const WhatsAppCampaignForm: React.FC = () => {
         </form>
     );
 };
+
+export default WhatsAppCampaignForm;

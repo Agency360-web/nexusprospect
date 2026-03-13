@@ -62,22 +62,6 @@ const WebhookTab: React.FC = () => {
 
             if (dbError) throw dbError;
 
-            // 2. Notificar o n8n
-            try {
-                await fetch('https://nexus360.infra-conectamarketing.site/webhook/5c008e53-e240-4905-98df-abdf1c15bdrrth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: user.id,
-                        email: user.email,
-                        webhookKey: newKey,
-                        action: 'webhook_key_created',
-                    }),
-                });
-            } catch (webhookErr) {
-                console.warn('Aviso: não foi possível notificar o n8n:', webhookErr);
-            }
-
             setWebhookKey(newKey);
         } catch (err: any) {
             console.error('Erro ao gerar webhook key:', err);
@@ -87,16 +71,21 @@ const WebhookTab: React.FC = () => {
         }
     };
 
+    // Construct the dynamic webhook URL based on the key
+    const fullWebhookUrl = webhookKey
+        ? `https://conectalab.sbs/webhook/leads?key=${webhookKey}`
+        : '';
+
     const copyToClipboard = async () => {
-        if (!webhookKey) return;
+        if (!fullWebhookUrl) return;
         try {
-            await navigator.clipboard.writeText(webhookKey);
+            await navigator.clipboard.writeText(fullWebhookUrl);
             setCopied(true);
             setTimeout(() => setCopied(false), 2500);
         } catch {
             // Fallback
             const input = document.createElement('input');
-            input.value = webhookKey;
+            input.value = fullWebhookUrl;
             document.body.appendChild(input);
             input.select();
             document.execCommand('copy');
@@ -123,7 +112,7 @@ const WebhookTab: React.FC = () => {
                     Webhook
                 </h2>
                 <p className="text-sm text-slate-500 mt-1">
-                    Gerencie sua chave de webhook única para integração com ferramentas externas.
+                    Gerencie a sua URL de webhook exclusiva para integrar ferramentas externas (como a extensão do Google Maps).
                 </p>
             </div>
 
@@ -134,24 +123,24 @@ const WebhookTab: React.FC = () => {
                         <Key size={20} />
                     </div>
                     <div>
-                        <h3 className="text-base font-bold text-slate-900">Chave de Webhook</h3>
+                        <h3 className="text-base font-bold text-slate-900">URL de Webhook</h3>
                         <p className="text-xs text-slate-500 mt-0.5">
-                            Esta chave é única e permanente. Ela identifica sua conta em integrações externas.
+                            Esta URL de recebimento é pessoal e exclusiva da sua conta.
                         </p>
                     </div>
                 </div>
 
-                {webhookKey ? (
+                {fullWebhookUrl ? (
                     /* Key exists - show it */
                     <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 font-mono text-sm font-bold text-slate-800 tracking-wider select-all">
-                                {webhookKey}
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                            <div className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 font-mono text-[11px] md:text-sm font-bold text-slate-800 tracking-wider truncate cursor-text select-all">
+                                {fullWebhookUrl}
                             </div>
                             <button
                                 type="button"
                                 onClick={copyToClipboard}
-                                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${copied
+                                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${copied
                                     ? 'bg-emerald-500 text-white'
                                     : 'bg-slate-900 text-white hover:bg-slate-800'
                                     }`}
@@ -159,12 +148,12 @@ const WebhookTab: React.FC = () => {
                                 {copied ? (
                                     <>
                                         <CheckCircle2 size={16} />
-                                        Copiado!
+                                        Copiada!
                                     </>
                                 ) : (
                                     <>
                                         <Copy size={16} />
-                                        Copiar
+                                        Copiar URL
                                     </>
                                 )}
                             </button>
@@ -172,7 +161,7 @@ const WebhookTab: React.FC = () => {
 
                         <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
                             <ShieldCheck size={14} />
-                            <span className="font-bold">Chave ativa e pronta para uso.</span>
+                            <span className="font-bold">URL ativa e pronta para uso.</span>
                         </div>
                     </div>
                 ) : (
@@ -180,7 +169,7 @@ const WebhookTab: React.FC = () => {
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
                             <AlertCircle size={14} />
-                            <span className="font-bold">Nenhuma chave gerada ainda. Clique no botão abaixo para criar.</span>
+                            <span className="font-bold">Nenhum webhook gerado ainda. Clique no botão abaixo para criar.</span>
                         </div>
 
                         <button
@@ -192,12 +181,12 @@ const WebhookTab: React.FC = () => {
                             {generating ? (
                                 <>
                                     <Loader2 size={16} className="animate-spin" />
-                                    Gerando chave...
+                                    Gerando acesso...
                                 </>
                             ) : (
                                 <>
                                     <Key size={16} />
-                                    Gerar Chave de Webhook
+                                    Gerar URL Exclusiva
                                 </>
                             )}
                         </button>
@@ -211,17 +200,17 @@ const WebhookTab: React.FC = () => {
 
             {/* Info Section */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <h4 className="text-sm font-bold text-slate-800 mb-3">Como funciona?</h4>
+                <h4 className="text-sm font-bold text-slate-800 mb-3">Como utilizar?</h4>
                 <ol className="text-xs text-slate-500 space-y-2 list-decimal list-inside">
-                    <li>Gere sua <strong>chave de webhook única</strong> clicando no botão acima.</li>
-                    <li>Configure a chave na sua <strong>extensão do navegador</strong> (Opera/Chrome).</li>
-                    <li>A extensão usará essa chave para <strong>enviar os leads extraídos</strong> diretamente para o Nexus360.</li>
-                    <li>Os leads chegarão automaticamente na aba <strong>"Leads no Google Maps"</strong> da Prospecção.</li>
+                    <li>Gere sua <strong>URL exclusiva</strong> clicando no botão acima.</li>
+                    <li>Copie o endereço e cole nas configurações da <strong>extensão do Extrator do Google Maps</strong> no navegador.</li>
+                    <li>Sempre que você utilizar a extensão, os leads extraídos serão enviados direto para sua conta de forma segura.</li>
+                    <li>Acesse-os pela aba respectiva na área de <strong>Prospecção</strong> do painel.</li>
                 </ol>
 
                 <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <p className="text-[11px] text-slate-400">
-                        ⚠️ <strong>Importante:</strong> Não compartilhe sua chave de webhook com terceiros. Ela identifica unicamente a sua conta no sistema.
+                        ⚠️ <strong>Importante:</strong> Não compartilhe esta URL com terceiros. A chave no link vincula todos os registros recebidos diretamente ao seu usuário.
                     </p>
                 </div>
             </div>
@@ -230,3 +219,4 @@ const WebhookTab: React.FC = () => {
 };
 
 export default WebhookTab;
+

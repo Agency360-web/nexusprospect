@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
 import Layout from './layouts/MainLayout';
@@ -15,6 +15,13 @@ const AiAgents = lazy(() => import('./pages/AiAgents'));
 const Prospecting = lazy(() => import('./pages/Prospecting'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const AdministrationDashboard = lazy(() => import('./pages/Administration'));
+
+// Components for nested routing
+const WhatsAppCampaignForm = lazy(() => import('./components/prospecting/WhatsAppCampaignForm'));
+const GoogleMapsLeadSearch = lazy(() => import('./components/prospecting/GoogleMapsLeadSearch'));
+const InstagramLeadSearch = lazy(() => import('./components/prospecting/InstagramLeadSearch'));
+const CnpjLeadSearch = lazy(() => import('./components/prospecting/CnpjLeadSearch'));
+
 // Loading fallback
 const PageLoader = () => (
   <div className="flex items-center justify-center h-screen bg-slate-50">
@@ -67,7 +74,16 @@ const App: React.FC = () => {
                   <Prospecting />
                 </Layout>
               </ProtectedRoute>
-            } />
+            }>
+              {/* Rota Padrão - Redireciona para /prospecting/messages */}
+              <Route index element={<Navigate to="messages" replace />} />
+            
+              {/* Rotas das Abas */}
+              <Route path="messages" element={<WhatsAppCampaignForm />} />
+              <Route path="maps" element={<GoogleMapsLeadSearch />} />
+              <Route path="instagram" element={<InstagramLeadSearch />} />
+              <Route path="cnpj" element={<CnpjLeadSearch />} />
+            </Route>
             <Route path="/clients/:clientId" element={
               <ProtectedRoute>
                 <Layout>
