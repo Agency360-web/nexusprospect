@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
-import { Search, MapPin, Phone, Mail, Instagram, ExternalLink, Calendar, CheckCircle2, ChevronDown, Filter, Download, Trash2, ArrowRight } from 'lucide-react';
+import { Search, MapPin, Phone, Mail, Instagram, ExternalLink, Calendar, CheckCircle2, ChevronDown, Filter, Download, Trash2, ArrowRight, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import TransferLeadsModal from './TransferLeadsModal';
 
 const InstagramLeadSearch: React.FC = () => {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ const InstagramLeadSearch: React.FC = () => {
   const [folders, setFolders] = useState<any[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [showFolderAssign, setShowFolderAssign] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   useEffect(() => {
     fetchLeads();
@@ -139,96 +141,99 @@ const InstagramLeadSearch: React.FC = () => {
             placeholder="Buscar por @username, nome ou palavra na bio..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 transition-all text-sm font-medium"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-sm font-medium"
           />
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors text-sm font-bold whitespace-nowrap shadow-sm">
-            <Filter size={16} className="text-pink-500" />
-            Filtros
-          </button>
-          
-          <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
-          
-          <button 
-            onClick={fetchLeads}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all text-sm font-bold whitespace-nowrap shadow-md shadow-slate-900/20"
-          >
-            Atualizar Leads
-          </button>
+          {selectedLeads.length > 0 ? (
+            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300">
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-blue-700 font-bold text-xs whitespace-nowrap">
+                <CheckCircle2 size={14} />
+                <span>{selectedLeads.length} selecionados</span>
+              </div>
+              
+              <button 
+                onClick={() => setIsTransferModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white hover:bg-brand-600 rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 flex-shrink-0"
+              >
+                <Send size={14} />
+                Transferir
+              </button>
+              
+              <button 
+                onClick={handleExportCSV}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-sm font-bold transition-all active:scale-95 flex-shrink-0"
+              >
+                <Download size={14} />
+                Exportar
+              </button>
+
+              <button 
+                onClick={handleDeleteSelected}
+                className="flex items-center justify-center w-9 h-9 bg-white text-red-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all border border-slate-200 shadow-sm active:scale-95 flex-shrink-0"
+                title="Excluir"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={fetchLeads}
+              className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all text-sm font-bold whitespace-nowrap shadow-md shadow-slate-900/20"
+            >
+              Atualizar Leads
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Bulk Actions */}
-      {selectedLeads.length > 0 && (
-        <div className="bg-pink-50 border border-pink-100 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2 text-pink-700 font-bold px-2">
-            <CheckCircle2 size={20} />
-            <span>{selectedLeads.length} leads selecionados</span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleExportCSV}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-700 hover:text-slate-900 rounded-lg text-sm font-bold transition-colors border border-slate-200 shadow-sm"
-            >
-              <Download size={16} />
-              Exportar CSV
-            </button>
-            <button 
-              onClick={handleDeleteSelected}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold transition-colors border border-red-100 shadow-sm"
-            >
-              <Trash2 size={16} />
-              Excluir
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Table Area */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 w-12 text-center">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
-                    onChange={selectAllLeads}
-                    className="w-4 h-4 rounded border-slate-300 text-pink-500 focus:ring-pink-500/50"
-                  />
-                </th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Perfil</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Métricas</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contato Público</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bio / Link</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-              </tr>
-            </thead>
+        {leads.length > 0 ? (
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-white border-b border-slate-200 text-slate-400">
+                    <th className="p-3 w-10 text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+                        onChange={selectAllLeads}
+                        className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
+                      />
+                    </th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider">Perfil</th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider">Métricas</th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider">Contato Público</th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider">Bio / Link</th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider text-center">Status</th>
+                    <th className="px-4 py-3 w-8"></th>
+                  </tr>
+                </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="p-12 text-center">
-                    <div className="w-8 h-8 border-4 border-slate-200 border-t-pink-500 rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-slate-500 font-medium">Carregando leads do Instagram...</p>
-                  </td>
-                </tr>
-              ) : filteredLeads.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-16 text-center">
-                    <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Instagram size={28} className="text-pink-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1">Nenhum lead encontrado</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto">
-                      Você ainda não extraiu nenhum lead do Instagram ou a busca não retornou resultados.
-                    </p>
-                  </td>
-                </tr>
-              ) : (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center">
+                        <div className="w-8 h-8 border-4 border-slate-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-slate-500 font-medium text-xs">Carregando leads do Instagram...</p>
+                      </td>
+                    </tr>
+                  ) : filteredLeads.length === 0 && searchTerm ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center">
+                        <p className="text-slate-500 font-medium text-xs">Nenhum lead encontrado para "{searchTerm}"</p>
+                      </td>
+                    </tr>
+                  ) : filteredLeads.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center text-slate-400">
+                        Nenhum lead disponível
+                      </td>
+                    </tr>
+                  ) : (
                 filteredLeads.map((lead) => (
                   <tr key={lead.id} className="hover:bg-slate-50/80 transition-colors group">
                     <td className="p-4 text-center">
@@ -236,21 +241,21 @@ const InstagramLeadSearch: React.FC = () => {
                         type="checkbox" 
                         checked={selectedLeads.includes(lead.id)}
                         onChange={() => toggleLeadSelection(lead.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-pink-500 focus:ring-pink-500/50"
+                        className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500/50"
                       />
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 flex items-center justify-center p-[2px] shadow-sm">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center p-[2px] shadow-sm">
                            <div className="w-full h-full bg-white rounded-full flex items-center justify-center">
-                              <Instagram size={18} className="text-pink-600" />
+                              <Instagram size={18} className="text-blue-600" />
                            </div>
                         </div>
                         <div>
                           <div className="font-bold text-slate-800 flex items-center gap-2">
                             {lead.username ? `@${lead.username}` : 'Sem Username'}
                             {lead.username && (
-                              <a href={`https://instagram.com/${lead.username}`} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-500 transition-colors">
+                              <a href={`https://instagram.com/${lead.username}`} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-500 transition-colors">
                                 <ExternalLink size={12} />
                               </a>
                             )}
@@ -299,7 +304,7 @@ const InstagramLeadSearch: React.FC = () => {
                             href={lead.external_url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-xs font-medium text-pink-600 hover:text-pink-700 flex items-center gap-1 truncate"
+                            className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1 truncate"
                             title={lead.external_url}
                           >
                             <ExternalLink size={10} />
@@ -327,26 +332,30 @@ const InstagramLeadSearch: React.FC = () => {
                 ))
               )}
             </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination Info */}
-        {!loading && filteredLeads.length > 0 && (
-          <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-between text-sm text-slate-500 font-medium">
-            <div>
-              Mostrando <strong className="text-slate-800">{filteredLeads.length}</strong> leads
-              {searchTerm && <span> (filtrados)</span>}
+              </table>
             </div>
-            {/* Simple placeholder pagination */}
-            <div className="flex items-center gap-1 opacity-50 cursor-not-allowed" title="Paginação será implementada em breve">
-              <button className="px-3 py-1 border border-slate-200 rounded-md">Anterior</button>
-              <button className="px-3 py-1 border border-slate-200 rounded-md bg-white text-slate-800">1</button>
-              <button className="px-3 py-1 border border-slate-200 rounded-md">Próxima</button>
-            </div>
+          </div>
+        ) : (
+          <div className="text-center py-16 text-slate-400 bg-slate-50 border border-slate-100 rounded-2xl border-dashed">
+            <Instagram size={48} className="mx-auto mb-4 text-slate-300" />
+            <p className="font-bold text-slate-500 text-sm">Nenhum lead encontrado no Instagram</p>
+            <p className="text-xs mt-1.5 max-w-sm mx-auto text-slate-400">
+              Utilize nossa extensão para extrair leads diretamente do Instagram e eles aparecerão aqui automaticamente.
+            </p>
           </div>
         )}
       </div>
 
+      <TransferLeadsModal 
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        selectedLeads={leads.filter(l => selectedLeads.includes(l.id))}
+        sourceType="instagram"
+        onTransferComplete={() => {
+            setSelectedLeads([]);
+            fetchLeads();
+        }}
+      />
     </div>
   );
 };

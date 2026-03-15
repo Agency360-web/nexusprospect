@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
-import { Search, Building2, Phone, Mail, ExternalLink, Calendar, CheckCircle2, Filter, Download, Trash2, MapPin } from 'lucide-react';
+import { Search, Building2, Phone, Mail, ExternalLink, Calendar, CheckCircle2, Filter, Download, Trash2, MapPin, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import TransferLeadsModal from './TransferLeadsModal';
 
 const CnpjLeadSearch: React.FC = () => {
   const { user } = useAuth();
@@ -9,6 +10,7 @@ const CnpjLeadSearch: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [folders, setFolders] = useState<any[]>([]);
 
   useEffect(() => {
@@ -154,88 +156,91 @@ const CnpjLeadSearch: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors text-sm font-bold whitespace-nowrap shadow-sm">
-            <Filter size={16} className="text-blue-500" />
-            Filtros Avançados
-          </button>
-          
-          <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
-          
-          <button 
-            onClick={fetchLeads}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all text-sm font-bold whitespace-nowrap shadow-md shadow-slate-900/20"
-          >
-            Atualizar Leads
-          </button>
+          {selectedLeads.length > 0 ? (
+            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300">
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-blue-700 font-bold text-xs whitespace-nowrap">
+                <CheckCircle2 size={14} />
+                <span>{selectedLeads.length} selecionados</span>
+              </div>
+              
+              <button 
+                onClick={() => setIsTransferModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white hover:bg-brand-600 rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 flex-shrink-0"
+              >
+                <Send size={14} />
+                Transferir
+              </button>
+              
+              <button 
+                onClick={handleExportCSV}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-sm font-bold transition-all active:scale-95 flex-shrink-0"
+              >
+                <Download size={14} />
+                Exportar
+              </button>
+
+              <button 
+                onClick={handleDeleteSelected}
+                className="flex items-center justify-center w-9 h-9 bg-white text-red-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all border border-slate-200 shadow-sm active:scale-95 flex-shrink-0"
+                title="Excluir"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={fetchLeads}
+              className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all text-sm font-bold whitespace-nowrap shadow-md shadow-slate-900/20"
+            >
+              Atualizar Leads
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Bulk Actions */}
-      {selectedLeads.length > 0 && (
-        <div className="bg-blue-50 border border-blue-100 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2 text-blue-700 font-bold px-2">
-            <CheckCircle2 size={20} />
-            <span>{selectedLeads.length} empresas selecionadas</span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleExportCSV}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-700 hover:text-slate-900 rounded-lg text-sm font-bold transition-colors border border-slate-200 shadow-sm"
-            >
-              <Download size={16} />
-              Exportar CSV
-            </button>
-            <button 
-              onClick={handleDeleteSelected}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold transition-colors border border-red-100 shadow-sm"
-            >
-              <Trash2 size={16} />
-              Excluir
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Table Area */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 w-12 text-center">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
-                    onChange={selectAllLeads}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500/50"
-                  />
-                </th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Empresa</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contato</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Localização</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Detalhes</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-              </tr>
-            </thead>
+        {leads.length > 0 ? (
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-white border-b border-slate-200 text-slate-400">
+                    <th className="p-3 w-10 text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+                        onChange={selectAllLeads}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500/50"
+                      />
+                    </th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider">Empresa</th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider">Contato</th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider">Localização</th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider">Detalhes</th>
+                    <th className="text-left px-4 py-3 font-bold text-[10px] uppercase tracking-wider text-center">Status</th>
+                    <th className="px-4 py-3 w-8"></th>
+                  </tr>
+                </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center">
+                  <td colSpan={7} className="p-12 text-center">
                     <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-slate-500 font-medium">Carregando leads do CNPJ...</p>
+                    <p className="text-slate-500 font-medium text-xs">Carregando leads do CNPJ...</p>
+                  </td>
+                </tr>
+              ) : filteredLeads.length === 0 && searchTerm ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-slate-500 text-xs">
+                    Nenhum lead encontrado para "{searchTerm}"
                   </td>
                 </tr>
               ) : filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-16 text-center">
-                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Building2 size={28} className="text-blue-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1">Nenhum lead encontrado</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto">
-                      Você ainda não extraiu nenhum lead de CNPJ ou a busca não retornou resultados.
-                    </p>
+                  <td colSpan={7} className="p-12 text-center text-slate-400">
+                    Nenhum lead disponível
                   </td>
                 </tr>
               ) : (
@@ -360,7 +365,27 @@ const CnpjLeadSearch: React.FC = () => {
           </div>
         )}
       </div>
+    ) : (
+      <div className="text-center py-16 text-slate-400 bg-slate-50 border border-slate-100 rounded-2xl border-dashed">
+        <Building2 size={48} className="mx-auto mb-4 text-slate-300" />
+        <p className="font-bold text-slate-500 text-sm">Nenhum lead de CNPJ encontrado</p>
+        <p className="text-xs mt-1.5 max-w-sm mx-auto text-slate-400">
+          Inicie uma pesquisa de CNPJ para extrair leads e eles aparecerão aqui automaticamente.
+        </p>
+      </div>
+    )}
+  </div>
 
+      <TransferLeadsModal 
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        selectedLeads={leads.filter(l => selectedLeads.includes(l.id))}
+        sourceType="cnpj"
+        onTransferComplete={() => {
+            setSelectedLeads([]);
+            fetchLeads();
+        }}
+      />
     </div>
   );
 };

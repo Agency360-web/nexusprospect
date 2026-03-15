@@ -84,7 +84,7 @@ serve(async (req) => {
       const knownTables = ['cnpj', 'google_maps', 'instagram']
       if (!knownTables.includes(itemSource)) {
         if (item.cnpj || item.razao_social) itemSource = 'cnpj'
-        else if (item.title && (item.address || item.phone || item.website)) itemSource = 'google_maps'
+        else if ((item.title || item.nome_empresa) && (item.address || item.endereco || item.phone || item.telefone || item.website)) itemSource = 'google_maps'
         else if (item.username) itemSource = 'instagram'
       }
       
@@ -113,19 +113,19 @@ serve(async (req) => {
       } else if (itemSource === 'google_maps') {
         mapsLeads.push({
           user_id: userId,
-          title: item.title,
-          category: item.category || '',
-          address: item.address || '',
+          title: item.nome_empresa || item.title || 'Inexistente',
+          category: item.especialidades || item.category || '',
+          address: item.endereco || item.address || '',
           city: item.city || '',
           neighborhood: item.neighborhood || '',
-          phone: item.phone || item.phone_number || '',
+          phone: item.telefone || item.phone || item.phone_number || '',
           website: item.website || '',
           instagram: item.instagram || '',
           facebook: item.facebook || '',
           linkedin: item.linkedin || '',
           emails: Array.isArray(item.emails) ? item.emails : [],
-          rating: typeof item.rating === 'number' ? item.rating : null,
-          reviews_count: typeof item.reviews === 'number' ? item.reviews : null,
+          rating: typeof item.rating === 'number' ? item.rating : (parseFloat(item.rating) || null),
+          reviews_count: typeof item.reviews === 'number' ? item.reviews : (parseInt(item.reviews) || null),
           status: 'new'
         })
       } else if (itemSource === 'instagram') {
