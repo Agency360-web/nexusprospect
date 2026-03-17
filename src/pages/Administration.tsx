@@ -268,7 +268,7 @@ const AdministrationDashboard: React.FC = () => {
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+        <div className="space-y-6 pb-20">
             {user && (
                 <TransactionModal
                     isOpen={isTransactionModalOpen}
