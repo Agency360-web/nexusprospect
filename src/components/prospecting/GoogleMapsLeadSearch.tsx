@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -38,7 +38,114 @@ interface GmapsLead {
     created_at: string;
 }
 
-const POLL_INTERVAL = 15000; // 15s
+const ITEMS_PER_PAGE = 100;
+const POLL_INTERVAL = 30000; // 30 segundos
+
+const LeadRow = React.memo(({ 
+    lead, 
+    isSelected, 
+    onToggle, 
+    onDelete, 
+    confirmDelete, 
+    setConfirmDelete 
+}: { 
+    lead: GmapsLead, 
+    isSelected: boolean, 
+    onToggle: (id: string) => void,
+    onDelete: (id: string) => void,
+    confirmDelete: string | null,
+    setConfirmDelete: (id: string | null) => void
+}) => (
+    <tr className="hover:bg-white transition-colors group">
+        <td className="p-3 text-center">
+            <input 
+                type="checkbox" 
+                checked={isSelected}
+                onChange={() => onToggle(lead.id)}
+                className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
+            />
+        </td>
+        <td className="px-4 py-3.5">
+            <span className="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors uppercase">{lead.title}</span>
+            {(lead.category || lead.address) && (
+                <div className="text-[10px] text-slate-400 mt-1 flex flex-col gap-0.5">
+                    {lead.category && <span className="truncate max-w-[250px]">{lead.category}</span>}
+                    {lead.address && <span className="truncate max-w-[250px]">{lead.address}</span>}
+                </div>
+            )}
+        </td>
+        <td className="px-4 py-3.5 align-top pt-4">
+            {lead.phone ? (
+                <span className="flex w-fit items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md font-bold border border-emerald-100">
+                    <Phone size={10} className="fill-emerald-600" />
+                    {lead.phone}
+                </span>
+            ) : (
+                <span className="text-[11px] text-slate-300 font-medium italic">Sem telefone</span>
+            )}
+        </td>
+        <td className="px-4 py-3.5 align-top pt-4">
+            {lead.rating ? (
+                <div className="flex flex-col gap-1">
+                    <span className="flex items-center gap-1 text-[11px] text-slate-700 font-bold">
+                        <Star size={12} className="fill-amber-400 text-amber-400" />
+                        {lead.rating}
+                    </span>
+                    {lead.reviews_count && (
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">{lead.reviews_count} Reviews</span>
+                    )}
+                </div>
+            ) : (
+                <span className="text-[11px] text-slate-300">—</span>
+            )}
+        </td>
+        <td className="px-4 py-3.5 align-top pt-4">
+            {lead.website ? (
+                <a
+                    href={lead.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[11px] text-slate-600 hover:text-blue-600 font-bold max-w-[140px] truncate bg-slate-100 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors w-fit"
+                    title={lead.website}
+                >
+                    <Globe size={10} />
+                    {(() => { try { return new URL(lead.website).hostname.replace('www.', ''); } catch { return lead.website; } })()}
+                </a>
+            ) : (
+                <span className="text-[11px] text-slate-300">—</span>
+            )}
+        </td>
+        <td className="px-4 py-3.5 align-middle text-right">
+            {confirmDelete === lead.id ? (
+                <div className="flex flex-col items-center gap-1 bg-red-50 p-1.5 rounded-lg border border-red-100">
+                    <button
+                        type="button"
+                        onClick={() => onDelete(lead.id)}
+                        className="text-[9px] font-black text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded w-full transition-colors"
+                    >
+                        APAGAR
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setConfirmDelete(null)}
+                        className="text-[9px] font-bold text-slate-500 hover:text-slate-700"
+                    >
+                        CANCELAR
+                    </button>
+                </div>
+            ) : (
+                <button
+                    type="button"
+                    onClick={() => setConfirmDelete(lead.id)}
+                    className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    title="Remover Lead"
+                >
+                    <Trash2 size={14} />
+                </button>
+            )}
+        </td>
+    </tr>
+));
 
 const GoogleMapsLeadSearch: React.FC = () => {
     const { user } = useAuth();
@@ -49,6 +156,7 @@ const GoogleMapsLeadSearch: React.FC = () => {
     const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
 
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -63,7 +171,7 @@ const GoogleMapsLeadSearch: React.FC = () => {
                 .select('*')
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false })
-                .limit(200);
+                .limit(1000);
 
             if (error) throw error;
 
@@ -89,10 +197,15 @@ const GoogleMapsLeadSearch: React.FC = () => {
         };
     }, [fetchLeads]);
 
+    // Reset page when searching
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
     // Deletar lead individual
     const deleteLead = async (id: string) => {
         try {
-            const { error } = await supabase.from('leads').delete().eq('id', id);
+            const { error } = await supabase.from('leads_google_maps').delete().eq('id', id);
             if (error) throw error;
             setLeads(prev => prev.filter(l => l.id !== id));
             setDeleteConfirm(null);
@@ -114,11 +227,21 @@ const GoogleMapsLeadSearch: React.FC = () => {
         }
     };
 
-    const filteredLeads = leads.filter(lead => 
+    const filteredLeads = useMemo(() => leads.filter(lead => 
         lead.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
         lead.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         lead.address?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ), [leads, searchTerm]);
+
+    // Paginação
+    const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
+    
+    const paginatedLeads = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredLeads.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredLeads, currentPage]);
+
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
     const handleExportCSV = () => {
         if (selectedLeads.length === 0) return;
@@ -156,16 +279,19 @@ const GoogleMapsLeadSearch: React.FC = () => {
     };
 
     const selectAllLeads = () => {
-        if (selectedLeads.length === filteredLeads.length && filteredLeads.length > 0) {
-            setSelectedLeads([]);
+        const paginatedIds = paginatedLeads.map(l => l.id);
+        const allSelected = paginatedIds.every(id => selectedLeads.includes(id));
+
+        if (allSelected) {
+            setSelectedLeads(prev => prev.filter(id => !paginatedIds.includes(id)));
         } else {
-            setSelectedLeads(filteredLeads.map(l => l.id));
+            setSelectedLeads(prev => [...new Set([...prev, ...paginatedIds])]);
         }
     };
 
 
     return (
-        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-400">
+        <div className="space-y-6">
 
             {/* Search and Filters Bar */}
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -234,7 +360,7 @@ const GoogleMapsLeadSearch: React.FC = () => {
                                         <th className="p-3 w-10 text-center">
                                             <input 
                                                 type="checkbox" 
-                                                checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+                                                checked={paginatedLeads.length > 0 && paginatedLeads.every(l => selectedLeads.includes(l.id))}
                                                 onChange={selectAllLeads}
                                                 className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
                                             />
@@ -247,100 +373,62 @@ const GoogleMapsLeadSearch: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {filteredLeads.map((lead) => (
-                                        <tr key={lead.id} className="hover:bg-white transition-colors group">
-                                            <td className="p-3 text-center">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={selectedLeads.includes(lead.id)}
-                                                    onChange={() => toggleLeadSelection(lead.id)}
-                                                    className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-3.5">
-                                                <span className="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors">{lead.title}</span>
-                                                {(lead.category || lead.address) && (
-                                                    <div className="text-[10px] text-slate-400 mt-1 flex flex-col gap-0.5">
-                                                        {lead.category && <span className="truncate max-w-[250px]">{lead.category}</span>}
-                                                        {lead.address && <span className="truncate max-w-[250px]">{lead.address}</span>}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3.5 align-top pt-4">
-                                                {lead.phone ? (
-                                                    <span className="flex w-fit items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md font-bold border border-emerald-100">
-                                                        <Phone size={10} className="fill-emerald-600" />
-                                                        {lead.phone}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-[11px] text-slate-300 font-medium italic">Sem telefone</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3.5 align-top pt-4">
-                                                {lead.rating ? (
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="flex items-center gap-1 text-[11px] text-slate-700 font-bold">
-                                                            <Star size={12} className="fill-amber-400 text-amber-400" />
-                                                            {lead.rating}
-                                                        </span>
-                                                        {lead.reviews_count && (
-                                                            <span className="text-[9px] font-bold text-slate-400 uppercase">{lead.reviews_count} Reviews</span>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-[11px] text-slate-300">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3.5 align-top pt-4">
-                                                {lead.website ? (
-                                                    <a
-                                                        href={lead.website}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center gap-1 text-[11px] text-slate-600 hover:text-blue-600 font-bold max-w-[140px] truncate bg-slate-100 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors w-fit"
-                                                        title={lead.website}
-                                                    >
-                                                        <Globe size={10} />
-                                                        {(() => { try { return new URL(lead.website).hostname.replace('www.', ''); } catch { return lead.website; } })()}
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-[11px] text-slate-300">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3.5 align-middle text-right">
-                                                {deleteConfirm === lead.id ? (
-                                                    <div className="flex flex-col items-center gap-1 bg-red-50 p-1.5 rounded-lg border border-red-100">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => deleteLead(lead.id)}
-                                                            className="text-[9px] font-black text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded w-full transition-colors"
-                                                        >
-                                                            APAGAR
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDeleteConfirm(null)}
-                                                            className="text-[9px] font-bold text-slate-500 hover:text-slate-700"
-                                                        >
-                                                            CANCELAR
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setDeleteConfirm(lead.id)}
-                                                        className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                                        title="Remover Lead"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
+                                    {paginatedLeads.map((lead) => (
+                                        <LeadRow 
+                                            key={lead.id}
+                                            lead={lead}
+                                            isSelected={selectedLeads.includes(lead.id)}
+                                            onToggle={toggleLeadSelection}
+                                            onDelete={deleteLead}
+                                            confirmDelete={deleteConfirm}
+                                            setConfirmDelete={setDeleteConfirm}
+                                        />
                                     ))}
                                 </tbody>
                             </table>
                         </div>
+                        
+                        {/* Paginação */}
+                        {totalPages > 1 && (
+                            <div className="bg-white border-t border-slate-100 p-4 flex items-center justify-between">
+                                <div className="text-xs text-slate-500 font-medium">
+                                    Mostrando <span className="text-slate-900 font-bold">{startIndex + 1}</span> a <span className="text-slate-900 font-bold">{Math.min(startIndex + ITEMS_PER_PAGE, filteredLeads.length)}</span> de <span className="text-slate-900 font-bold">{filteredLeads.length}</span> leads
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        Anterior
+                                    </button>
+                                    
+                                    <div className="flex items-center gap-1">
+                                        {[...Array(totalPages)].map((_, i) => (
+                                            <button
+                                                key={i + 1}
+                                                onClick={() => setCurrentPage(i + 1)}
+                                                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                                                    currentPage === i + 1
+                                                        ? 'bg-slate-900 text-white shadow-md'
+                                                        : 'hover:bg-slate-50 text-slate-500'
+                                                }`}
+                                            >
+                                                {i + 1}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        Próximo
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="text-center py-16 text-slate-400 bg-slate-50 border border-slate-100 rounded-2xl border-dashed">

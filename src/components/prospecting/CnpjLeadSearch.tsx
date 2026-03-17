@@ -1,8 +1,98 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { Search, Building2, Phone, Mail, ExternalLink, Calendar, CheckCircle2, Filter, Download, Trash2, MapPin, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TransferLeadsModal from './TransferLeadsModal';
+
+const ITEMS_PER_PAGE = 100;
+
+const LeadRowCNPJ = React.memo(({ 
+  lead, 
+  isSelected, 
+  onToggle,
+  formatCNPJ
+}: { 
+  lead: any, 
+  isSelected: boolean, 
+  onToggle: (id: string) => void,
+  formatCNPJ: (cnpj: string) => string
+}) => (
+  <tr className="hover:bg-slate-50/80 transition-colors group">
+    <td className="p-4 text-center">
+      <input 
+        type="checkbox" 
+        checked={isSelected}
+        onChange={() => onToggle(lead.id)}
+        className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500/50"
+      />
+    </td>
+    <td className="p-4">
+      <div className="font-bold text-slate-800 truncate max-w-[250px]" title={lead.razao_social}>
+        {lead.razao_social || 'Sem Razão Social'}
+      </div>
+      <div className="flex flex-col mt-0.5">
+        <span className="text-xs text-slate-500 truncate max-w-[250px]" title={lead.nome_fantasia}>
+          {lead.nome_fantasia || '—'}
+        </span>
+        <div className="flex items-center gap-1 mt-1">
+          <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+            {formatCNPJ(lead.cnpj)}
+          </span>
+        </div>
+      </div>
+    </td>
+    <td className="p-4">
+      <div className="space-y-1.5">
+        {lead.telefone && (
+          <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md w-fit
+            ${lead.whatsapp ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-700'}`}>
+            <Phone size={12} />
+            {lead.telefone}
+            {lead.whatsapp && <span className="text-[10px] ml-1 bg-green-200 text-green-800 px-1 rounded">WA</span>}
+          </div>
+        )}
+        {lead.email && lead.email !== '—' && (
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded w-fit">
+            <Mail size={11} className="text-slate-400 fill-slate-400" />
+            {lead.email}
+          </div>
+        )}
+      </div>
+    </td>
+    <td className="p-4">
+      <div className="text-xs text-slate-700 font-bold max-w-[200px] truncate">
+        {lead.municipio} / {lead.uf}
+      </div>
+      <div className="text-[10px] text-slate-400 mt-1 max-w-[200px] truncate" title={`${lead.logradouro}, ${lead.numero}`}>
+        {lead.logradouro}, {lead.numero}
+        {lead.bairro && ` - ${lead.bairro}`}
+      </div>
+    </td>
+    <td className="p-4">
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+          <Calendar size={10} />
+          {lead.abertura}
+          <span className="text-[9px] bg-slate-100 px-1 rounded ml-1 italic font-bold text-slate-400 uppercase">Abertura</span>
+        </div>
+        <div className="text-[10px] text-slate-400 truncate max-w-[180px]" title={lead.cnae_principal_desc}>
+          {lead.cnae_principal_desc}
+        </div>
+      </div>
+    </td>
+    <td className="p-4 text-center">
+      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider
+        ${lead.situacao === 'ATIVA' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+        {lead.situacao}
+      </span>
+    </td>
+    <td className="p-4 text-right">
+      <button className="p-1.5 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all opacity-0 group-hover:opacity-100">
+        <ExternalLink size={16} />
+      </button>
+    </td>
+  </tr>
+));
 
 const CnpjLeadSearch: React.FC = () => {
   const { user } = useAuth();
@@ -13,10 +103,18 @@ const CnpjLeadSearch: React.FC = () => {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [folders, setFolders] = useState<any[]>([]);
 
+  const ITEMS_PER_PAGE = 100;
+  const [currentPage, setCurrentPage] = useState(1);
+
   useEffect(() => {
     fetchLeads();
     fetchFolders();
   }, [user]);
+
+  // Reset page when searching
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const fetchLeads = async () => {
     if (!user) return;
@@ -54,11 +152,21 @@ const CnpjLeadSearch: React.FC = () => {
     }
   };
 
-  const filteredLeads = leads.filter(lead => 
+  const filteredLeads = useMemo(() => leads.filter(lead => 
     lead.razao_social?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     lead.cnpj?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.nome_fantasia?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ), [leads, searchTerm]);
+
+  // Paginação
+  const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
+  
+  const paginatedLeads = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredLeads.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredLeads, currentPage]);
+
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
   const toggleLeadSelection = (id: string) => {
     setSelectedLeads(prev => 
@@ -67,10 +175,13 @@ const CnpjLeadSearch: React.FC = () => {
   };
 
   const selectAllLeads = () => {
-    if (selectedLeads.length === filteredLeads.length) {
-      setSelectedLeads([]);
+    const paginatedIds = paginatedLeads.map(l => l.id);
+    const allSelected = paginatedIds.every(id => selectedLeads.includes(id));
+
+    if (allSelected) {
+      setSelectedLeads(prev => prev.filter(id => !paginatedIds.includes(id)));
     } else {
-      setSelectedLeads(filteredLeads.map(l => l.id));
+      setSelectedLeads(prev => [...new Set([...prev, ...paginatedIds])]);
     }
   };
 
@@ -117,7 +228,7 @@ const CnpjLeadSearch: React.FC = () => {
         `"${l.situacao || ''}"`,
         new Date(l.created_at).toLocaleDateString('pt-BR')
       ].join(','))
-    ].join('\\n');
+    ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -132,15 +243,15 @@ const CnpjLeadSearch: React.FC = () => {
 
   const formatCNPJ = (cnpj: string) => {
     if (!cnpj) return '';
-    const cleaned = cnpj.replace(/\\D/g, '');
+    const cleaned = cnpj.replace(/\D/g, '');
     if (cleaned.length === 14) {
-      return cleaned.replace(/^(\\d{2})(\\d{3})(\\d{3})(\\d{4})(\\d{2})/, "$1.$2.$3/$4-$5");
+      return cleaned.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
     }
     return cnpj;
   };
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6">
       
       {/* Search and Filters Bar */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -210,7 +321,7 @@ const CnpjLeadSearch: React.FC = () => {
                     <th className="p-3 w-10 text-center">
                       <input 
                         type="checkbox" 
-                        checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+                        checked={paginatedLeads.length > 0 && paginatedLeads.every(l => selectedLeads.includes(l.id))}
                         onChange={selectAllLeads}
                         className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500/50"
                       />
@@ -223,151 +334,88 @@ const CnpjLeadSearch: React.FC = () => {
                     <th className="px-4 py-3 w-8"></th>
                   </tr>
                 </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="p-12 text-center">
-                    <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-slate-500 font-medium text-xs">Carregando leads do CNPJ...</p>
-                  </td>
-                </tr>
-              ) : filteredLeads.length === 0 && searchTerm ? (
-                <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-500 text-xs">
-                    Nenhum lead encontrado para "{searchTerm}"
-                  </td>
-                </tr>
-              ) : filteredLeads.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-400">
-                    Nenhum lead disponível
-                  </td>
-                </tr>
-              ) : (
-                filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="p-4 text-center">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedLeads.includes(lead.id)}
-                        onChange={() => toggleLeadSelection(lead.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500/50"
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center">
+                        <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-slate-500 font-medium text-xs">Carregando leads do CNPJ...</p>
+                      </td>
+                    </tr>
+                  ) : paginatedLeads.length === 0 && searchTerm ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center text-slate-500 text-xs">
+                        Nenhum lead encontrado para "{searchTerm}"
+                      </td>
+                    </tr>
+                  ) : paginatedLeads.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-12 text-center text-slate-400">
+                        Nenhum lead disponível
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedLeads.map((lead) => (
+                      <LeadRowCNPJ 
+                        key={lead.id}
+                        lead={lead}
+                        isSelected={selectedLeads.includes(lead.id)}
+                        onToggle={toggleLeadSelection}
+                        formatCNPJ={formatCNPJ}
                       />
-                    </td>
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800 truncate max-w-[250px]" title={lead.razao_social}>
-                        {lead.razao_social || 'Sem Razão Social'}
-                      </div>
-                      <div className="flex flex-col mt-0.5">
-                        <span className="text-xs text-slate-500 truncate max-w-[250px]" title={lead.nome_fantasia}>
-                          {lead.nome_fantasia || '—'}
-                        </span>
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
-                            {formatCNPJ(lead.cnpj)}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="space-y-1.5">
-                        {lead.telefone && (
-                          <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md w-fit
-                            ${lead.whatsapp ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-700'}`}>
-                            <Phone size={12} />
-                            {lead.telefone}
-                            {lead.whatsapp && <span className="text-[10px] ml-1 bg-green-200 text-green-800 px-1 rounded">WA</span>}
-                          </div>
-                        )}
-                        {lead.email && (
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 truncate max-w-[180px]" title={lead.email}>
-                            <Mail size={12} className="text-slate-400 flex-shrink-0" />
-                            {lead.email}
-                          </div>
-                        )}
-                        {!lead.telefone && !lead.email && (
-                          <span className="text-xs text-slate-400 italic">Sem contato</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="space-y-1.5">
-                        <div className="flex items-start gap-1.5 text-xs text-slate-600">
-                          <MapPin size={12} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                          <div className="truncate max-w-[200px]" title={`${lead.logradouro}, ${lead.numero} - ${lead.bairro}`}>
-                            {lead.logradouro ? `${lead.logradouro}, ${lead.numero || 'SN'}` : 'Endereço não informado'}
-                          </div>
-                        </div>
-                        {(lead.municipio || lead.uf) && (
-                          <div className="text-xs font-medium text-slate-700 ml-4">
-                            {lead.municipio}{lead.municipio && lead.uf ? ' - ' : ''}{lead.uf}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="space-y-2">
-                        {lead.cnae_principal && (
-                          <div className="text-[10px] leading-tight text-slate-500 bg-slate-50 p-1.5 rounded border border-slate-100 truncate max-w-[200px]" title={lead.cnae_principal}>
-                            <strong>CNAE:</strong> {lead.cnae_principal}
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-1">
-                          {lead.situacao && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold
-                              ${lead.situacao.includes('ATIVA') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                              {lead.situacao}
-                            </span>
-                          )}
-                          {lead.porte && (
-                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
-                              {lead.porte}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold
-                        ${lead.status === 'contacted' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                        lead.status === 'converted' ? 'bg-green-50 text-green-700 border border-green-200' :
-                        'bg-slate-100 text-slate-700 border border-slate-200'}`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full 
-                          ${lead.status === 'contacted' ? 'bg-blue-500' :
-                          lead.status === 'converted' ? 'bg-green-500' :
-                          'bg-slate-500'}`}
-                        />
-                        {lead.status === 'contacted' ? 'Contatado' :
-                         lead.status === 'converted' ? 'Convertido' : 'Novo'}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination Info */}
-        {!loading && filteredLeads.length > 0 && (
-          <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-between text-sm text-slate-500 font-medium">
-            <div>
-              Mostrando <strong className="text-slate-800">{filteredLeads.length}</strong> empresas
-              {searchTerm && <span> (filtradas)</span>}
-            </div>
-            {/* Simple placeholder pagination */}
-            <div className="flex items-center gap-1 opacity-50 cursor-not-allowed" title="Paginação será implementada em breve">
-              <button className="px-3 py-1 border border-slate-200 rounded-md">Anterior</button>
-              <button className="px-3 py-1 border border-slate-200 rounded-md bg-white text-slate-800">1</button>
-              <button className="px-3 py-1 border border-slate-200 rounded-md">Próxima</button>
-            </div>
+                    ))
+                  )}
+                </tbody>
+            </table>
           </div>
-        )}
-      </div>
-    ) : (
-      <div className="text-center py-16 text-slate-400 bg-slate-50 border border-slate-100 rounded-2xl border-dashed">
-        <Building2 size={48} className="mx-auto mb-4 text-slate-300" />
+
+          {!loading && filteredLeads.length > 0 && (
+            <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-between text-sm text-slate-500 font-medium font-sans">
+              <div>
+                Mostrando <strong className="text-slate-800">{startIndex + 1}</strong> a <strong className="text-slate-800">{Math.min(startIndex + ITEMS_PER_PAGE, filteredLeads.length)}</strong> de <strong className="text-slate-800">{filteredLeads.length}</strong> leads
+              </div>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    Anterior
+                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {[...Array(totalPages)].map((_, i) => (
+                      <button
+                        key={i + 1}
+                        onClick={() => setCurrentPage(i + 1)}
+                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                          currentPage === i + 1
+                            ? 'bg-slate-900 text-white shadow-md'
+                            : 'hover:bg-slate-50 text-slate-500'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    Próximo
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-16 text-slate-400 bg-slate-50 border border-slate-100 rounded-2xl border-dashed">
+          <Building2 size={48} className="mx-auto mb-4 text-slate-300" />
         <p className="font-bold text-slate-500 text-sm">Nenhum lead de CNPJ encontrado</p>
         <p className="text-xs mt-1.5 max-w-sm mx-auto text-slate-400">
           Inicie uma pesquisa de CNPJ para extrair leads e eles aparecerão aqui automaticamente.
