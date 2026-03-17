@@ -106,6 +106,28 @@ serve(async (req) => {
 
             const uazapiData = await uazapiRes.json()
 
+            // Configurar webhook da instância para receber mensagens
+            const instanceToken = uazapiData.token || uazapiData.instance?.token || ''
+            if (instanceToken) {
+                try {
+                    await fetch(`${UAZAPI_BASE_URL}/instance/webhook`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'token': instanceToken,
+                        },
+                        body: JSON.stringify({
+                            webhook_url: 'https://nexus360.infra-conectamarketing.site/webhook/nexus-mensagens',
+                            webhook_enabled: true,
+                        }),
+                    })
+                    console.log(`Webhook da instância ${instanceName} configurado com sucesso.`)
+                } catch (webhookErr) {
+                    console.error(`Falha ao configurar webhook da instância ${instanceName} (não crítico):`, webhookErr)
+                }
+            }
+
             // Persist in DB
             const { data: dbRecord, error: insertErr } = await supabaseAdmin
                 .from('whatsapp_connections')
