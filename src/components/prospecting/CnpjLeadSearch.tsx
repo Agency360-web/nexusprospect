@@ -41,7 +41,7 @@ const LeadRowCNPJ = React.memo(({
         </div>
       </div>
     </td>
-    <td className="p-4">
+    <td className="p-4 whitespace-nowrap">
       <div className="space-y-1.5">
         {lead.telefone && (
           <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md w-fit

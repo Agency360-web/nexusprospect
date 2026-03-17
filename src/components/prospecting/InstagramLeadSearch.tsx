@@ -46,7 +46,7 @@ const LeadRowInstagram = React.memo(({
         </div>
       </div>
     </td>
-    <td className="p-4">
+    <td className="p-4 whitespace-nowrap">
       <div className="flex flex-col gap-1">
         {lead.public_phone_number && (
           <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md w-fit border border-emerald-100">

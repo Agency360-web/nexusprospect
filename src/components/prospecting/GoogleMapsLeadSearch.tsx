@@ -74,7 +74,7 @@ const LeadRow = React.memo(({
                 </div>
             )}
         </td>
-        <td className="px-4 py-3.5 align-top pt-4">
+        <td className="px-4 py-3.5 align-top pt-4 whitespace-nowrap">
             {lead.phone ? (
                 <span className="flex w-fit items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md font-bold border border-emerald-100">
                     <Phone size={10} className="fill-emerald-600" />
