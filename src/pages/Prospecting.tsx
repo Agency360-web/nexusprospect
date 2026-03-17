@@ -54,7 +54,7 @@ const Prospecting: React.FC = () => {
             <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full shadow-sm overflow-x-auto hide-scrollbar">
                 <TabButton id="messages" to="/prospecting/messages" label="Disparo no WhatsApp" icon={Send} />
                 <TabButton id="maps" to="/prospecting/maps" label="Leads no Google Maps" icon={MapPin} />
-                <TabButton id="instagram" to="/prospecting/instagram" label="Leads no Instagram" icon={Instagram} />
+                {/* <TabButton id="instagram" to="/prospecting/instagram" label="Leads no Instagram" icon={Instagram} /> */}
                 <TabButton id="cnpj" to="/prospecting/cnpj" label="Leads por CNPJ" icon={Building2} />
             </div>
 

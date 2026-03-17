@@ -81,7 +81,7 @@ const App: React.FC = () => {
               {/* Rotas das Abas */}
               <Route path="messages" element={<WhatsAppCampaignForm />} />
               <Route path="maps" element={<GoogleMapsLeadSearch />} />
-              <Route path="instagram" element={<InstagramLeadSearch />} />
+              {/* <Route path="instagram" element={<InstagramLeadSearch />} /> */}
               <Route path="cnpj" element={<CnpjLeadSearch />} />
             </Route>
             <Route path="/clients/:clientId" element={
