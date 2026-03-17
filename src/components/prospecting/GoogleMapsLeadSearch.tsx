@@ -155,6 +155,7 @@ const GoogleMapsLeadSearch: React.FC = () => {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [phoneFilter, setPhoneFilter] = useState<'all' | 'with_phone' | 'without_phone'>('all');
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -227,11 +228,17 @@ const GoogleMapsLeadSearch: React.FC = () => {
         }
     };
 
-    const filteredLeads = useMemo(() => leads.filter(lead => 
-        lead.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        lead.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.address?.toLowerCase().includes(searchTerm.toLowerCase())
-    ), [leads, searchTerm]);
+    const filteredLeads = useMemo(() => leads.filter(lead => {
+        const matchesSearch = lead.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              lead.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              lead.address?.toLowerCase().includes(searchTerm.toLowerCase());
+                              
+        let matchesPhone = true;
+        if (phoneFilter === 'with_phone') matchesPhone = !!lead.phone;
+        if (phoneFilter === 'without_phone') matchesPhone = !lead.phone;
+        
+        return matchesSearch && matchesPhone;
+    }), [leads, searchTerm, phoneFilter]);
 
     // Paginação
     const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
@@ -295,15 +302,31 @@ const GoogleMapsLeadSearch: React.FC = () => {
 
             {/* Search and Filters Bar */}
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="relative flex-1 w-full max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                    <input 
-                        type="text" 
-                        placeholder="Buscar por nome, categoria ou endereço..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-sm font-medium"
-                    />
+                <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full max-w-2xl">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input 
+                            type="text" 
+                            placeholder="Buscar por nome, categoria ou endereço..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-sm font-medium"
+                        />
+                    </div>
+                    <select
+                        value={phoneFilter}
+                        onChange={(e) => setPhoneFilter(e.target.value as any)}
+                        className="py-2.5 px-4 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all text-sm font-medium text-slate-600 sm:w-auto w-full outline-none appearance-none pr-8 cursor-pointer bg-no-repeat"
+                        style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                            backgroundPosition: 'right 0.75rem center',
+                            backgroundSize: '1em 1em'
+                        }}
+                    >
+                        <option value="all">Todos os contatos</option>
+                        <option value="with_phone">Com Telefone</option>
+                        <option value="without_phone">Sem Telefone</option>
+                    </select>
                 </div>
                 
                 <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
