@@ -207,7 +207,7 @@ const CampaignConfiguratorProV2: React.FC = () => {
                                 type="text"
                                 value={prospectorCompany}
                                 onChange={(e) => setProspectorCompany(e.target.value)}
-                                placeholder="Ex: Conecta"
+                                placeholder="Ex: Nexus"
                                 className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
                             />
                         </div>
@@ -231,10 +231,10 @@ const CampaignConfiguratorProV2: React.FC = () => {
                             className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
                         >
                             <option value="name_only">Só o nome (Ex: Lucas)</option>
-                            <option value="name_company">Nome + Empresa (Ex: Lucas, da Conecta)</option>
+                            <option value="name_company">Nome + Empresa (Ex: Lucas, da Nexus)</option>
                             <option value="name_role">Nome + Cargo (Ex: Lucas, Especialista de Vendas)</option>
-                            <option value="name_role_company">Nome + Cargo + Empresa (Ex: Lucas, Especialista da Conecta)</option>
-                            <option value="company_only">Só Empresa (Ex: Da Conecta)</option>
+                            <option value="name_role_company">Nome + Cargo + Empresa (Ex: Lucas, Especialista da Nexus)</option>
+                            <option value="company_only">Só Empresa (Ex: Da Nexus)</option>
                         </select>
                     </div>
                 </section>
