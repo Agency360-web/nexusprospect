@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
-import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone, Lock } from 'lucide-react';
+import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone, Lock, Rocket } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import CampaignMonitor from './CampaignMonitor';
+import CampaignConfiguratorProV2 from '../campaign/CampaignConfiguratorProV2';
 
 const WhatsAppCampaignForm: React.FC = () => {
-    const [campaignType, setCampaignType] = useState<'simple' | 'ai' | 'multi-ai' | ''>('');
+    const [campaignType, setCampaignType] = useState<'simple' | 'ai' | 'multi-ai' | 'pro-v2' | ''>('');
     const [name, setName] = useState('');
     const [minDelay, setMinDelay] = useState(15);
     const [maxDelay, setMaxDelay] = useState(30);
@@ -394,7 +395,7 @@ const WhatsAppCampaignForm: React.FC = () => {
 
             <div className="mb-10">
                 <label className="block text-sm font-bold text-slate-700 mb-4">Selecione o Tipo de Disparo *</label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button
                         type="button"
                         onClick={() => setCampaignType(campaignType === 'simple' ? '' : 'simple')}
@@ -404,6 +405,8 @@ const WhatsAppCampaignForm: React.FC = () => {
                         <span className={`font-bold ${campaignType === 'simple' ? 'text-white' : 'text-slate-700'}`}>Disparo Simples</span>
                         <span className={`text-xs text-center mt-2 ${campaignType === 'simple' ? 'text-slate-300' : 'text-slate-500'}`}>Envio de mensagens em massa padrão.</span>
                     </button>
+                    
+                    {/* Disparo com IA - Escondido para ajustes internos
                     <button
                         type="button"
                         onClick={() => setCampaignType(campaignType === 'ai' ? '' : 'ai')}
@@ -411,8 +414,11 @@ const WhatsAppCampaignForm: React.FC = () => {
                     >
                         <Bot className={`mb-3 ${campaignType === 'ai' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
                         <span className={`font-bold ${campaignType === 'ai' ? 'text-white' : 'text-slate-700'}`}>Disparo com IA</span>
-                        <span className={`text-xs text-center mt-2 ${campaignType === 'ai' ? 'text-slate-300' : 'text-slate-500'}`}>Envio de mensagens em massa personalizado com IA.</span>
+                        <span className={`text-xs text-center mt-2 ${campaignType === 'ai' ? 'text-slate-300' : 'text-slate-500'}`}>Envio personalizado com IA.</span>
                     </button>
+                    */}
+
+                    {/* Multi-Instância com IA - Escondido para ajustes internos
                     <button
                         type="button"
                         onClick={() => {
@@ -428,12 +434,24 @@ const WhatsAppCampaignForm: React.FC = () => {
                         )}
                         <Layers className={`mb-3 ${isStarter ? 'text-slate-300' : campaignType === 'multi-ai' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
                         <span className={`font-bold ${isStarter ? 'text-slate-400' : campaignType === 'multi-ai' ? 'text-white' : 'text-slate-700'}`}>Multi-Instância com IA</span>
-                        <span className={`text-xs text-center mt-2 ${isStarter ? 'text-slate-400' : campaignType === 'multi-ai' ? 'text-slate-300' : 'text-slate-500'}`}>Distribui os envios com IA entre vários números.</span>
+                        <span className={`text-xs text-center mt-2 ${isStarter ? 'text-slate-400' : campaignType === 'multi-ai' ? 'text-slate-300' : 'text-slate-500'}`}>Distribui envios entre vários números.</span>
                         {isStarter && (
                             <div className="mt-4 bg-slate-200 text-slate-500 text-[10px] uppercase tracking-wider font-bold py-1 px-3 rounded-full">
                                 Plano Pro
                             </div>
                         )}
+                    </button>
+                    */}
+
+                    <button
+                        type="button"
+                        onClick={() => setCampaignType(campaignType === 'pro-v2' ? '' : 'pro-v2')}
+                        className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${campaignType === 'pro-v2' ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                    >
+                        <div className="absolute -top-3 right-4 bg-slate-800 text-white text-[10px] uppercase tracking-wider font-bold py-1 px-3 rounded-full shadow-md">NOVO</div>
+                        <Rocket className={`mb-3 ${campaignType === 'pro-v2' ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
+                        <span className={`font-bold text-center ${campaignType === 'pro-v2' ? 'text-white' : 'text-slate-700'}`}>Disparador Pro V2</span>
+                        <span className={`text-xs text-center mt-2 ${campaignType === 'pro-v2' ? 'text-slate-300' : 'text-slate-500'}`}>Campanhas altamente detalhadas.</span>
                     </button>
                 </div>
 
@@ -445,7 +463,13 @@ const WhatsAppCampaignForm: React.FC = () => {
                 )}
             </div>
 
-            {campaignType && (
+            {campaignType === 'pro-v2' && (
+                <div className="mt-8 animate-in fade-in slide-in-from-top-4 duration-500 border-t border-slate-200 pt-8">
+                    <CampaignConfiguratorProV2 />
+                </div>
+            )}
+
+            {campaignType && campaignType !== 'pro-v2' && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
                     {/* Instância do WhatsApp */}
                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
