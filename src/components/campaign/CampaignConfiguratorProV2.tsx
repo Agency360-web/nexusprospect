@@ -17,6 +17,7 @@ const CampaignConfiguratorProV2: React.FC = () => {
     const [campaignName, setCampaignName] = useState('');
     const [productService, setProductService] = useState('');
     const [campaignPromise, setCampaignPromise] = useState('');
+    const [campaignNiche, setCampaignNiche] = useState('');
 
     // === ESTADOS: SEÇÃO 3 ===
     const [startTime, setStartTime] = useState('09:00');
@@ -44,7 +45,8 @@ const CampaignConfiguratorProV2: React.FC = () => {
                 .replace(/\{\{cargo\}\}/g, prospectorRole || '[Cargo]')
                 .replace(/\{\{produto\}\}/g, productService || '[Produto]')
                 .replace(/\{\{promessa\}\}/g, campaignPromise || '[Promessa]')
-                .replace(/\{\{nichoBanco\}\}/g, '[Nicho do Lead]');
+                .replace(/\{\{nicho\}\}/g, campaignNiche || '[Nicho]')
+                .replace(/\{\{nichoBanco\}\}/g, campaignNiche || '[Nicho]');
         };
 
         const getRandom = (arr: any[]) => {
@@ -73,7 +75,7 @@ const CampaignConfiguratorProV2: React.FC = () => {
 
     useEffect(() => {
         generatePreview();
-    }, [messageLibrary, prospectorName, prospectorCompany, prospectorRole, productService, campaignPromise]);
+    }, [messageLibrary, prospectorName, prospectorCompany, prospectorRole, productService, campaignPromise, campaignNiche]);
 
     const cleanPhone = (phone: string) => {
         if (!phone) return '';
@@ -94,7 +96,8 @@ const CampaignConfiguratorProV2: React.FC = () => {
                     .replace(/\{\{empresa\}\}/g, prospectorCompany || '')
                     .replace(/\{\{cargo\}\}/g, prospectorRole || '')
                     .replace(/\{\{produto\}\}/g, productService || '')
-                    .replace(/\{\{promessa\}\}/g, campaignPromise || '');
+                    .replace(/\{\{promessa\}\}/g, campaignPromise || '')
+                    .replace(/\{\{nicho\}\}/g, campaignNiche || '');
             };
 
             const activeInstances = instances.filter(i => i.active);
@@ -124,7 +127,12 @@ const CampaignConfiguratorProV2: React.FC = () => {
                 pergunta: messageLibrary.cta.map(i => i.text),
 
                 // === CAMPANHA ===
-                campaign: { name: campaignName, product: productService, promise: campaignPromise },
+                campaign: { 
+                    name: campaignName, 
+                    product: productService, 
+                    promise: campaignPromise,
+                    niche: campaignNiche
+                },
                 dispatch: { 
                     startTime, 
                     endTime, 
@@ -238,38 +246,53 @@ const CampaignConfiguratorProV2: React.FC = () => {
                             2. Configurações da Campanha
                         </h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1.5">Nome da Campanha *</label>
-                            <input
-                                type="text"
-                                value={campaignName}
-                                onChange={(e) => setCampaignName(e.target.value)}
-                                placeholder="Ex: Oferta B2B Março"
-                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
-                            />
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Nome da Campanha *</label>
+                                <input
+                                    type="text"
+                                    value={campaignName}
+                                    onChange={(e) => setCampaignName(e.target.value)}
+                                    placeholder="Ex: Oferta B2B Março"
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Produto ou Serviço *</label>
+                                <input
+                                    type="text"
+                                    value={productService}
+                                    onChange={(e) => setProductService(e.target.value)}
+                                    placeholder="Ex: Assessoria de Marketing"
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1.5">Produto ou Serviço *</label>
-                            <input
-                                type="text"
-                                value={productService}
-                                onChange={(e) => setProductService(e.target.value)}
-                                placeholder="Ex: Assessoria de Marketing"
-                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
-                            />
-                        </div>
-                    </div>
 
-                    <div className="mb-4">
-                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Promessa de Resultado *</label>
-                        <input
-                            type="text"
-                            value={campaignPromise}
-                            onChange={(e) => setCampaignPromise(e.target.value)}
-                            placeholder="Ex: R$ 10 mil a R$ 70 mil/mês"
-                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
-                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Nicho de Prospecção (Opcional)</label>
+                                <input
+                                    type="text"
+                                    value={campaignNiche}
+                                    onChange={(e) => setCampaignNiche(e.target.value)}
+                                    placeholder="Ex: Clínicas Odontológicas, Pet Shops, etc."
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-1 italic">Dica: Use {"{{nicho}}"} nas mensagens.</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1.5">Promessa de Resultado *</label>
+                                <input
+                                    type="text"
+                                    value={campaignPromise}
+                                    onChange={(e) => setCampaignPromise(e.target.value)}
+                                    placeholder="Ex: R$ 10 mil a R$ 70 mil/mês"
+                                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
+                                />
+                            </div>
+                        </div>
                     </div>
 
                 </section>
@@ -309,15 +332,17 @@ const CampaignConfiguratorProV2: React.FC = () => {
 
                 {/* NOVAS SEÇÕES */}
                 <SectionInstances instances={instances} setInstances={setInstances} />
-                <SectionMessageLibrary 
-                    library={messageLibrary} 
-                    setLibrary={setMessageLibrary} 
+                <SectionMessageLibrary
+                    library={messageLibrary}
+                    setLibrary={setMessageLibrary}
                     dynamicValues={{
                         nome: prospectorName,
                         empresa: prospectorCompany,
                         cargo: prospectorRole,
                         produto: productService,
                         promessa: campaignPromise,
+                        nicho: campaignNiche,
+                        nichoBanco: campaignNiche
                     }}
                 />
                 <SectionButtons buttons={buttons} setButtons={setButtons} />

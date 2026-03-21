@@ -22,6 +22,7 @@ export type DynamicValues = {
     produto?: string;
     promessa?: string;
     segmentos?: string;
+    nicho?: string;
     nichoBanco?: string;
 };
 
@@ -182,6 +183,7 @@ const renderTemplate = (template: string, values: DynamicValues): string => {
         .replace(/\{\{produto\}\}/g, values.produto || '[Produto/Serviço]')
         .replace(/\{\{promessa\}\}/g, values.promessa || '[Promessa]')
         .replace(/\{\{segmentos\}\}/g, values.segmentos || '[Segmentos]')
+        .replace(/\{\{nicho\}\}/g, values.nicho || '[Nicho]')
         .replace(/\{\{nichoBanco\}\}/g, values.nichoBanco || '[Nicho]');
 };
 
