@@ -118,7 +118,7 @@ const SectionInstances: React.FC<Props> = ({ instances, setInstances }) => {
                             <div 
                                 key={instance.id} 
                                 onClick={() => toggleActive(instance.id)}
-                                className={`border rounded-lg p-4 flex flex-col md:flex-row gap-4 items-start md:items-center cursor-pointer transition-all ${instance.active ? 'bg-blue-50/30 border-blue-200 shadow-sm' : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-white'} ${!isConnected && 'opacity-60 cursor-not-allowed'}`}
+                                className={`border rounded-lg p-4 flex flex-col md:flex-row gap-4 items-start md:items-center cursor-pointer transition-all ${instance.active ? 'bg-yellow-50/50 border-yellow-400 shadow-sm' : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-white'} ${!isConnected && 'opacity-60 cursor-not-allowed'}`}
                             >
                                 <div className="flex-1 flex items-center gap-4 min-w-0">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isConnected ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
@@ -142,7 +142,7 @@ const SectionInstances: React.FC<Props> = ({ instances, setInstances }) => {
                                 </div>
                                 
                                 <div className="flex items-center w-full md:w-auto justify-end md:pl-4 md:border-l border-slate-200">
-                                    <div className="relative pointer-events-none">
+                                    <div className="relative inline-flex items-center">
                                         <input 
                                             type="checkbox" 
                                             className="sr-only" 
@@ -150,8 +150,8 @@ const SectionInstances: React.FC<Props> = ({ instances, setInstances }) => {
                                             disabled={!isConnected}
                                             readOnly
                                         />
-                                        <div className={`block w-10 h-6 rounded-full transition-colors ${instance.active ? 'bg-blue-600' : 'bg-slate-300'}`}></div>
-                                        <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${instance.active ? 'transform translate-x-4' : ''}`}></div>
+                                        <div className={`block w-10 h-6 rounded-full transition-colors ${instance.active ? 'bg-[#F9C300]' : 'bg-slate-300'}`}></div>
+                                        <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${instance.active ? 'translate-x-4' : ''}`}></div>
                                     </div>
                                     <span className="ml-3 font-bold text-[11px] text-slate-500 uppercase tracking-wide w-16 text-right">
                                         {instance.active ? 'Usar' : 'Não Usar'}

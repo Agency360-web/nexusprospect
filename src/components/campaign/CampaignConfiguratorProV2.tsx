@@ -353,9 +353,13 @@ const CampaignConfiguratorProV2: React.FC = () => {
                         type="button"
                         onClick={handleSubmit}
                         disabled={isSubmitting}
-                        className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-lg shadow-lg shadow-slate-900/10 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-lg shadow-lg shadow-slate-900/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed group"
                     >
-                        {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                        {isSubmitting ? (
+                            <Loader2 className="animate-spin text-[#F9C300]" size={18} />
+                        ) : (
+                            <Save className="text-[#F9C300] group-hover:scale-110 transition-transform" size={18} />
+                        )}
                         {isSubmitting ? 'Gerando e Enviando...' : 'Salvar e Iniciar Campanha'}
                     </button>
                     <p className="text-center text-[10px] text-slate-400 mt-2 font-medium uppercase tracking-wider"></p>

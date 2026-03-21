@@ -731,8 +731,8 @@ const WhatsAppCampaignForm: React.FC = () => {
                                             type="button"
                                             onClick={toggleSelectCurrentPage}
                                             className={`text-xs font-bold py-1.5 px-3 rounded-lg transition-colors ${allCurrentPageSelected
-                                                ? 'text-amber-700 bg-amber-100 hover:bg-amber-200'
-                                                : 'text-blue-700 bg-blue-50 hover:bg-blue-100'
+                                                ? 'text-slate-900 bg-[#F9C300] hover:bg-[#E6B400]'
+                                                : 'text-slate-700 bg-slate-100 hover:bg-slate-200'
                                                 }`}
                                         >
                                             {allCurrentPageSelected ? `Página ${currentPage} ✓` : `Página ${currentPage}`}

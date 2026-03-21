@@ -269,8 +269,8 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                     onClick={() => setShowSuggestions(showSuggestions === key ? null : key)}
                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
                                         showSuggestions === key 
-                                        ? 'bg-indigo-600 text-white shadow-sm' 
-                                        : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100'
+                                        ? 'bg-slate-700 text-white shadow-sm' 
+                                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
                                     }`}
                                 >
                                     <Lightbulb size={12} /> Sugestões
@@ -280,7 +280,7 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                         </div>
 
                         {showSuggestions === key && (
-                            <div className="bg-indigo-50/30 border-b border-indigo-100 p-3">
+                            <div className="bg-slate-50 border-b border-slate-200 p-3">
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
                                         <Sparkles className="text-indigo-500" size={14} />
@@ -294,7 +294,7 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                             <button
                                                 type="button"
                                                 onClick={() => handleAddAll(key)}
-                                                className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-sm"
+                                                className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-slate-700 text-white hover:bg-slate-800 transition-all shadow-sm"
                                             >
                                                 <Plus size={10} /> Adicionar Todas ({remaining})
                                             </button>
@@ -318,7 +318,7 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                                 className={`text-[10px] font-medium px-3 py-1.5 rounded-md border transition-all text-left max-w-sm ${
                                                     isAlreadyIn 
                                                     ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                                    : 'bg-white border-indigo-100 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 hover:shadow-sm'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-800 hover:shadow-sm'
                                                 }`}
                                             >
                                                 {displayText}
