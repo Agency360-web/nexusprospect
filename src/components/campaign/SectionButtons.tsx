@@ -4,6 +4,7 @@ import { MousePointerClick, Plus, Trash2, GripVertical, Info } from 'lucide-reac
 export type InteractiveButton = {
     id: string;
     text: string;
+    url?: string;
 };
 
 interface Props {
@@ -17,11 +18,11 @@ const SectionButtons: React.FC<Props> = ({ buttons, setButtons }) => {
 
     const handleAdd = () => {
         if (buttons.length >= 3) return; // Limite do WhatsApp = 3 botões
-        setButtons([...buttons, { id: Date.now().toString(), text: '' }]);
+        setButtons([...buttons, { id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(), text: '', url: '' }]);
     };
 
-    const handleUpdate = (id: string, text: string) => {
-        setButtons(buttons.map(btn => btn.id === id ? { ...btn, text } : btn));
+    const handleUpdate = (id: string, field: 'text' | 'url', value: string) => {
+        setButtons(buttons.map(btn => btn.id === id ? { ...btn, [field]: value } : btn));
     };
 
     const handleRemove = (id: string) => {
@@ -57,7 +58,7 @@ const SectionButtons: React.FC<Props> = ({ buttons, setButtons }) => {
                 {buttons.map((btn, index) => (
                     <div 
                         key={btn.id} 
-                        className="bg-slate-50 border border-slate-200 rounded-md p-2 flex items-center gap-2 group transition-all"
+                        className="bg-slate-50 border border-slate-200 rounded-md p-2 flex items-start gap-2 group transition-all"
                         draggable
                         onDragStart={(e) => {
                             dragItem.current = index;
@@ -72,23 +73,30 @@ const SectionButtons: React.FC<Props> = ({ buttons, setButtons }) => {
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={handleSort}
                     >
-                        <div className="text-slate-300 cursor-grab active:cursor-grabbing hover:text-slate-500">
+                        <div className="text-slate-300 cursor-grab active:cursor-grabbing hover:text-slate-500 pt-2.5">
                             <GripVertical size={16} />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 space-y-2">
                             <input 
                                 type="text" 
                                 value={btn.text} 
-                                onChange={(e) => handleUpdate(btn.id, e.target.value)}
+                                onChange={(e) => handleUpdate(btn.id, 'text', e.target.value)}
                                 placeholder={`Texto do Botão ${index + 1}`}
                                 maxLength={20}
+                                className="w-full bg-white border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm font-medium" 
+                            />
+                            <input 
+                                type="url" 
+                                value={btn.url || ''} 
+                                onChange={(e) => handleUpdate(btn.id, 'url', e.target.value)}
+                                placeholder={`Link do Botão ${index + 1} (Ex: https://nexusprospect.com.br) - Opcional`}
                                 className="w-full bg-white border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 text-sm font-medium" 
                             />
                         </div>
                         <button 
                             type="button" 
                             onClick={() => handleRemove(btn.id)}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all mt-0.5"
                             title="Remover Botão"
                         >
                             <Trash2 size={16} />

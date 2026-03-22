@@ -118,13 +118,19 @@ const CampaignConfiguratorProV2: React.FC = () => {
                 },
                 saudacao1: prospectorName, // Para compatibilidade com o N8N
 
-                // === ARRAYS DE MENSAGENS (formato que o N8N espera) ===
+                // === MENSAGENS E BOTÕES ===
                 ident: messageLibrary.greeting.map(i => replaceVars(i.text)),
                 anuncio: messageLibrary.presentation.map(i => i.text),
                 promessa: messageLibrary.product.map(i => i.text),
                 nichosGenericos: messageLibrary.triggers.map(i => i.text),
-                frasesNicho: messageLibrary.socialProof.map(i => i.text), // {{nichoBanco}} será substituído pelo N8N com dados do lead
+                frasesNicho: messageLibrary.socialProof.map(i => i.text),
                 pergunta: messageLibrary.cta.map(i => i.text),
+
+                // Botões Interativos formatados
+                buttons: buttons.filter(b => b.text.trim() !== ''),
+                botao1: buttons[0]?.text || '',
+                botao2: buttons[1]?.text || '',
+                botao3: buttons[2]?.text || '',
 
                 // === CAMPANHA ===
                 campaign: { 
@@ -147,7 +153,6 @@ const CampaignConfiguratorProV2: React.FC = () => {
                     instanceName: i.instanceName,
                     token: i.token
                 })),
-                buttons: buttons,
                 leads: {
                     fileName: '',
                     mapping: { name: '', phone: '' },
