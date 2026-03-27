@@ -37,6 +37,7 @@ interface CampaignStats {
     total: number;
     sent: number;
     failed: number;
+    invalid: number;
     pending: number;
 }
 
@@ -81,9 +82,9 @@ const CampaignMonitor: React.FC = () => {
                 console.error('Erro ao buscar messages:', msgError);
             }
 
-            const statsMap: Record<string, { total: number; sent: number; failed: number; pending: number }> = {};
+            const statsMap: Record<string, { total: number; sent: number; failed: number; invalid: number; pending: number }> = {};
             campaignIds.forEach(id => {
-                statsMap[id] = { total: 0, sent: 0, failed: 0, pending: 0 };
+                statsMap[id] = { total: 0, sent: 0, failed: 0, invalid: 0, pending: 0 };
             });
 
             if (messagesData) {
@@ -93,6 +94,7 @@ const CampaignMonitor: React.FC = () => {
                         s.total++;
                         if (msg.status === 'sent') s.sent++;
                         else if (msg.status === 'failed') s.failed++;
+                        else if (msg.status === 'invalid') s.invalid++;
                         else s.pending++;
                     }
                 });
@@ -107,7 +109,7 @@ const CampaignMonitor: React.FC = () => {
                     stats.pending = 0;
                 }
 
-                const processed = stats.sent + stats.failed;
+                const processed = stats.sent + stats.failed + stats.invalid;
 
                 // Auto-marcar como completed se todos processados
                 if (stats.total > 0 && stats.pending === 0 && processed >= stats.total && c.status === 'active') {
@@ -286,14 +288,15 @@ const CampaignMonitor: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        type="button"
+                    <span
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => { e.stopPropagation(); fetchCampaigns(); }}
-                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                         title="Atualizar agora"
                     >
                         <RefreshCw size={14} />
-                    </button>
+                    </span>
                     {expanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                 </div>
             </button>
@@ -341,6 +344,10 @@ const CampaignMonitor: React.FC = () => {
                                                         className="bg-red-400 transition-all duration-500"
                                                         style={{ width: `${c.total > 0 ? (c.failed / c.total) * 100 : 0}%` }}
                                                     />
+                                                    <div
+                                                        className="bg-amber-400 transition-all duration-500"
+                                                        style={{ width: `${c.total > 0 ? (c.invalid / c.total) * 100 : 0}%` }}
+                                                    />
                                                 </div>
                                             </div>
                                             <span className="text-xs font-bold text-slate-600 tabular-nums w-10 text-right">
@@ -362,6 +369,12 @@ const CampaignMonitor: React.FC = () => {
                                                 <span className="flex items-center gap-1 text-red-500">
                                                     <XCircle size={11} />
                                                     <span className="font-bold">{c.failed}</span> falha{c.failed !== 1 ? 's' : ''}
+                                                </span>
+                                            )}
+                                            {c.invalid > 0 && (
+                                                <span className="flex items-center gap-1 text-amber-500">
+                                                    <AlertTriangle size={11} />
+                                                    <span className="font-bold">{c.invalid}</span> inválido{c.invalid !== 1 ? 's' : ''}
                                                 </span>
                                             )}
                                             {c.pending > 0 && (
@@ -487,7 +500,7 @@ const CampaignMonitor: React.FC = () => {
                 const config = dc.configuration || {};
                 const statusInfo = getCampaignStatusInfo(dc);
                 const progress = getProgressPercent(dc);
-                const processed = dc.sent + dc.failed;
+                const processed = dc.sent + dc.failed + dc.invalid;
                 const successRate = dc.total > 0 ? ((dc.sent / dc.total) * 100).toFixed(1) : '0';
 
                 const typeLabel = config.campaignType === 'simple' ? 'Disparo Simples'
@@ -545,7 +558,7 @@ const CampaignMonitor: React.FC = () => {
                                         <Activity size={13} />
                                         Estatísticas
                                     </h4>
-                                    <div className="grid grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-5 gap-3">
                                         <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
                                             <p className="text-xl font-black text-slate-800">{dc.total}</p>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Total</p>
@@ -557,6 +570,10 @@ const CampaignMonitor: React.FC = () => {
                                         <div className="bg-red-50 rounded-xl p-3 text-center border border-red-100">
                                             <p className="text-xl font-black text-red-600">{dc.failed}</p>
                                             <p className="text-[10px] font-bold text-red-400 uppercase mt-0.5">Falhas</p>
+                                        </div>
+                                        <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100">
+                                            <p className="text-xl font-black text-amber-600">{dc.invalid}</p>
+                                            <p className="text-[10px] font-bold text-amber-400 uppercase mt-0.5">Inválidos</p>
                                         </div>
                                         <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100">
                                             <p className="text-xl font-black text-blue-600">{dc.pending}</p>
@@ -578,6 +595,10 @@ const CampaignMonitor: React.FC = () => {
                                                     <div
                                                         className="bg-red-400 transition-all duration-500"
                                                         style={{ width: `${dc.total > 0 ? (dc.failed / dc.total) * 100 : 0}%` }}
+                                                    />
+                                                    <div
+                                                        className="bg-amber-400 transition-all duration-500"
+                                                        style={{ width: `${dc.total > 0 ? (dc.invalid / dc.total) * 100 : 0}%` }}
                                                     />
                                                 </div>
                                             </div>

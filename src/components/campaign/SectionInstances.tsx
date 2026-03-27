@@ -76,7 +76,7 @@ const SectionInstances: React.FC<Props> = ({ instances, setInstances }) => {
                 <div>
                     <h4 className="flex items-center gap-2 text-base font-bold text-slate-800">
                         <Smartphone className="text-slate-700" size={18} />
-                        4. Instâncias WhatsApp (Chips)
+                        5. Instâncias WhatsApp (Chips)
                     </h4>
                     <p className="text-slate-500 text-sm mt-1">Selecione as conexões que farão os disparos desta campanha.</p>
                 </div>

@@ -17,7 +17,7 @@ const SectionButtons: React.FC<Props> = ({ buttons, setButtons }) => {
     const dragOverItem = useRef<number | null>(null);
 
     const handleAdd = () => {
-        if (buttons.length >= 3) return; // Limite do WhatsApp = 3 botões
+        if (buttons.length >= 1) return; // Limite = 1 botão
         setButtons([...buttons, { id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(), text: '', url: '' }]);
     };
 
@@ -48,9 +48,9 @@ const SectionButtons: React.FC<Props> = ({ buttons, setButtons }) => {
                 <div>
                     <h4 className="flex items-center gap-2 text-base font-bold text-slate-800 mb-1">
                         <MousePointerClick className="text-slate-700" size={18} />
-                        6. Botões Interativos
+                        7. Botões Interativos
                     </h4>
-                    <p className="text-slate-500 text-sm">Aparecem no final da mensagem (Máximo 3 botões).</p>
+                    <p className="text-slate-500 text-sm">Aparece no final da mensagem (Máximo 1 botão).</p>
                 </div>
             </div>
 
@@ -105,7 +105,7 @@ const SectionButtons: React.FC<Props> = ({ buttons, setButtons }) => {
                 ))}
             </div>
 
-            {buttons.length < 3 && (
+            {buttons.length < 1 && (
                 <button 
                     type="button" 
                     onClick={handleAdd}

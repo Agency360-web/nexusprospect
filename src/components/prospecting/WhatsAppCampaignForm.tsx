@@ -305,19 +305,16 @@ const WhatsAppCampaignForm: React.FC = () => {
 
             console.log('Enviando dados para o webhook de teste...', webhookUrl);
 
-            const response = await fetch(webhookUrl, {
+            // Disparo assíncrono (Fire and Forget) para evitar timeouts na tela
+            fetch(webhookUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),
-            });
+            }).catch(e => console.log('Fetch request completed or timeout as expected:', e));
 
-            if (!response.ok) {
-                throw new Error(`Falha no envio do webhook: ${response.statusText}`);
-            }
-
-            console.log('Webhook disparado com sucesso!', await response.text());
+            console.log('Campanha enviada para a fila do n8n (Assíncrono).');
 
             setSuccess(true);
 

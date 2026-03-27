@@ -28,6 +28,7 @@ interface CampaignStat {
     created_at: string;
     sent_count: number;
     failed_count: number;
+    invalid_count: number;
     total_leads: number;
 }
 
@@ -81,9 +82,9 @@ const Dashboard: React.FC = () => {
 
 
             // Step 3: Aggregate stats per campaign (same as CampaignMonitor)
-            const statsMap: Record<string, { total: number; sent: number; failed: number; pending: number }> = {};
+            const statsMap: Record<string, { total: number; sent: number; failed: number; invalid: number; pending: number }> = {};
             campaignIds.forEach(id => {
-                statsMap[id] = { total: 0, sent: 0, failed: 0, pending: 0 };
+                statsMap[id] = { total: 0, sent: 0, failed: 0, invalid: 0, pending: 0 };
             });
 
             if (messagesData) {
@@ -93,6 +94,7 @@ const Dashboard: React.FC = () => {
                         s.total++;
                         if (msg.status === 'sent') s.sent++;
                         else if (msg.status === 'failed') s.failed++;
+                        else if (msg.status === 'invalid') s.invalid++;
                         else s.pending++;
                     }
                 });
@@ -117,6 +119,7 @@ const Dashboard: React.FC = () => {
                     created_at: c.created_at,
                     sent_count: stats.sent,
                     failed_count: stats.failed,
+                    invalid_count: stats.invalid,
                     total_leads: stats.total,
                 };
             });
@@ -147,19 +150,22 @@ const Dashboard: React.FC = () => {
         // KPIs calculation based on filtered data
         let totalSent = 0;
         let totalFailed = 0;
+        let totalInvalid = 0;
         let actives = 0;
 
         filtered.forEach(c => {
             totalSent += (c.sent_count || 0);
             totalFailed += (c.failed_count || 0);
+            totalInvalid += (c.invalid_count || 0);
             if (c.status === 'active' || c.status === 'in_progress') {
                 actives++;
             }
         });
 
-        const totalProcessed = totalSent + totalFailed;
+        const totalProcessed = totalSent + totalFailed + totalInvalid;
         const successRate = totalProcessed > 0 ? (totalSent / totalProcessed) * 100 : 0;
         const failRate = totalProcessed > 0 ? (totalFailed / totalProcessed) * 100 : 0;
+        const invalidRate = totalProcessed > 0 ? (totalInvalid / totalProcessed) * 100 : 0;
 
         // Chart Data Calculation
         let chartAggr: any[] = [];
@@ -227,7 +233,8 @@ const Dashboard: React.FC = () => {
                 totalDisparos: totalProcessed,
                 campanhasAtivas: actives,
                 taxaSucesso: successRate,
-                taxaFalha: failRate
+                taxaFalha: failRate,
+                totalInvalidos: totalInvalid
             }
         };
     }, [campaigns, timeFilter]);

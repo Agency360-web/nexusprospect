@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Megaphone, Settings2, Play, Save, Loader2, Clock, ChevronLeft, Video, Phone, MoreVertical, CheckCheck } from 'lucide-react';
+import { User, Megaphone, Settings2, Play, Save, Loader2, Clock, ChevronLeft, Video, Phone, MoreVertical, CheckCheck, Building2, Folder, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
 import SectionInstances, { WhatsAppInstance } from './SectionInstances';
 import SectionMessageLibrary, { MessageLibraryType } from './SectionMessageLibrary';
 import SectionButtons, { InteractiveButton } from './SectionButtons';
@@ -34,7 +35,18 @@ const CampaignConfiguratorProV2: React.FC = () => {
     });
     const [buttons, setButtons] = useState<InteractiveButton[]>([]);
 
+    // === ESTADOS: CLIENTE / PASTA / LEADS ===
+    const [clients, setClients] = useState<any[]>([]);
+    const [folders, setFolders] = useState<any[]>([]);
+    const [leads, setLeads] = useState<any[]>([]);
+    const [selectedClientId, setSelectedClientId] = useState<string>('');
+    const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+    const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [leadsPerPage, setLeadsPerPage] = useState(20);
+
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
     const [previewText, setPreviewText] = useState('');
 
     const generatePreview = () => {
@@ -77,6 +89,76 @@ const CampaignConfiguratorProV2: React.FC = () => {
         generatePreview();
     }, [messageLibrary, prospectorName, prospectorCompany, prospectorRole, productService, campaignPromise, campaignNiche]);
 
+    // === FETCH: Clientes ===
+    useEffect(() => {
+        const fetchClients = async () => {
+            if (!user) return;
+            const { data, error } = await supabase
+                .from('clients')
+                .select('id, name')
+                .eq('user_id', user.id)
+                .order('name');
+            if (!error && data) setClients(data);
+        };
+        fetchClients();
+    }, [user]);
+
+    // === FETCH: Pastas e Leads ===
+    useEffect(() => {
+        const fetchFoldersAndLeads = async () => {
+            if (!selectedClientId) {
+                setFolders([]);
+                setLeads([]);
+                return;
+            }
+            const { data: folderData } = await supabase
+                .from('lead_folders')
+                .select('id, name')
+                .eq('client_id', selectedClientId);
+            setFolders(folderData || []);
+
+            let query = supabase.from('leads').select('id, name, company, phone, website, address, rating, reviews, specialties').eq('client_id', selectedClientId).order('name');
+            if (selectedFolderId) {
+                query = query.eq('folder_id', selectedFolderId);
+            }
+            const { data: leadsData } = await query;
+            setLeads(leadsData || []);
+            setSelectedLeads([]);
+            setCurrentPage(1);
+        };
+        fetchFoldersAndLeads();
+    }, [selectedClientId, selectedFolderId]);
+
+    // === HELPERS: Seleção de Leads ===
+    const toggleLeadSelection = (leadId: string) => {
+        setSelectedLeads(prev =>
+            prev.includes(leadId) ? prev.filter(id => id !== leadId) : [...prev, leadId]
+        );
+    };
+    const selectAllLeads = () => {
+        if (selectedLeads.length === leads.length && leads.length > 0) {
+            setSelectedLeads([]);
+        } else {
+            setSelectedLeads(leads.map(l => l.id));
+        }
+    };
+    const selectLeadsBatch = (count: number) => {
+        const unselectedLeads = leads.filter(l => !selectedLeads.includes(l.id));
+        const toSelect = unselectedLeads.slice(0, count).map(l => l.id);
+        setSelectedLeads(prev => [...prev, ...toSelect]);
+    };
+    const currentPageLeads = leads.slice((currentPage - 1) * leadsPerPage, currentPage * leadsPerPage);
+    const currentPageLeadIds = currentPageLeads.map(l => l.id);
+    const allCurrentPageSelected = currentPageLeads.length > 0 && currentPageLeadIds.every(id => selectedLeads.includes(id));
+    const toggleSelectCurrentPage = () => {
+        if (allCurrentPageSelected) {
+            setSelectedLeads(prev => prev.filter(id => !currentPageLeadIds.includes(id)));
+        } else {
+            const toAdd = currentPageLeadIds.filter(id => !selectedLeads.includes(id));
+            setSelectedLeads(prev => [...prev, ...toAdd]);
+        }
+    };
+
     const cleanPhone = (phone: string) => {
         if (!phone) return '';
         return phone.replace(/\D/g, '');
@@ -102,9 +184,68 @@ const CampaignConfiguratorProV2: React.FC = () => {
 
             const activeInstances = instances.filter(i => i.active);
 
+            // Buscar dados completos dos leads selecionados
+            const fullSelectedLeads = selectedLeads
+                .map(id => leads.find(l => l.id === id))
+                .filter(Boolean);
+
+            const currentFolder = selectedFolderId ? folders.find(f => f.id === selectedFolderId) : null;
+            const currentClient = selectedClientId ? clients.find(c => c.id === selectedClientId) : null;
+
+            // 1. Criar campanha no Supabase
+            const { data: campaignData, error: dbError } = await supabase
+                .from('campaigns')
+                .insert([{
+                    name: campaignName,
+                    status: 'active',
+                    type: 'whatsapp_pro_v2',
+                    user_id: user?.id,
+                    configuration: {
+                        campaignType: 'pro-v2',
+                        prospector: { name: prospectorName, company: prospectorCompany, role: prospectorRole },
+                        product: productService,
+                        promise: campaignPromise,
+                        niche: campaignNiche,
+                        dispatch: { startTime, endTime, roundLimit, minDelay, maxDelay },
+                        selectedLeadsCount: fullSelectedLeads.length,
+                        clientId: selectedClientId,
+                        folderId: selectedFolderId || null,
+                    }
+                }])
+                .select()
+                .single();
+
+            if (dbError) {
+                console.error('Erro ao salvar campanha no banco:', dbError);
+            }
+
+            // 2. Inserir campaign_messages com status 'pending'
+            if (campaignData?.id && fullSelectedLeads.length > 0) {
+                const messagesToInsert = fullSelectedLeads.map((lead: any) => ({
+                    campaign_id: campaignData.id,
+                    lead_id: lead.id,
+                    lead_name: lead.name || null,
+                    lead_phone: lead.phone || null,
+                    status: 'pending',
+                }));
+
+                const batchSize = 100;
+                for (let i = 0; i < messagesToInsert.length; i += batchSize) {
+                    const batch = messagesToInsert.slice(i, i + batchSize);
+                    const { error: msgError } = await supabase
+                        .from('campaign_messages')
+                        .insert(batch);
+                    if (msgError) {
+                        console.error('Erro ao inserir campaign_messages (batch):', msgError);
+                    }
+                }
+                console.log(`Inseridos ${messagesToInsert.length} registros de campaign_messages como pending.`);
+            }
+
             const payload = {
                 // === METADADOS ===
                 userId: user?.id || '',
+                campaignId: campaignData?.id || null,
                 timestamp: new Date().toISOString(),
                 version: '2.0-pro',
 
@@ -116,7 +257,7 @@ const CampaignConfiguratorProV2: React.FC = () => {
                     identificationMode,
                     formattedIdentification: previewText.split('\n\n')[0]
                 },
-                saudacao1: prospectorName, // Para compatibilidade com o N8N
+                saudacao1: prospectorName,
 
                 // === MENSAGENS E BOTÕES ===
                 ident: messageLibrary.greeting.map(i => replaceVars(i.text)),
@@ -153,25 +294,27 @@ const CampaignConfiguratorProV2: React.FC = () => {
                     instanceName: i.instanceName,
                     token: i.token
                 })),
-                leads: {
-                    fileName: '',
-                    mapping: { name: '', phone: '' },
-                    totalLeads: 0,
-                    data: []
-                }
+
+                // === CLIENTE / PASTA / LEADS ===
+                clientId: selectedClientId || null,
+                clientName: currentClient?.name || null,
+                folderId: selectedFolderId || null,
+                folderName: currentFolder?.name || 'Todas as Pastas',
+                selectedLeads: fullSelectedLeads,
+                totalLeads: fullSelectedLeads.length,
             };
 
             const WEBHOOK_URL = 'https://nexus360.infra-conectamarketing.site/webhook/b997708c-4ed3-4106-a3ed-88ff9e843816';
 
-            const response = await fetch(WEBHOOK_URL, {
+            // Disparo assíncrono (Fire and Forget)
+            fetch(WEBHOOK_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            });
+            }).catch(e => console.log('Fetch request completed or timeout as expected:', e));
 
-            if (!response.ok) throw new Error('Falha ao enviar para o webhook');
-
-            alert('Campanha enviada com sucesso para o N8N!');
+            setSubmitSuccess(true);
+            setTimeout(() => setSubmitSuccess(false), 4000);
         } catch (error) {
             console.error(error);
             alert('Ocorreu um erro ao enviar a campanha. Verifique o console.');
@@ -335,6 +478,172 @@ const CampaignConfiguratorProV2: React.FC = () => {
 
                 </section>
 
+                {/* SEÇÃO: Seleção de Cliente / Pasta / Leads */}
+                <section id="sec-leads" className="bg-white border border-slate-200 rounded-lg p-6">
+                    <h4 className="flex items-center gap-2 text-base font-bold text-slate-800 mb-4">
+                        <Users className="text-slate-700" size={18} />
+                        4. Selecionar Leads
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                                <Building2 size={12} /> Cliente *
+                            </label>
+                            <select
+                                value={selectedClientId}
+                                onChange={(e) => {
+                                    setSelectedClientId(e.target.value);
+                                    setSelectedFolderId('');
+                                }}
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium"
+                            >
+                                <option value="">Selecione um cliente...</option>
+                                {clients.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                                <Folder size={12} /> Pasta de Leads (Opcional)
+                            </label>
+                            <select
+                                value={selectedFolderId}
+                                onChange={(e) => setSelectedFolderId(e.target.value)}
+                                disabled={!selectedClientId}
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-medium disabled:opacity-50"
+                            >
+                                <option value="">Todas as Pastas</option>
+                                {folders.map(f => (
+                                    <option key={f.id} value={f.id}>{f.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Toolbar de seleção de leads */}
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-slate-500">
+                            {leads.length} lead{leads.length !== 1 ? 's' : ''} encontrado{leads.length !== 1 ? 's' : ''}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                                {[20, 50, 100].map(n => (
+                                    <button
+                                        key={n}
+                                        type="button"
+                                        onClick={() => { setLeadsPerPage(n); setCurrentPage(1); }}
+                                        className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all ${leadsPerPage === n
+                                            ? 'bg-white text-slate-800 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        {n}
+                                    </button>
+                                ))}
+                                <span className="text-[10px] text-slate-400 pr-1">/ pág</span>
+                            </div>
+                            {selectedLeads.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedLeads([])}
+                                    className="text-[10px] font-bold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 py-1 px-2.5 rounded-md transition-colors"
+                                >
+                                    Desmarcar ({selectedLeads.length})
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={toggleSelectCurrentPage}
+                                className={`text-[10px] font-bold py-1 px-2.5 rounded-md transition-colors ${allCurrentPageSelected
+                                    ? 'text-slate-900 bg-[#F9C300] hover:bg-[#E6B400]'
+                                    : 'text-slate-700 bg-slate-100 hover:bg-slate-200'
+                                }`}
+                            >
+                                {allCurrentPageSelected ? `Pág ${currentPage} ✓` : `Pág ${currentPage}`}
+                            </button>
+                            {[20, 50, 100].map(n => (
+                                <button
+                                    key={`sel-${n}`}
+                                    type="button"
+                                    onClick={() => selectLeadsBatch(n)}
+                                    disabled={selectedLeads.length >= leads.length}
+                                    className="text-[10px] font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 py-1 px-2 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    +{n}
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={selectAllLeads}
+                                className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 py-1 px-2.5 rounded-md transition-colors"
+                            >
+                                {selectedLeads.length === leads.length && leads.length > 0 ? 'Todos ✓' : 'Todos'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Lista de leads */}
+                    <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden max-h-[400px] overflow-y-auto">
+                        {leads.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400 text-sm">
+                                {selectedClientId ? 'Nenhum lead encontrado nesta pasta.' : 'Selecione um cliente para ver os leads.'}
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-slate-100">
+                                {currentPageLeads.map((lead) => (
+                                    <label key={lead.id} className="flex items-center gap-3 py-2 px-3 hover:bg-white cursor-pointer transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedLeads.includes(lead.id)}
+                                            onChange={() => toggleLeadSelection(lead.id)}
+                                            className="w-4 h-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500/50"
+                                        />
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-sm text-slate-800 truncate">{lead.name || 'Lead sem nome'}</p>
+                                            <p className="text-[11px] font-medium text-slate-400 truncate">
+                                                {lead.company && <span className="mr-2">{lead.company}</span>}
+                                                {lead.phone && <span>{lead.phone}</span>}
+                                            </p>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Paginação */}
+                    {leads.length > leadsPerPage && (
+                        <div className="flex items-center justify-center gap-1.5 mt-3">
+                            <button type="button" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="text-[10px] font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 py-1 px-2.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed">← Anterior</button>
+                            {Array.from({ length: Math.ceil(leads.length / leadsPerPage) }, (_, i) => i + 1)
+                                .filter(p => {
+                                    const total = Math.ceil(leads.length / leadsPerPage);
+                                    if (total <= 7) return true;
+                                    if (p === 1 || p === total) return true;
+                                    if (Math.abs(p - currentPage) <= 1) return true;
+                                    return false;
+                                })
+                                .map((p, idx, arr) => (
+                                    <React.Fragment key={p}>
+                                        {idx > 0 && arr[idx - 1] !== p - 1 && (
+                                            <span className="text-[10px] text-slate-300 px-1">…</span>
+                                        )}
+                                        <button type="button" onClick={() => setCurrentPage(p)} className={`text-[10px] font-bold w-7 h-7 rounded-md transition-all ${currentPage === p ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>
+                                            {p}
+                                        </button>
+                                    </React.Fragment>
+                                ))}
+                            <button type="button" onClick={() => setCurrentPage(p => Math.min(Math.ceil(leads.length / leadsPerPage), p + 1))} disabled={currentPage === Math.ceil(leads.length / leadsPerPage)} className="text-[10px] font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 py-1 px-2.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Próximo →</button>
+                        </div>
+                    )}
+
+                    <p className="text-[11px] font-semibold text-slate-500 mt-2 text-right">
+                        {selectedLeads.length} de {leads.length} leads selecionados
+                    </p>
+                </section>
+
                 {/* NOVAS SEÇÕES */}
                 <SectionInstances instances={instances} setInstances={setInstances} />
                 <SectionMessageLibrary
@@ -357,15 +666,21 @@ const CampaignConfiguratorProV2: React.FC = () => {
                     <button
                         type="button"
                         onClick={handleSubmit}
-                        disabled={isSubmitting}
-                        className="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-lg shadow-lg shadow-slate-900/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed group"
+                        disabled={isSubmitting || submitSuccess}
+                        className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all flex items-center justify-center gap-2 text-sm disabled:cursor-not-allowed group ${
+                            submitSuccess
+                                ? 'bg-emerald-600 shadow-emerald-600/20 text-white'
+                                : 'bg-slate-900 hover:bg-black shadow-slate-900/20 text-white disabled:opacity-70'
+                        }`}
                     >
                         {isSubmitting ? (
                             <Loader2 className="animate-spin text-[#F9C300]" size={18} />
+                        ) : submitSuccess ? (
+                            <CheckCheck className="text-white" size={18} />
                         ) : (
                             <Save className="text-[#F9C300] group-hover:scale-110 transition-transform" size={18} />
                         )}
-                        {isSubmitting ? 'Gerando e Enviando...' : 'Salvar e Iniciar Campanha'}
+                        {isSubmitting ? 'Gerando e Enviando...' : submitSuccess ? '✓ Campanha Criada com Sucesso!' : 'Salvar e Iniciar Campanha'}
                     </button>
                     <p className="text-center text-[10px] text-slate-400 mt-2 font-medium uppercase tracking-wider"></p>
                 </div>

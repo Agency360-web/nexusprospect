@@ -250,7 +250,7 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
             <div className="mb-4">
                 <h4 className="flex items-center gap-2 text-base font-bold text-slate-800 mb-1">
                     <BookOpen className="text-slate-700" size={18} />
-                    5. Biblioteca de Mensagens (Variações)
+                    6. Biblioteca de Mensagens (Variações)
                 </h4>
                 <p className="text-slate-500 text-sm">O N8N fará o spintax misturando um bloco de cada categoria. Use as <strong>Sugestões</strong> para adicionar modelos prontos.</p>
             </div>
