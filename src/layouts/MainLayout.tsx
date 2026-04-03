@@ -14,6 +14,7 @@ import {
     Bot,
     Plus,
     Target,
+    Wrench,
 
 } from 'lucide-react';
 import { useRBAC } from '../hooks/useRBAC';
@@ -141,6 +142,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 icon={<Target size={20} />}
                                 label="Prospecção"
                                 active={location.pathname.startsWith('/prospecting')}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
+                        {canAccess('clients') && (
+                            <SidebarItem
+                                to="/tools"
+                                icon={<Wrench size={20} />}
+                                label="Ferramentas"
+                                active={location.pathname.startsWith('/tools')}
                                 isCollapsed={isCollapsed}
                             />
                         )}

@@ -15,6 +15,9 @@ const AiAgents = lazy(() => import('./pages/AiAgents'));
 const Prospecting = lazy(() => import('./pages/Prospecting'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const AdministrationDashboard = lazy(() => import('./pages/Administration'));
+const ToolsManager = lazy(() => import('./pages/ToolsManager'));
+const WhatsAppVerifier = lazy(() => import('./pages/tools/WhatsAppVerifier'));
+const ContactSynchronizer = lazy(() => import('./pages/tools/ContactSynchronizer'));
 
 // Components for nested routing
 const WhatsAppCampaignForm = lazy(() => import('./components/prospecting/WhatsAppCampaignForm'));
@@ -95,6 +98,27 @@ const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <AdministrationDashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/tools" element={
+              <ProtectedRoute>
+                <Layout>
+                  <ToolsManager />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/tools/whatsapp-verifier" element={
+              <ProtectedRoute>
+                <Layout>
+                  <WhatsAppVerifier />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/tools/contact-synchronizer" element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContactSynchronizer />
                 </Layout>
               </ProtectedRoute>
             } />
