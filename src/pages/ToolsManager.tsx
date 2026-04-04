@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ToolHeader from '../components/tools/ToolHeader';
 import ToolList, { ToolItem } from '../components/tools/ToolList';
-import { Smartphone, RefreshCw } from 'lucide-react';
+import { Smartphone, RefreshCw, UploadCloud } from 'lucide-react';
 
 const TOOLS_DATA: ToolItem[] = [
     {
@@ -15,10 +15,18 @@ const TOOLS_DATA: ToolItem[] = [
     {
         id: 'contact-synchronizer',
         name: 'Sincronizador de Contatos',
-        description: 'Importe os contatos do WhatsApp diretamente para uma pasta dentro da Nexus.',
+        description: 'Importe os contatos do WhatsApp diretamente para uma pasta dentro da Nexus360.',
         status: 'active',
         path: '/tools/contact-synchronizer',
         icon: <RefreshCw size={20} />
+    },
+    {
+        id: 'contact-exporter',
+        name: 'Exportador de Contatos',
+        description: 'Exporte leads selecionados da Nexus360 para o seu WhatsApp.',
+        status: 'active',
+        path: '/tools/contact-exporter',
+        icon: <UploadCloud size={20} />
     }
 ];
 
