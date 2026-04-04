@@ -19,6 +19,7 @@ const ToolsManager = lazy(() => import('./pages/ToolsManager'));
 const WhatsAppVerifier = lazy(() => import('./pages/tools/WhatsAppVerifier'));
 const ContactSynchronizer = lazy(() => import('./pages/tools/ContactSynchronizer'));
 const ContactExporter = lazy(() => import('./pages/tools/ContactExporter'));
+const GroupExtractor = lazy(() => import('./pages/tools/GroupExtractor'));
 
 // Components for nested routing
 const WhatsAppCampaignForm = lazy(() => import('./components/prospecting/WhatsAppCampaignForm'));
@@ -127,6 +128,13 @@ const App: React.FC = () => {
               <ProtectedRoute>
                 <Layout>
                   <ContactExporter />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/tools/group-extractor" element={
+              <ProtectedRoute>
+                <Layout>
+                  <GroupExtractor />
                 </Layout>
               </ProtectedRoute>
             } />

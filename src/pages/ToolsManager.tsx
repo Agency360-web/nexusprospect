@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ToolHeader from '../components/tools/ToolHeader';
 import ToolList, { ToolItem } from '../components/tools/ToolList';
-import { Smartphone, RefreshCw, UploadCloud } from 'lucide-react';
+import { Smartphone, RefreshCw, UploadCloud, Users } from 'lucide-react';
 
 const TOOLS_DATA: ToolItem[] = [
     {
@@ -27,6 +27,14 @@ const TOOLS_DATA: ToolItem[] = [
         status: 'active',
         path: '/tools/contact-exporter',
         icon: <UploadCloud size={20} />
+    },
+    {
+        id: 'group-extractor',
+        name: 'Extrator de Grupos',
+        description: 'Faça a extração de leads dos grupos do WhatsApp com a Nexus360.',
+        status: 'active',
+        path: '/tools/group-extractor',
+        icon: <Users size={20} />
     }
 ];
 

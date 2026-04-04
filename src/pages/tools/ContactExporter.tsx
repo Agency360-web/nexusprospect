@@ -333,7 +333,7 @@ export const ContactExporter: React.FC = () => {
                         <ArrowLeft size={24} />
                     </button>
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight flex items-center gap-3">
+                        <h1 className="text-3xl font-black mb-2 tracking-tight flex items-center gap-3">
                             <UploadCloud className="text-brand-500" size={32} />
                             Exportador de Contatos
                         </h1>
