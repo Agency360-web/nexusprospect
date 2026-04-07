@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ToolHeader from '../components/tools/ToolHeader';
 import ToolList, { ToolItem } from '../components/tools/ToolList';
-import { Smartphone, RefreshCw, UploadCloud, Users } from 'lucide-react';
+import { Smartphone, RefreshCw, UploadCloud, Users, Flame } from 'lucide-react';
 
 const TOOLS_DATA: ToolItem[] = [
     {
@@ -35,6 +35,14 @@ const TOOLS_DATA: ToolItem[] = [
         status: 'active',
         path: '/tools/group-extractor',
         icon: <Users size={20} />
+    },
+    {
+        id: 'whatsapp-heater',
+        name: 'Aquecedor de WhatsApp',
+        description: 'Faça o aquecimento de instâncias conectadas simulando interações humanas para aumentar reputação.',
+        status: 'active',
+        path: '/tools/whatsapp-heater',
+        icon: <Flame size={20} />
     }
 ];
 
