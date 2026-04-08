@@ -18,6 +18,7 @@ interface AuthContextType {
     loading: boolean;
     isAdmin: boolean;
     isStarter: boolean;
+    maxAgents: number;
     signOut: () => Promise<void>;
 }
 
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     isAdmin: false,
     isStarter: true,
+    maxAgents: 1,
     signOut: async () => { },
 });
 
@@ -91,9 +93,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Helpers de plano
     const isAdmin = useMemo(() => user?.email === 'marketing@conectaperformance.com.br', [user?.email]);
+    
     const isStarter = useMemo(() => {
         if (isAdmin) return false;
         return profile?.plan_id === 'starter' || !profile?.plan_id;
+    }, [isAdmin, profile?.plan_id]);
+
+    const maxAgents = useMemo(() => {
+        if (isAdmin) return 100;
+        switch (profile?.plan_id) {
+            case 'starter': return 1;
+            case 'pro': return 3;
+            case 'business': return 5;
+            case 'enterprise': return 10;
+            default: return 1;
+        }
     }, [isAdmin, profile?.plan_id]);
 
     // Memoize context value to prevent unnecessary re-renders
@@ -104,8 +118,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         isAdmin,
         isStarter,
+        maxAgents,
         signOut
-    }), [session, user, profile, loading, isAdmin, isStarter, signOut]);
+    }), [session, user, profile, loading, isAdmin, isStarter, maxAgents, signOut]);
 
     return (
         <AuthContext.Provider value={value}>

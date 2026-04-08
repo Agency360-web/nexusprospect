@@ -1,420 +1,470 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Bot, Save, Loader2, AlertTriangle, CheckCircle2, Send, MessageCircle, RefreshCw, Lock } from 'lucide-react';
+import { Bot, Plus, Search, Loader2, MessageCircle, Send, ExternalLink, Trash2, Circle, ArrowLeft, Smartphone } from 'lucide-react';
+import AgentForm from '../components/tools/AgentForm';
 
 type AgentType = 'dispatch' | 'support';
+type ViewMode = 'list' | 'edit';
 
-interface AgentSettings {
-    id?: string;
-    is_active_dispatch: boolean;
-    is_active_support: boolean;
+interface Agent {
+    id: string;
     agent_name: string;
-    use_custom_initial_message: boolean;
-    initial_message: string;
+    type: AgentType;
+    is_active: boolean;
+    status: string;
+    prompt: string;
     language: string;
     temperature: number;
     provider: string;
     model: string;
-    prompt_dispatch: string;
-    prompt_support: string;
-    prompt_followup: string;
+    use_custom_initial_message: boolean;
+    initial_message: string;
+    api_key: string;
+    max_tokens: number;
+    diversity_level: number;
+    frequency_penalty: number;
+    presence_penalty: number;
+    sign_messages: boolean;
+    read_messages: boolean;
+    whatsapp_instance_id: string;
+    whatsapp_instance_name: string;
+    whatsapp_number?: string;
+    isSyncing?: boolean;
 }
 
-const AGENT_TYPES: { id: AgentType; label: string; description: string; icon: React.ElementType }[] = [
-    { id: 'dispatch', label: 'Agente de Disparo', description: 'Personalize o agente para campanhas de envio de mensagens.', icon: Send },
-    { id: 'support', label: 'Agente de Atendimento', description: 'Personalize o agente para atendimento ao cliente via WhatsApp.', icon: MessageCircle },
-];
-
-const PROMPT_COLUMN: Record<AgentType, keyof AgentSettings> = {
-    dispatch: 'prompt_dispatch',
-    support: 'prompt_support',
-};
-
-const defaultSettings: AgentSettings = {
-    is_active_dispatch: false,
-    is_active_support: false,
-    agent_name: '',
-    use_custom_initial_message: false,
-    initial_message: '',
-    language: 'pt-BR',
-    temperature: 0.7,
-    provider: 'openai',
-    model: 'gpt-3.5-turbo',
-    prompt_dispatch: '',
-    prompt_support: '',
-    prompt_followup: '',
-};
-
 const AiAgents: React.FC = () => {
-    const { user, isStarter } = useAuth();
-    const [selectedAgentType, setSelectedAgentType] = useState<AgentType | ''>('');
+    const { user, profile, maxAgents } = useAuth();
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [whatsappInstances, setWhatsappInstances] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-    const [settings, setSettings] = useState<AgentSettings>({ ...defaultSettings });
+    const [isCreating, setIsCreating] = useState(false);
+    
+    // New Creation State
+    const [selectedInstanceId, setSelectedInstanceId] = useState<string>('');
+    const [newAgentName, setNewAgentName] = useState<string>('');
+
+    const [view, setView] = useState<ViewMode>('list');
+    const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     useEffect(() => {
-        if (user) fetchSettings();
+        if (user) {
+            fetchAgents();
+            fetchInstances();
+        }
     }, [user]);
 
-    const fetchSettings = async () => {
+    const fetchAgents = async () => {
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from('ai_agent_settings')
                 .select('*')
                 .eq('user_id', user!.id)
-                .maybeSingle();
+                .order('created_at', { ascending: false });
 
-            if (error && error.code !== 'PGRST116') throw error;
-
-            if (data) {
-                setSettings({
-                    id: data.id,
-                    is_active_dispatch: data.is_active_dispatch || false,
-                    is_active_support: data.is_active_support || false,
-                    agent_name: data.agent_name || '',
-                    use_custom_initial_message: data.use_custom_initial_message || false,
-                    initial_message: data.initial_message || '',
-                    language: data.language || 'pt-BR',
-                    temperature: data.temperature ?? 0.7,
-                    provider: data.provider || 'openai',
-                    model: data.model || 'gpt-3.5-turbo',
-                    prompt_dispatch: data.prompt_dispatch || '',
-                    prompt_support: data.prompt_support || '',
-                    prompt_followup: data.prompt_followup || '',
-                });
-            }
-        } catch (err: any) {
-            console.error('Error fetching agent settings:', err);
-            setMessage({ type: 'error', text: 'Não foi possível carregar as configurações do agente.' });
+            if (error) throw error;
+            setAgents(data || []);
+        } catch (err) {
+            console.error('Error fetching agents:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    const currentPromptKey = selectedAgentType ? PROMPT_COLUMN[selectedAgentType] : null;
-    const currentPromptValue = currentPromptKey ? (settings[currentPromptKey] as string) : '';
-
-    const updatePrompt = (value: string) => {
-        if (!currentPromptKey) return;
-        setSettings(prev => ({ ...prev, [currentPromptKey]: value }));
-    };
-
-    const currentActiveKey: keyof AgentSettings | null =
-        selectedAgentType === 'dispatch' ? 'is_active_dispatch' :
-            selectedAgentType === 'support' ? 'is_active_support' : null;
-
-    const handleSave = async () => {
-        if (!user || !selectedAgentType) return;
-
+    const fetchInstances = async () => {
         try {
-            setSaving(true);
-            setMessage(null);
-
-            const payload = {
-                is_active_dispatch: settings.is_active_dispatch,
-                is_active_support: settings.is_active_support,
-                agent_name: settings.agent_name,
-                use_custom_initial_message: settings.use_custom_initial_message,
-                initial_message: settings.use_custom_initial_message ? settings.initial_message : '',
-                language: settings.language,
-                temperature: settings.temperature,
-                provider: settings.provider,
-                model: settings.model,
-                prompt_dispatch: settings.prompt_dispatch,
-                prompt_support: settings.prompt_support,
-                prompt_followup: settings.prompt_followup,
-                updated_at: new Date().toISOString(),
-            };
-
-            let query;
-            if (settings.id) {
-                query = supabase
-                    .from('ai_agent_settings')
-                    .update(payload)
-                    .eq('id', settings.id);
-            } else {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('organization_id')
-                    .eq('id', user.id)
-                    .single();
-
-                query = supabase
-                    .from('ai_agent_settings')
-                    .insert({
-                        ...payload,
-                        organization_id: profile?.organization_id || null,
-                        user_id: user.id,
-                    });
-            }
-
-            const { error } = await query;
+            const { data, error } = await supabase
+                .from('whatsapp_connections')
+                .select('*')
+                .order('created_at', { ascending: false });
             if (error) throw error;
-
-            // Se for Agente de Atendimento, notificar o webhook do N8N com todas as instâncias
-            if (selectedAgentType === 'support') {
-                try {
-                    // Buscar todas as instâncias conectadas do usuário
-                    const { data: connections } = await supabase
-                        .from('whatsapp_connections')
-                        .select('instance, token, phone_number, profile_name, status')
-                        .eq('user_id', user.id);
-
-                    const allInstances = (connections || []).map(conn => ({
-                        instance: conn.instance,
-                        token: conn.token,
-                        phoneNumber: conn.phone_number,
-                        profileName: conn.profile_name,
-                        status: conn.status,
-                    }));
-
-                    await fetch('https://nexus360.infra-conectamarketing.site/webhook/e30ccb57-e8ed-49a4-8915-4617d43e3724', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userId: user.id,
-                            agentType: 'support',
-                            is_active: settings.is_active_support,
-                            agent_name: settings.agent_name,
-                            prompt: settings.prompt_support,
-                            language: settings.language,
-                            instances: allInstances,
-                            instanceCount: allInstances.length,
-                        }),
-                    });
-                } catch (webhookErr) {
-                    console.warn('Webhook do agente de atendimento não respondeu:', webhookErr);
-                }
-            }
-
-            setMessage({ type: 'success', text: 'Configurações do agente salvas com sucesso!' });
-            setTimeout(() => setMessage(null), 3000);
-
-            if (!settings.id) fetchSettings();
-
-        } catch (err: any) {
-            console.error('Error saving agent settings:', err);
-            setMessage({ type: 'error', text: `Erro ao salvar: ${err.message}` });
-        } finally {
-            setSaving(false);
+            setWhatsappInstances(data || []);
+        } catch (err) {
+            console.error('Error fetching instances:', err);
         }
     };
 
-    const currentAgentLabel = AGENT_TYPES.find(a => a.id === selectedAgentType)?.label || 'Agente';
+    const handleCreateAgent = async () => {
+        if (!user || !selectedInstanceId || !newAgentName.trim()) return;
+        
+        if (agents.length >= maxAgents) {
+            alert(`Limite do plano atingido (${maxAgents} agentes)`);
+            return;
+        }
 
-    if (loading) {
+        const instance = whatsappInstances.find(i => String(i.id) === String(selectedInstanceId));
+        if (!instance) return;
+
+        try {
+            setIsCreating(true);
+            
+            // Generate a random text-based ID to avoid UUID conflicts with n8n
+            const randomId = 'ag_' + Math.random().toString(36).substring(2, 10);
+            
+            const newAgentData = {
+                id: randomId,
+                user_id: user.id,
+                organization_id: profile?.organization_id || null,
+                agent_name: newAgentName.trim(),
+                whatsapp_instance_id: String(instance.id),
+                whatsapp_instance_name: instance.instance || instance.profile_name,
+                whatsapp_number: instance.phone_number,
+                type: 'support',
+                is_active: false,
+                language: 'pt-BR',
+                temperature: 25,
+                provider: 'openai',
+                model: 'gpt-4o-mini',
+                prompt: "Você é um agente de suporte técnico. Forneça respostas curtas, claras e objetivas.",
+                api_key: "sk-proj-SuaChaveDaOpenAIAqui...",
+                max_tokens: 800,
+                diversity_level: 40,
+                frequency_penalty: 30,
+                presence_penalty: 15,
+                sign_messages: true,
+                read_messages: true,
+                use_custom_initial_message: false,
+                initial_message: '',
+            };
+
+            const { data, error } = await supabase
+                .from('ai_agent_settings')
+                .insert(newAgentData)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Supabase error:', error);
+                throw new Error(error.message || 'Erro ao inserir no banco de dados');
+            }
+
+            setAgents(prev => [{ ...data, isSyncing: true }, ...prev]);
+
+            // Webhook call matching the user request
+            let finalAgent = { ...data, isSyncing: false };
+            try {
+                const response = await fetch('https://nexus360.infra-conectamarketing.site/webhook/agente_criar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: data.agent_name,
+                        provider: data.provider,
+                        apikey: data.api_key,
+                        model: data.model,
+                        basePrompt: data.prompt,
+                        temperature: data.temperature,
+                        maxTokens: data.max_tokens,
+                        diversityLevel: data.diversity_level,
+                        frequencyPenalty: data.frequency_penalty,
+                        presencePenalty: data.presence_penalty,
+                        signMessages: data.sign_messages,
+                        readMessages: data.read_messages,
+                        whatsappInstanceId: data.whatsapp_instance_id,
+                        whatsappInstanceName: data.whatsapp_instance_name,
+                        whatsappNumber: data.whatsapp_number,
+                        instanceName: instance.instance || data.whatsapp_instance_name,
+                        instanceToken: instance.token,
+                        instanceId: instance.instance_id,
+                        instanceNumber: instance.phone_number
+                    }),
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (Array.isArray(result) && result.length > 0) {
+                        const webhookAgent = result[0];
+                        
+                        // Simplificamos: Não deletamos/reinserimos mais para não conflitar com o n8n.
+                        // Apenas atualizamos o estado local e os metadados se necessário.
+                        finalAgent = { ...data, ...webhookAgent, id: data.id, isSyncing: false };
+                        
+                        // Atualização opcional de metadados no Supabase (exceto ID)
+                        await supabase
+                            .from('ai_agent_settings')
+                            .update({
+                                agent_name: finalAgent.agent_name,
+                                prompt: finalAgent.prompt,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', data.id);
+                    }
+                }
+            } catch (webhookErr) {
+                console.warn('Webhook notification failed but agent was created:', webhookErr);
+            }
+
+            // Update local state with the final version from webhook (Official ID)
+            setAgents(prev => {
+                const filtered = prev.filter(a => a.id !== data.id);
+                return [{ ...finalAgent, isSyncing: false }, ...filtered];
+            });
+
+            setNewAgentName('');
+            setSelectedInstanceId('');
+        } catch (err: any) {
+            console.error('Full creation error:', err);
+            alert(`Erro ao criar novo agente: ${err.message || 'Erro desconhecido'}`);
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    const handleToggleStatus = async (id: string, currentStatus: boolean) => {
+        try {
+            // Optimistic update
+            setAgents(prev => prev.map(a => a.id === id ? { ...a, is_active: !currentStatus } : a));
+
+            const { error } = await supabase
+                .from('ai_agent_settings')
+                .update({ is_active: !currentStatus })
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error toggling status:', err);
+            // Rollback on error
+            setAgents(prev => prev.map(a => a.id === id ? { ...a, is_active: currentStatus } : a));
+            alert('Erro ao alterar status do agente');
+        }
+    };
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!confirm('Tem certeza que deseja excluir este agente?')) return;
+        try {
+            setDeletingId(id);
+            const { error } = await supabase
+                .from('ai_agent_settings')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+            setAgents(agents.filter(a => a.id !== id));
+        } catch (err) {
+            console.error('Error deleting agent:', err);
+            alert('Erro ao excluir agente');
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    const reachedLimit = agents.length >= maxAgents;
+
+    if (loading && agents.length === 0) {
         return (
             <div className="flex items-center justify-center p-20">
-                <Loader2 size={32} className="animate-spin text-[#ffd700]" />
+                <Loader2 size={32} className="animate-spin text-emerald-500" />
             </div>
         );
     }
 
+
     return (
         <div className="space-y-8 pb-20">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative shadow-2xl shadow-slate-900/10 mb-8">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 text-white p-8 rounded-3xl overflow-hidden relative shadow-2xl shadow-slate-900/10">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
-                <div className="relative z-10 text-center md:text-left">
-                    <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight flex flex-col md:flex-row items-center justify-center md:justify-start gap-3">
+                <div className="relative z-10">
+                    <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight flex items-center gap-3">
                         <Bot className="text-yellow-500" size={32} />
                         Agentes de IA
                     </h1>
                     <p className="text-slate-300 font-medium text-sm md:text-base">
-                        Selecione e personalize os agentes inteligentes da sua empresa.
+                        Crie e gerencie seus agentes inteligentes para automação de conversas.
                     </p>
+                </div>
+            </header>
+
+            {/* NEW Toolbar — Inline Creation Flow */}
+            <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="flex flex-col lg:flex-row items-center gap-4">
+                    {/* WhatsApp Instance Select */}
+                    <div className="flex-1 w-full relative group">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <Bot className="h-5 w-5 text-slate-400 group-focus-within:text-yellow-500 transition-colors" />
+                        </div>
+                        <select
+                            value={selectedInstanceId}
+                            onChange={(e) => setSelectedInstanceId(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-yellow-500/10 focus:border-yellow-500 outline-none transition-all appearance-none cursor-pointer"
+                        >
+                            <option value="">WhatsApp do Agente</option>
+                            {whatsappInstances.map(inst => {
+                                const isUsed = agents.some(a => String(a.whatsapp_instance_id) === String(inst.id));
+                                return (
+                                    <option key={inst.id} value={inst.id} disabled={isUsed}>
+                                        {inst.profile_name || inst.instance} {isUsed ? '— (Já possui agente)' : `(${inst.phone_number || 'Sem número'})`}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
+
+                    {/* Agent Name Input */}
+                    <div className="flex-1 w-full relative group">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <Circle className="h-4 w-4 text-slate-400 group-focus-within:text-yellow-500 transition-colors" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Nome do Agente"
+                            value={newAgentName}
+                            onChange={(e) => setNewAgentName(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-yellow-500/10 focus:border-yellow-500 outline-none transition-all"
+                        />
+                    </div>
+
+                    {/* Create Button */}
+                    {(() => {
+                        const isInstanceUsed = selectedInstanceId && agents.some(a => String(a.whatsapp_instance_id) === String(selectedInstanceId));
+                        const canCreate = !reachedLimit && !isCreating && selectedInstanceId && newAgentName.trim() && !isInstanceUsed;
+                        
+                        return (
+                            <button
+                                onClick={handleCreateAgent}
+                                disabled={!canCreate}
+                                className={`flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95 whitespace-nowrap w-full lg:w-auto h-[46px] ${
+                                    !canCreate
+                                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
+                                    : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20'
+                                }`}
+                            >
+                                {isCreating ? (
+                                    <Loader2 size={18} className="animate-spin" />
+                                ) : isInstanceUsed ? (
+                                    'Instância já em uso'
+                                ) : (
+                                    <Plus size={18} />
+                                )}
+                                {!isCreating && !isInstanceUsed && 'Criar novo Agente'}
+                                {!isCreating && isInstanceUsed && ''}
+                            </button>
+                        );
+                    })()}
                 </div>
             </div>
 
-            {/* Main Card */}
-            <div className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-slate-200">
-                <div className="mb-8">
-                    <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-                        <Bot className="text-brand-500" size={28} />
-                        Configuração do Agente
-                    </h2>
-                    <p className="text-slate-500 mt-2 font-medium">
-                        Selecione o tipo de agente que deseja personalizar e configure seu comportamento.
-                    </p>
+            {/* Agents List */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="grid grid-cols-[0.8fr_1.5fr_1.2fr_0.6fr_140px] gap-4 px-6 py-3 bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                    <div>Agente ID</div>
+                    <div>Nome do Agente</div>
+                    <div>WhatsApp do Agente</div>
+                    <div className="text-center">Status</div>
+                    <div className="w-[140px] text-right">Ações</div>
                 </div>
 
-                {/* Agent Type Selector */}
-                <div className="mb-10">
-                    <label className="block text-sm font-bold text-slate-700 mb-4">Selecione o Agente *</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {AGENT_TYPES.map(({ id, label, description, icon: Icon }) => {
-                            const isLocked = false;
+                <div className="divide-y divide-slate-100">
+                    {agents.map(agent => (
+                        <div
+                            key={agent.id}
+                            className="grid grid-cols-[0.8fr_1.5fr_1.2fr_0.6fr_140px] items-center gap-4 px-6 py-4 hover:bg-slate-50/50 transition-colors group"
+                        >
+                            {/* ID */}
+                            <div className="flex flex-col min-w-0">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                    {agent.isSyncing ? (
+                                        <div className="flex items-center gap-2 px-2 py-0.5 bg-emerald-50 rounded-md animate-pulse">
+                                            <Loader2 size={10} className="animate-spin text-emerald-500" />
+                                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">Gerando ID...</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] font-mono text-slate-400 tracking-tight">{agent.id}</span>
+                                    )}
+                                </div>
+                            </div>
 
-                            return (
+                            {/* Name */}
+                            <div className="min-w-0">
+                                <span className="text-xs font-bold text-slate-700 truncate block">{agent.agent_name || 'Agente sem nome'}</span>
+                            </div>
+
+                            {/* Linked WhatsApp */}
+                            <div className="min-w-0">
+                                <span className="text-[11px] font-medium text-slate-500 block">
+                                    {agent.whatsapp_number || agent.whatsapp_instance_name || 'Não vinculado'}
+                                </span>
+                            </div>
+
+                            {/* Status */}
+                            <div className="flex justify-center">
                                 <button
-                                    key={id}
-                                    type="button"
-                                    onClick={() => {
-                                        if (isLocked) return;
-                                        setSelectedAgentType(selectedAgentType === id ? '' : id);
-                                    }}
-                                    className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 ${isLocked ? 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-70' : selectedAgentType === id
-                                        ? 'border-slate-900 bg-slate-900 shadow-xl transform -translate-y-1'
-                                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                                        }`}
+                                    onClick={() => handleToggleStatus(agent.id, agent.is_active)}
+                                    className={`relative inline-flex h-5 w-10 items-center rounded-full transition-all duration-300 focus:outline-none shadow-inner ${
+                                        agent.is_active ? 'bg-emerald-500' : 'bg-slate-300'
+                                    }`}
                                 >
-                                    {isLocked && (
-                                        <div className="absolute top-3 right-3 bg-red-100 text-red-600 p-1.5 rounded-lg flex items-center justify-center shadow-sm">
-                                            <Lock size={14} />
-                                        </div>
-                                    )}
-                                    <Icon className={`mb-3 ${isLocked ? 'text-slate-300' : selectedAgentType === id ? 'text-yellow-500' : 'text-slate-400'}`} size={32} />
-                                    <span className={`font-bold ${isLocked ? 'text-slate-400' : selectedAgentType === id ? 'text-white' : 'text-slate-700'}`}>{label}</span>
-                                    <span className={`text-xs text-center mt-2 ${isLocked ? 'text-slate-400' : selectedAgentType === id ? 'text-slate-300' : 'text-slate-500'}`}>{description}</span>
-                                    {isLocked && (
-                                        <div className="mt-4 bg-slate-200 text-slate-500 text-[10px] uppercase tracking-wider font-bold py-1 px-3 rounded-full">
-                                            Plano Pro
-                                        </div>
-                                    )}
+                                    <span
+                                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-300 ${
+                                            agent.is_active ? 'translate-x-[22px]' : 'translate-x-[4px]'
+                                        }`}
+                                    />
                                 </button>
-                            );
-                        })}
-                    </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center justify-end gap-2 w-[140px]">
+                                <button
+                                    onClick={() => {
+                                        setSelectedAgent(agent);
+                                        setView('edit');
+                                    }}
+                                    className="px-4 py-2 bg-transparent text-slate-500 hover:bg-emerald-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all flex items-center gap-2 active:scale-95"
+                                >
+                                    Editar
+                                </button>
+                                <button
+                                    onClick={(e) => handleDelete(e, agent.id)}
+                                    disabled={deletingId === agent.id}
+                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                    title="Excluir agente"
+                                >
+                                    {deletingId === agent.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
 
-                {/* Form — only shown when an agent type is selected */}
-                {selectedAgentType && (
-                    <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                        {/* Active toggle */}
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">{currentAgentLabel}</p>
-                                <p className="text-xs text-slate-500">Ative ou desative este agente</p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    if (currentActiveKey) {
-                                        setSettings(prev => ({ ...prev, [currentActiveKey]: !prev[currentActiveKey] as boolean }));
-                                    }
-                                }}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${currentActiveKey && settings[currentActiveKey] ? 'bg-green-500' : 'bg-slate-300'
-                                    }`}
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ${currentActiveKey && settings[currentActiveKey] ? 'translate-x-6' : 'translate-x-1'
-                                    }`} />
-                            </button>
+                {(agents.length === 0 && !loading) && (
+                    <div className="text-center py-20 text-slate-400">
+                        <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Bot size={32} className="text-slate-200" />
                         </div>
-
-                        {/* Basic Settings */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700">Nome do Agente</label>
-                                <input
-                                    type="text"
-                                    value={settings.agent_name}
-                                    onChange={(e) => setSettings({ ...settings, agent_name: e.target.value })}
-                                    placeholder="Ex: Assistente Conecta"
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700">Idioma do Agente</label>
-                                <select
-                                    value={settings.language}
-                                    onChange={(e) => setSettings({ ...settings, language: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all"
-                                >
-                                    <option value="pt-BR">Português (Brasil)</option>
-                                    <option value="en-US">English (US)</option>
-                                    <option value="es-ES">Español</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-sm font-bold text-slate-700">Mensagem Inicial Padrão</label>
-                                <p className="text-xs text-slate-500 mt-1 mb-3">Define como o agente iniciará o atendimento com o cliente.</p>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <label className={`flex items-center p-5 border-2 rounded-xl cursor-pointer transition-all min-h-[80px] ${!settings.use_custom_initial_message ? 'border-[#ffd700] bg-[#ffd700]/5' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
-                                        <input
-                                            type="radio"
-                                            name="initialMsgType"
-                                            checked={!settings.use_custom_initial_message}
-                                            onChange={() => setSettings({ ...settings, use_custom_initial_message: false })}
-                                            className="w-4 h-4 text-[#ffd700] focus:ring-[#ffd700] border-slate-300 shrink-0"
-                                        />
-                                        <div className="ml-3">
-                                            <span className="block text-sm font-bold text-slate-900">Deixar o Agente decidir</span>
-                                            <span className="block text-xs text-slate-500 mt-1">A IA vai gerar a mensagem inicial com base no prompt.</span>
-                                        </div>
-                                    </label>
-
-                                    <label className={`flex items-center p-5 border-2 rounded-xl cursor-pointer transition-all min-h-[80px] ${settings.use_custom_initial_message ? 'border-[#ffd700] bg-[#ffd700]/5' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
-                                        <input
-                                            type="radio"
-                                            name="initialMsgType"
-                                            checked={settings.use_custom_initial_message}
-                                            onChange={() => setSettings({ ...settings, use_custom_initial_message: true })}
-                                            className="w-4 h-4 text-[#ffd700] focus:ring-[#ffd700] border-slate-300 shrink-0"
-                                        />
-                                        <div className="ml-3">
-                                            <span className="block text-sm font-bold text-slate-900">Mensagem fixa customizada</span>
-                                            <span className="block text-xs text-slate-500 mt-1">O mesmo texto será enviado sempre no início.</span>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {settings.use_custom_initial_message && (
-                                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <textarea
-                                        value={settings.initial_message}
-                                        onChange={(e) => setSettings({ ...settings, initial_message: e.target.value })}
-                                        placeholder="Olá! Sou o assistente virtual. Como posso ajudar?"
-                                        rows={2}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all resize-y"
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        <hr className="border-slate-100" />
-
-                        {/* Prompt — uses the column specific to the selected agent type */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-700">Prompt do {currentAgentLabel} (Diretrizes e Regras)</label>
-                            <p className="text-xs text-slate-500 mb-2">Descreva detalhadamente como o agente deve se comportar, seu tom de voz, regras de negócio e informações importantes.</p>
-                            <textarea
-                                value={currentPromptValue}
-                                onChange={(e) => updatePrompt(e.target.value)}
-                                placeholder="Você é um assistente de vendas focado em conversão. Seu objetivo é..."
-                                rows={10}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ffd700] focus:bg-white transition-all resize-y font-mono text-sm leading-relaxed"
-                            />
-                        </div>
-
-                        {/* Notification */}
-                        {message && (
-                            <div className={`p-4 rounded-2xl border flex items-center gap-3 ${message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                                {message.type === 'success' ? <CheckCircle2 size={20} className="text-emerald-500" /> : <AlertTriangle size={20} className="text-red-500" />}
-                                <span className="text-sm font-medium">{message.text}</span>
-                            </div>
-                        )}
-
-                        {/* Submit */}
-                        <div className="pt-6 border-t border-slate-100 flex justify-end">
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="flex items-center space-x-2 px-8 py-4 bg-[#ffd700] text-slate-900 rounded-2xl font-black shadow-xl shadow-[#ffd700]/30 hover:bg-[#f8ab15] hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                            >
-                                {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-                                <span>Salvar Configurações</span>
-                            </button>
-                        </div>
+                        <p className="font-bold text-sm text-slate-600">Nenhum agente encontrado</p>
+                        <p className="text-xs mt-1">Selecione uma instância e dê um nome para começar.</p>
                     </div>
                 )}
+            </div>
+
+            {/* Drawer Sidebar for Editing - Slides from Left to Right */}
+            <div 
+                className={`fixed inset-0 z-[60] transition-opacity duration-300 ${
+                    view === 'edit' ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                }`}
+            >
+                {/* Backdrop Overlay */}
+                <div 
+                    className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+                    onClick={() => setView('list')}
+                />
+                
+                {/* Sidebar Panel Content */}
+                <div 
+                    className={`absolute top-0 right-0 h-full w-full sm:min-w-[450px] lg:w-[35%] bg-white shadow-2xl transition-transform duration-500 ease-out border-l border-slate-200 overflow-y-auto ${
+                        view === 'edit' ? 'translate-x-0' : 'translate-x-full'
+                    }`}
+                >
+                    {selectedAgent && (
+                        <AgentForm 
+                            agent={selectedAgent as any}
+                            userId={user!.id}
+                            onBack={() => setView('list')}
+                            onSuccess={fetchAgents}
+                        />
+                    )}
+                </div>
             </div>
         </div>
     );
