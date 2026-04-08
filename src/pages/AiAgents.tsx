@@ -27,6 +27,11 @@ interface Agent {
     presence_penalty: number;
     sign_messages: boolean;
     read_messages: boolean;
+    max_message_length: number;
+    typing_delay_seconds: number;
+    context_time_window_hours: number;
+    context_max_messages: number;
+    context_min_messages: number;
     whatsapp_instance_id: string;
     whatsapp_instance_name: string;
     whatsapp_number?: string;
@@ -125,6 +130,11 @@ const AiAgents: React.FC = () => {
                 presence_penalty: 15,
                 sign_messages: true,
                 read_messages: true,
+                max_message_length: 500,
+                typing_delay_seconds: 3,
+                context_time_window_hours: 24,
+                context_max_messages: 50,
+                context_min_messages: 3,
                 use_custom_initial_message: false,
                 initial_message: '',
             };
@@ -452,7 +462,7 @@ const AiAgents: React.FC = () => {
                 
                 {/* Sidebar Panel Content */}
                 <div 
-                    className={`absolute top-0 right-0 h-full w-full sm:min-w-[450px] lg:w-[35%] bg-white shadow-2xl transition-transform duration-500 ease-out border-l border-slate-200 overflow-y-auto ${
+                    className={`absolute top-0 right-0 h-full w-full sm:min-w-[450px] lg:w-[40%] bg-white shadow-2xl transition-transform duration-500 ease-out border-l border-slate-200 overflow-y-auto ${
                         view === 'edit' ? 'translate-x-0' : 'translate-x-full'
                     }`}
                 >
