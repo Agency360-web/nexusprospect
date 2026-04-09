@@ -319,11 +319,10 @@ const ClientDetail: React.FC = () => {
       </div>
 
       {/* Tabs Nav */}
-      <div className="bg-white border-b border-slate-200 sticky top-16 lg:top-0 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-3xl">
-
-        <TabButton id="credentials" label="Acessos" icon={Key} />
+      <div className="bg-white border-b border-slate-200 sticky top-16 lg:top-0 z-20 flex px-2 overflow-x-auto no-scrollbar rounded-t-xl">
         <TabButton id="costs" label="Custos" icon={DollarSign} />
         <TabButton id="leads" label="Leads" icon={Users} />
+        <TabButton id="credentials" label="Acessos" icon={Key} />
       </div>
 
       <div className="pt-4">

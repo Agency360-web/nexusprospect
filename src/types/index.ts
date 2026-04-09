@@ -154,3 +154,26 @@ export interface CampaignWithStats {
   failed_count: number;
   pending_count: number;
 }
+
+export interface KnowledgeBase {
+  id: string;
+  agent_id: string;
+  user_id: string;
+  active: boolean;
+  tittle: string;
+  content: string;
+  status: 'processing' | 'ok';
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface KnowledgeBasePayload {
+  id: string;
+  delete: boolean;
+  knowledge: {
+    active: boolean;
+    tittle: string;
+    content: string;
+  };
+}
+
