@@ -138,6 +138,10 @@ const ConnectionsTab: React.FC = () => {
             throw new Error(`Resposta inválida do servidor (HTTP ${res.status}): ${text.substring(0, 200)}`);
         }
 
+        if (!res.ok) {
+            throw new Error(data?.message || data?.error || `Erro HTTP ${res.status}`);
+        }
+
         if (data?.error) {
             throw new Error(data.error);
         }
@@ -267,9 +271,13 @@ const ConnectionsTab: React.FC = () => {
         setActionLoading('create');
         setError(null);
         try {
+            console.log("[DEBUG] Chamando API create...");
             await callApi('create');
+            console.log("[DEBUG] create ok. Chamando fetchConnections...");
             await fetchConnections();
         } catch (err: any) {
+            console.error("[DEBUG] Erro travado no handleCreate:", err);
+            alert("ERRO REAL AO CRIAR: " + err.message);
             setError(err.message);
         } finally {
             setActionLoading(null);

@@ -14,6 +14,7 @@ interface Agent {
     is_active: boolean;
     status: string;
     prompt: string;
+    prompt_support?: string;
     language: string;
     temperature: number;
     provider: string;
@@ -123,6 +124,7 @@ const AiAgents: React.FC = () => {
                 provider: 'openai',
                 model: 'gpt-4o-mini',
                 prompt: "Você é um agente de suporte técnico. Forneça respostas curtas, claras e objetivas.",
+                prompt_support: "Você é um agente de suporte técnico. Forneça respostas curtas, claras e objetivas.",
                 api_key: "sk-proj-SuaChaveDaOpenAIAqui...",
                 max_tokens: 800,
                 diversity_level: 40,
@@ -222,21 +224,45 @@ const AiAgents: React.FC = () => {
     };
 
     const handleToggleStatus = async (id: string, currentStatus: boolean) => {
+        const newStatus = !currentStatus;
         try {
             // Optimistic update
-            setAgents(prev => prev.map(a => a.id === id ? { ...a, is_active: !currentStatus } : a));
+            setAgents(prev => prev.map(a => a.id === id ? { ...a, is_active: newStatus } : a));
 
-            const { error } = await supabase
+            const { error, data } = await supabase
                 .from('ai_agent_settings')
-                .update({ is_active: !currentStatus })
-                .eq('id', id);
+                .update({ is_active: newStatus })
+                .eq('id', id)
+                .eq('user_id', user!.id)
+                .select();
 
-            if (error) throw error;
+            if (error) {
+                throw error;
+            }
+            
+            console.log("Status atualizado no Supabase:", data);
+
+            // Send to n8n webhook instantly
+            const agentData = agents.find(a => a.id === id);
+            
+            fetch('https://nexus360.infra-conectamarketing.site/webhook/agente_status', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    id, 
+                    is_active: newStatus,
+                    whatsappNumber: agentData?.whatsapp_number,
+                    instanceName: agentData?.whatsapp_instance_name,
+                    agentName: agentData?.agent_name
+                })
+            }).then(r => console.log('Ping status webhook:', r.status))
+              .catch(e => console.error('Ping status erro:', e));
+
         } catch (err) {
             console.error('Error toggling status:', err);
             // Rollback on error
             setAgents(prev => prev.map(a => a.id === id ? { ...a, is_active: currentStatus } : a));
-            alert('Erro ao alterar status do agente');
+            alert('Erro ao alterar status do agente: verifique permissões ou conexão.');
         }
     };
 

@@ -118,8 +118,9 @@ serve(async (req) => {
                             'token': instanceToken,
                         },
                         body: JSON.stringify({
-                            webhook_url: 'https://nexus360.infra-conectamarketing.site/webhook/nexus-mensagens',
-                            webhook_enabled: true,
+                            url: 'https://nexus360.infra-conectamarketing.site/webhook/e30ccb57-e8ed-49a4-8915-4617d43e3724',
+                            events: ["messages"],
+                            excludeMessages: ["wasSentByApi", "isGroupYes"]
                         }),
                     })
                     console.log(`Webhook da instância ${instanceName} configurado com sucesso.`)
