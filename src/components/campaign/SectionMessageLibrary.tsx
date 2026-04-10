@@ -227,7 +227,7 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
 
     const handleSort = (category: keyof MessageLibraryType) => {
         if (!dragItem.current || !dragOverItem.current) return;
-        
+
         if (dragItem.current.category !== category || dragOverItem.current.category !== category) return;
 
         setLibrary(prev => {
@@ -245,14 +245,128 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
         dragOverItem.current = null;
     };
 
+    const [copiedPrompt, setCopiedPrompt] = useState(false);
+
+    const handleCopyPrompt = () => {
+        // Build template examples dynamically from SUGGESTED_TEMPLATES
+        const categoryLabels: Record<keyof MessageLibraryType, { name: string; instruction: string }> = {
+            greeting: {
+                name: '1. Saudação e Identificação',
+                instruction: 'Como eu me apresento no primeiro contato de forma leve e humana. Use as variáveis {{nome}} e {{empresa}} para personalização automática.'
+            },
+            presentation: {
+                name: '2. Anúncio / Apresentação',
+                instruction: 'O que nós fazemos e o motivo rápido do contato. Deve ser direto, gerar curiosidade e mostrar autoridade sem ser arrogante.'
+            },
+            product: {
+                name: '3. Promessa (Oferta de Valor)',
+                instruction: 'O resultado concreto ou solução que entregamos ao cliente. Use a variável {{promessa}} para o resultado financeiro prometido (ex: "R$30 mil/mês", "2x mais clientes"). Deve conectar a entrega com o resultado financeiro.'
+            },
+            triggers: {
+                name: '4. Texto Genérico de Abrangência (Gatilho)',
+                instruction: 'Cite 3 a 5 segmentos de empresas que eu atendo para mostrar amplitude e autoridade. Deve dar a sensação de que atendemos muitos tipos de negócio. Adapte os segmentos para o meu nicho específico.'
+            },
+            socialProof: {
+                name: '5. Frase Específica do Nicho (Prova Social)',
+                instruction: 'Uma frase focada no nicho específico do lead destinatário, mostrando que tenho experiência direta com aquele segmento. Use a variável {{nichoBanco}} para o nicho que vem do banco de dados do lead.'
+            },
+            cta: {
+                name: '6. Pergunta Final (CTA)',
+                instruction: 'O próximo passo claro, suave e objetivo. Deve ser uma pergunta fechada que convida o lead a responder "sim" ou "não", sem pressão. Curta e direta.'
+            },
+        };
+
+        const buildCategoryBlock = (key: keyof MessageLibraryType) => {
+            const label = categoryLabels[key];
+            const templates = SUGGESTED_TEMPLATES[key];
+            const examplesText = templates.map((t, i) => `  ${i + 1}. ${t}`).join('\n');
+            return `\n--- ${label.name} ---\nInstrução: ${label.instruction}\n\nModelos de referência que já utilizamos (mantenha o mesmo tom, tamanho e estilo):\n${examplesText}\n`;
+        };
+
+        const allBlocks = (Object.keys(categoryLabels) as (keyof MessageLibraryType)[])
+            .map(key => buildCategoryBlock(key))
+            .join('\n');
+
+        const promptText = `Atue como um especialista em Copywriting B2B e Vendas de Alta Conversão para prospecção ativa via WhatsApp.
+
+=== CONTEXTO DO SISTEMA ===
+Eu utilizo um sistema de automação de prospecção fria via WhatsApp que funciona assim:
+- Cada mensagem enviada é montada automaticamente juntando UMA frase de cada uma das 6 categorias abaixo.
+- O sistema faz "spintax": ele sorteia aleatoriamente uma frase de cada categoria e junta tudo em uma única mensagem natural.
+- Objetivo: cada lead recebe uma mensagem diferente, única, humanizada — como se fosse escrita à mão.
+
+=== SOBRE O MEU NEGÓCIO ===
+- Segmento de atuação: [COLOQUE SEU SEGMENTO AQUI — ex: Marketing Digital para Negócios Locais]
+- Produto/serviço principal: [COLOQUE SEU PRODUTO/SERVIÇO AQUI — ex: Assessoria de Marketing]
+- Público-alvo: [COLOQUE SEU PÚBLICO-ALVO AQUI — ex: Donos de negócios físicos/locais]
+- Promessa principal de resultado: [COLOQUE SUA PROMESSA AQUI — ex: faturar R$30 mil/mês]
+- Nome do(a) vendedor(a)/prospector(a): [COLOQUE SEU NOME AQUI]
+- Nome da empresa: [COLOQUE O NOME DA SUA EMPRESA AQUI]
+
+=== O QUE EU PRECISO ===
+Gere 15 variações NOVAS e ORIGINAIS para cada uma das 6 categorias abaixo.
+
+REGRAS OBRIGATÓRIAS:
+- A linguagem deve ser natural, amigável, humanizada, super curta e direta.
+- NÃO pareça texto de robô, e-mail corporativo, ou panfleto.
+- NÃO use aspas nas frases.
+- NÃO repita os modelos de referência que estou te enviando — use-os APENAS como inspiração de tom e estilo.
+- Mantenha as variáveis dinâmicas entre chaves duplas exatamente como mostrado (ex: {{nome}}, {{empresa}}, {{promessa}}, {{nichoBanco}}).
+- Cada frase deve funcionar sozinha e também combinar bem com frases das outras categorias.
+- Varie o comprimento: algumas frases mais curtas (1 linha), outras um pouco mais elaboradas (2 linhas no máximo).
+
+=== AS 6 CATEGORIAS COM MODELOS DE REFERÊNCIA ===
+Abaixo estão as 6 categorias do meu sistema, com a instrução de cada uma e os modelos de mensagem que já utilizamos hoje. Use esses modelos como referência de TOM, ESTILO e TAMANHO — mas crie frases completamente novas.
+${allBlocks}
+=== FORMATO DE ENTREGA ===
+Entregue as 15 variações de cada categoria de forma limpa e organizada, separadas por categoria, SEM introdução, SEM explicação, SEM numeração de "Categoria X". Apenas o título da categoria e as frases abaixo, prontas para eu copiar e colar diretamente no meu sistema.
+
+Exemplo do formato esperado:
+
+1. Saudação e Identificação
+Frase 1 aqui
+Frase 2 aqui
+...
+
+2. Anúncio / Apresentação
+Frase 1 aqui
+...
+
+E assim por diante até a categoria 6.`;
+
+        navigator.clipboard.writeText(promptText);
+        setCopiedPrompt(true);
+        setTimeout(() => setCopiedPrompt(false), 3000);
+    };
+
     return (
         <section id="sec-5" className="bg-white border border-slate-200 rounded-lg p-6">
             <div className="mb-4">
-                <h4 className="flex items-center gap-2 text-base font-bold text-slate-800 mb-1">
-                    <BookOpen className="text-slate-700" size={18} />
-                    6. Biblioteca de Mensagens (Variações)
-                </h4>
-                <p className="text-slate-500 text-sm">O N8N fará o spintax misturando um bloco de cada categoria. Use as <strong>Sugestões</strong> para adicionar modelos prontos.</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                    <h4 className="flex items-center gap-2 text-base font-bold text-slate-800">
+                        <BookOpen className="text-slate-700" size={18} />
+                        6. Biblioteca de Mensagens (Variações)
+                    </h4>
+
+                    <button
+                        type="button"
+                        onClick={handleCopyPrompt}
+                        className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all border ${copiedPrompt
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                            }`}
+                        title="Gera um prompt para ChatGPT/Claude e te ajuda a criar novas campanhas!"
+                    >
+                        {copiedPrompt ? (
+                            <><Check size={14} className="text-emerald-500" /> Prompt copiado!</>
+                        ) : (
+                            <><Sparkles size={14} className="text-indigo-500" /> Copiar Prompt para IA</>
+                        )}
+                    </button>
+                </div>
+                <p className="text-slate-500 text-sm">
+                    A Nexus360 fará o spintax misturando um bloco de cada categoria. Use as <strong>Sugestões</strong> ou clique em "Copiar Prompt para IA" para gerar no seu ChatGPT/Claude.
+                </p>
             </div>
 
             <div className="space-y-4">
@@ -264,14 +378,13 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                 <p className="text-[10px] text-slate-400 font-medium">{description}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => setShowSuggestions(showSuggestions === key ? null : key)}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
-                                        showSuggestions === key 
-                                        ? 'bg-slate-700 text-white shadow-sm' 
-                                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
-                                    }`}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${showSuggestions === key
+                                            ? 'bg-slate-700 text-white shadow-sm'
+                                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+                                        }`}
                                 >
                                     <Lightbulb size={12} /> Sugestões
                                 </button>
@@ -315,11 +428,10 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                                 type="button"
                                                 disabled={isAlreadyIn}
                                                 onClick={() => handleAdd(key, template)}
-                                                className={`text-[10px] font-medium px-3 py-1.5 rounded-md border transition-all text-left max-w-sm ${
-                                                    isAlreadyIn 
-                                                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-800 hover:shadow-sm'
-                                                }`}
+                                                className={`text-[10px] font-medium px-3 py-1.5 rounded-md border transition-all text-left max-w-sm ${isAlreadyIn
+                                                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-800 hover:shadow-sm'
+                                                    }`}
                                             >
                                                 {displayText}
                                                 {isAlreadyIn && <Check size={10} className="inline ml-1 text-green-500" />}
@@ -329,7 +441,7 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                 </div>
                             </div>
                         )}
-                        
+
                         <div className="p-3 space-y-2">
                             {library[key].length === 0 ? (
                                 <div className="text-center py-3 bg-slate-50 rounded-md border border-dashed border-slate-200">
@@ -337,8 +449,8 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                 </div>
                             ) : (
                                 library[key].map((item, index) => (
-                                    <div 
-                                        key={item.id} 
+                                    <div
+                                        key={item.id}
                                         className="flex items-start gap-2 group"
                                         draggable
                                         onDragStart={(e) => {
@@ -358,14 +470,14 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                         <div className="mt-2.5 text-slate-300 cursor-grab active:cursor-grabbing hover:text-slate-500 transition-colors">
                                             <GripVertical size={14} />
                                         </div>
-                                        <textarea 
+                                        <textarea
                                             value={item.text}
                                             onChange={(e) => handleUpdate(key, item.id, e.target.value)}
                                             placeholder={`Escreva a variação ${index + 1}...`}
                                             className="flex-1 bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2 rounded-md focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-xs font-medium resize-none h-16"
                                         ></textarea>
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => handleRemove(key, item.id)}
                                             className="mt-1.5 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all opacity-0 group-hover:opacity-100"
                                             title="Remover Variação"
@@ -376,8 +488,8 @@ const SectionMessageLibrary: React.FC<Props> = ({ library, setLibrary, dynamicVa
                                 ))
                             )}
 
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 onClick={() => handleAdd(key)}
                                 className="w-full mt-2 border border-dashed border-slate-300 hover:border-slate-400 text-slate-500 hover:text-slate-600 hover:bg-slate-50 font-bold py-2 rounded-md flex items-center justify-center gap-1.5 transition-all text-xs"
                             >
