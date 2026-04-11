@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { Loader2, Mail, Lock, ArrowRight, AlertCircle, Users, Target, Layers, Bot, CheckCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, ArrowRight, AlertCircle, Users, Target, Layers, Bot, CheckCircle, Eye, EyeOff } from 'lucide-react';
 
 const ParticleBackground: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -96,6 +96,7 @@ const Login: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -147,13 +148,31 @@ const Login: React.FC = () => {
         setError(null);
         setSuccessMessage(null);
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/#/reset-password`,
+            // Call our Edge Function that sends via Resend API
+            // This bypasses Supabase's built-in email (which has rate limits on free tier)
+            const { data: { session } } = await supabase.auth.getSession();
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+            const response = await fetch(`${supabaseUrl}/functions/v1/send-reset-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': supabaseAnonKey,
+                    'Authorization': `Bearer ${session?.access_token ?? supabaseAnonKey}`,
+                },
+                body: JSON.stringify({ email }),
             });
-            if (error) throw error;
-            setSuccessMessage('Email de recuperação enviado! Verifique sua caixa de entrada.');
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Erro ao enviar e-mail de recuperação.');
+            }
+
+            setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada (e o spam).');
         } catch (err: any) {
-            setError(err.message || 'Erro ao enviar email de recuperação');
+            setError(err.message || 'Erro ao enviar e-mail de recuperação.');
         } finally {
             setLoading(false);
         }
@@ -275,13 +294,22 @@ const Login: React.FC = () => {
                                             <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-[#FFD700] transition-colors duration-300" />
                                         </div>
                                         <input
-                                            type="password"
+                                            type={showPassword ? 'text' : 'password'}
                                             placeholder="••••••••••••"
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            className="block w-full pl-11 pr-4 py-4 bg-white hover:bg-gray-50 focus:bg-white border-2 border-slate-100 focus:border-[#FFD700] rounded-xl text-base text-slate-900 placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-[#FFD700]/10 transition-all duration-300 ease-out shadow-sm"
+                                            className="block w-full pl-11 pr-12 py-4 bg-white hover:bg-gray-50 focus:bg-white border-2 border-slate-100 focus:border-[#FFD700] rounded-xl text-base text-slate-900 placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-[#FFD700]/10 transition-all duration-300 ease-out shadow-sm"
                                             required
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword((prev) => !prev)}
+                                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-700 transition-colors duration-200"
+                                            tabIndex={-1}
+                                            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                        >
+                                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
                                     </div>
                                 </div>
                             )}
