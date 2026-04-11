@@ -115,11 +115,6 @@ serve(async (req) => {
                             🔒 Se você não solicitou a redefinição de senha, ignore este e-mail. Sua senha permanece a mesma.
                           </p>
                         </div>
-
-                        <p style="margin:24px 0 0;font-size:12px;color:#cbd5e1;line-height:1.5;">
-                          Ou copie e cole este link no seu navegador:<br>
-                          <a href="${resetLink}" style="color:#94a3b8;word-break:break-all;">${resetLink}</a>
-                        </p>
                       </td>
                     </tr>
 
