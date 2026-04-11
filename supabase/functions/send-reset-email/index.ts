@@ -33,7 +33,7 @@ serve(async (req) => {
       type: 'recovery',
       email: email,
       options: {
-        redirectTo: 'https://nexusprospect.com.br/#/reset-password',
+        redirectTo: 'https://www.nexusprospect.com.br/#/reset-password',
       },
     })
 
