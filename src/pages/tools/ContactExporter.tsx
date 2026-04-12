@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { WEBHOOKS } from '../../config/webhooks';
 import {
     RefreshCw,
     ArrowLeft,
@@ -254,7 +255,7 @@ export const ContactExporter: React.FC = () => {
                 user_id: user?.id
             };
 
-            const response = await fetch('https://nexus360.infra-conectamarketing.site/webhook/adicionar_contatos_em_massa', {
+            const response = await fetch(WEBHOOKS.CONTACT_EXPORT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

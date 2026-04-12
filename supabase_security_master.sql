@@ -69,6 +69,7 @@ create table if not exists public.contracts (
 );
 
 -- 1. Enable RLS on all tables
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
@@ -84,10 +85,16 @@ ALTER TABLE public.contracts ENABLE ROW LEVEL SECURITY;
 -- 2. Drop insecure "Allow all" policies
 DROP POLICY IF EXISTS "Allow all access for public" ON public.clients;
 DROP POLICY IF EXISTS "Allow all access for public" ON public.leads;
-DROP POLICY IF EXISTS "Allow all access for public" ON public.goals;
-DROP POLICY IF EXISTS "Allow all access for public" ON public.transmissions;
-DROP POLICY IF EXISTS "Allow all access for public" ON public.campaigns;
-DROP POLICY IF EXISTS "Allow all access for public" ON public.email_senders;
+DROP POLICY IF EXISTS "Allow all access for public" ON public.profiles;
+
+-- 3. Create Strict Policies for Profiles
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+CREATE POLICY "Users can view own profile" ON public.profiles
+    FOR SELECT USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile" ON public.profiles
+    FOR UPDATE USING (auth.uid() = id);
 
 -- 3. Create/Ensure Strict Policies for Clients
 -- Users can only see/edit their own clients

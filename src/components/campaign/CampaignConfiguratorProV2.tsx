@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Megaphone, Settings2, Play, Save, Loader2, Clock, ChevronLeft, Video, Phone, MoreVertical, CheckCheck, Building2, Folder, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
+import { WEBHOOKS } from '../../config/webhooks';
 import SectionInstances, { WhatsAppInstance } from './SectionInstances';
 import SectionMessageLibrary, { MessageLibraryType } from './SectionMessageLibrary';
 import SectionButtons, { InteractiveButton } from './SectionButtons';
@@ -304,7 +305,7 @@ const CampaignConfiguratorProV2: React.FC = () => {
                 totalLeads: fullSelectedLeads.length,
             };
 
-            const WEBHOOK_URL = 'https://nexus360.infra-conectamarketing.site/webhook/b997708c-4ed3-4106-a3ed-88ff9e843816';
+            const WEBHOOK_URL = WEBHOOKS.CAMPAIGN_PRO_V2;
 
             // Disparo assíncrono (Fire and Forget)
             fetch(WEBHOOK_URL, {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
+import { WEBHOOKS } from '../../config/webhooks';
 import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone, Lock, Rocket } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import CampaignMonitor from './CampaignMonitor';
@@ -301,12 +302,8 @@ const WhatsAppCampaignForm: React.FC = () => {
                 instanceCount: instancesData.length,
             };
 
-            const webhookUrl = 'https://nexus360.infra-conectamarketing.site/webhook/nexus-disparos';
-
-            console.log('Enviando dados para o webhook de teste...', webhookUrl);
-
             // Disparo assíncrono (Fire and Forget) para evitar timeouts na tela
-            fetch(webhookUrl, {
+            fetch(WEBHOOKS.CAMPAIGN_DISPATCH, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

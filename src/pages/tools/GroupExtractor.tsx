@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { WEBHOOKS } from '../../config/webhooks';
 import {
     ArrowLeft,
     Wifi,
@@ -113,7 +114,7 @@ export const GroupExtractor: React.FC = () => {
                 user_email: user?.email,
             };
 
-            const response = await fetch('https://nexus360.infra-conectamarketing.site/webhook/get_grupos', {
+            const response = await fetch(WEBHOOKS.GROUP_LIST, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -179,7 +180,7 @@ export const GroupExtractor: React.FC = () => {
                 user_email: user?.email,
             };
 
-            const response = await fetch('https://nexus360.infra-conectamarketing.site/webhook/get_leads_grupos', {
+            const response = await fetch(WEBHOOKS.GROUP_LEADS, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

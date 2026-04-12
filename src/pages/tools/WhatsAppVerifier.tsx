@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { WEBHOOKS } from '../../config/webhooks';
 import { 
     Smartphone, 
     ArrowLeft, 
@@ -220,7 +221,7 @@ export const WhatsAppVerifier: React.FC = () => {
                 whatsapp_instances: activeInstances
             };
 
-            const response = await fetch('https://nexus360.infra-conectamarketing.site/webhook/verificador_numero', {
+            const response = await fetch(WEBHOOKS.WA_VERIFIER, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

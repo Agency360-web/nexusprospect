@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { WEBHOOKS } from '../config/webhooks';
 import { Loader2, Mail, Lock, ArrowRight, AlertCircle, Users, Target, Layers, Bot, CheckCircle, Eye, EyeOff } from 'lucide-react';
 
 const ParticleBackground: React.FC = () => {
@@ -105,10 +106,10 @@ const Login: React.FC = () => {
 
         try {
             // 1. Validar acesso via Webhook Externo
-            const webhookResponse = await fetch('https://nexus360.infra-conectamarketing.site/webhook/verifica_usuarios', {
+            const webhookResponse = await fetch(WEBHOOKS.AUTH_VERIFY, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ email: email, action: 'login' })
             });
 
             const accessResult = await webhookResponse.json();
