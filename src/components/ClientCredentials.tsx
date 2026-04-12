@@ -230,6 +230,7 @@ const ClientCredentials: React.FC<ClientCredentialsProps> = ({ clientId }) => {
                         <div className="relative flex-1 md:w-64">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input
+                                id="search-credentials"
                                 type="text"
                                 placeholder="Buscar acessos..."
                                 value={searchTerm}
@@ -388,8 +389,9 @@ const ClientCredentials: React.FC<ClientCredentialsProps> = ({ clientId }) => {
             >
                 <form onSubmit={handleSave} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Serviço *</label>
+                        <label htmlFor="cred-name" className="block text-sm font-medium text-slate-700 mb-1">Nome do Serviço *</label>
                         <input
+                            id="cred-name"
                             type="text"
                             required
                             placeholder="Ex: Instagram, Google Ads..."
@@ -400,8 +402,9 @@ const ClientCredentials: React.FC<ClientCredentialsProps> = ({ clientId }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
+                        <label htmlFor="cred-category" className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
                         <select
+                            id="cred-category"
                             value={formData.category}
                             onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"

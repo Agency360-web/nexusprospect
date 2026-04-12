@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Clock, MapPin, AlignLeft, User, ExternalLink, Trash2, Edit2, Link2, Calendar as CalendarIcon } from 'lucide-react';
 import { CalendarEvent, formatEventDate, formatEventTime, getEventColorClasses } from '../../services/googleCalendar';
+import { sanitizeHtml } from '../../utils/security';
 
 interface EventDetailsModalProps {
     isOpen: boolean;
@@ -90,7 +91,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                             <AlignLeft className="text-slate-400 shrink-0 mt-0.5" size={18} />
                             <div
                                 className="text-sm text-slate-600 whitespace-pre-wrap max-h-[150px] overflow-y-auto pr-1"
-                                dangerouslySetInnerHTML={{ __html: event.description }}
+                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(event.description) }}
                             />
                         </div>
                     )}

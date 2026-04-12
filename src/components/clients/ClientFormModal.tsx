@@ -109,12 +109,13 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <label className="text-[13px] font-bold text-slate-600 ml-1">Nome Fantasia (Interno)</label>
+                            <label htmlFor="client-name" className="text-[13px] font-bold text-slate-600 ml-1">Nome Fantasia (Interno)</label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
                                     <Building2 size={16} />
                                 </div>
                                 <input
+                                    id="client-name"
                                     type="text"
                                     placeholder="Ex: Tech Solutions"
                                     className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
@@ -125,12 +126,13 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[13px] font-bold text-slate-600 ml-1">Razão Social</label>
+                            <label htmlFor="corporate-name" className="text-[13px] font-bold text-slate-600 ml-1">Razão Social</label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
                                     <Building2 size={16} />
                                 </div>
                                 <input
+                                    id="corporate-name"
                                     type="text"
                                     placeholder="Ex: Tech Solutions Ltda"
                                     className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"

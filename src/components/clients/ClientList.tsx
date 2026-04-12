@@ -66,6 +66,7 @@ const ClientList: React.FC<ClientListProps> = ({
                     placeholder="Buscar cliente..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label="Buscar cliente"
                     className="block w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:border-[#ffd700] focus:ring-4 focus:ring-[#ffd700]/20 transition-all shadow-sm group-hover:shadow-md"
                 />
                 <div className="hidden md:flex absolute inset-y-0 right-0 pr-4 items-center pointer-events-none">

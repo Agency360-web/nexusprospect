@@ -317,21 +317,49 @@
 
     const modal = document.createElement('div');
     modal.className = 'gmapsx-modal';
-    modal.innerHTML = `
-      <header>
-        <h3>Enviar para Webhook</h3>
-        <button class="close" aria-label="Fechar">×</button>
-      </header>
-      <div class="body">
-        <div style="margin-bottom:8px;color:#9aa4b2">Foram coletados <b>${leadsCount}</b> leads. Informe seu webhook para enviar agora.</div>
-        <label for="gmapsx-input">URL do webhook</label>
-        <input id="gmapsx-input" type="text" placeholder="https://seu-dominio.com/webhook/receber">
-      </div>
-      <div class="actions">
-        <button class="gmapsx-btn" id="gmapsx-cancel">Cancelar</button>
-        <button class="gmapsx-btn primary" id="gmapsx-send">Enviar</button>
-      </div>
-    `;
+    const header = document.createElement('header');
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Enviar para Webhook';
+    const closeBtnModal = document.createElement('button');
+    closeBtnModal.className = 'close';
+    closeBtnModal.setAttribute('aria-label', 'Fechar');
+    closeBtnModal.textContent = '×';
+    header.appendChild(h3);
+    header.appendChild(closeBtnModal);
+
+    const body = document.createElement('div');
+    body.className = 'body';
+    const info = document.createElement('div');
+    info.style.marginBottom = '8px';
+    info.style.color = '#9aa4b2';
+    info.innerHTML = `Foram coletados <b>${leadsCount}</b> leads. Informe seu webhook para enviar agora.`; // OK: count is number
+    const label = document.createElement('label');
+    label.setAttribute('for', 'gmapsx-input');
+    label.textContent = 'URL do webhook';
+    const input = document.createElement('input');
+    input.id = 'gmapsx-input';
+    input.type = 'text';
+    input.placeholder = 'https://seu-dominio.com/webhook/receber';
+    body.appendChild(info);
+    body.appendChild(label);
+    body.appendChild(input);
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const btnCancel = document.createElement('button');
+    btnCancel.className = 'gmapsx-btn';
+    btnCancel.id = 'gmapsx-cancel';
+    btnCancel.textContent = 'Cancelar';
+    const btnSend = document.createElement('button');
+    btnSend.className = 'gmapsx-btn primary';
+    btnSend.id = 'gmapsx-send';
+    btnSend.textContent = 'Enviar';
+    actions.appendChild(btnCancel);
+    actions.appendChild(btnSend);
+
+    modal.appendChild(header);
+    modal.appendChild(body);
+    modal.appendChild(actions);
     back.appendChild(modal);
     document.body.appendChild(back);
 
@@ -401,22 +429,40 @@
 
     const modal = document.createElement('div');
     modal.className = 'gmapsx-modal';
-    modal.innerHTML = `
-      <header>
-        <h3>Limpar os dados?</h3>
-        <button class="close" aria-label="Fechar">×</button>
-      </header>
-      <div class="body">
-        <div style="margin-bottom:8px;color:#9aa4b2">
-          Você acabou de enviar <b>${leadsCount}</b> leads com sucesso.<br>
-          <b>Deseja limpar os dados salvos</b> para evitar envio duplicado?
-        </div>
-      </div>
-      <div class="actions">
-        <button class="gmapsx-btn" id="gmapsx-no">Não</button>
-        <button class="gmapsx-btn primary" id="gmapsx-yes">Sim (Recomendado)</button>
-      </div>
-    `;
+    const header = document.createElement('header');
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Limpar os dados?';
+    const closeBtnModal = document.createElement('button');
+    closeBtnModal.className = 'close';
+    closeBtnModal.setAttribute('aria-label', 'Fechar');
+    closeBtnModal.textContent = '×';
+    header.appendChild(h3);
+    header.appendChild(closeBtnModal);
+
+    const body = document.createElement('div');
+    body.className = 'body';
+    const info = document.createElement('div');
+    info.style.marginBottom = '8px';
+    info.style.color = '#9aa4b2';
+    info.innerHTML = `Você acabou de enviar <b>${leadsCount}</b> leads com sucesso.<br><b>Deseja limpar os dados salvos</b> para evitar envio duplicado?`; // OK: count is number
+    body.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const btnNo = document.createElement('button');
+    btnNo.className = 'gmapsx-btn';
+    btnNo.id = 'gmapsx-no';
+    btnNo.textContent = 'Não';
+    const btnYes = document.createElement('button');
+    btnYes.className = 'gmapsx-btn primary';
+    btnYes.id = 'gmapsx-yes';
+    btnYes.textContent = 'Sim (Recomendado)';
+    actions.appendChild(btnNo);
+    actions.appendChild(btnYes);
+
+    modal.appendChild(header);
+    modal.appendChild(body);
+    modal.appendChild(actions);
     back.appendChild(modal);
     document.body.appendChild(back);
 

@@ -125,7 +125,7 @@ const AiAgents: React.FC = () => {
                 model: 'gpt-4o-mini',
                 prompt: "Você é um agente de suporte técnico. Forneça respostas curtas, claras e objetivas.",
                 prompt_support: "Você é um agente de suporte técnico. Forneça respostas curtas, claras e objetivas.",
-                api_key: "sk-proj-SuaChaveDaOpenAIAqui...",
+                api_key: import.meta.env.VITE_OPENAI_API_KEY || "sk-proj-...",
                 max_tokens: 800,
                 diversity_level: 40,
                 frequency_penalty: 30,
@@ -157,7 +157,7 @@ const AiAgents: React.FC = () => {
             // Webhook call matching the user request
             let finalAgent = { ...data, isSyncing: false };
             try {
-                const response = await fetch('https://nexus360.infra-conectamarketing.site/webhook/agente_criar', {
+                const response = await fetch(import.meta.env.VITE_WEBHOOK_URL_CREATE_AGENT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -245,7 +245,7 @@ const AiAgents: React.FC = () => {
             // Send to n8n webhook instantly
             const agentData = agents.find(a => a.id === id);
             
-            fetch('https://nexus360.infra-conectamarketing.site/webhook/agente_status', {
+            fetch(import.meta.env.VITE_WEBHOOK_URL_STATUS_AGENT, {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -323,6 +323,7 @@ const AiAgents: React.FC = () => {
                         <select
                             value={selectedInstanceId}
                             onChange={(e) => setSelectedInstanceId(e.target.value)}
+                            aria-label="Selecionar instância do WhatsApp"
                             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-yellow-500/10 focus:border-yellow-500 outline-none transition-all appearance-none cursor-pointer"
                         >
                             <option value="">WhatsApp do Agente</option>
@@ -347,6 +348,7 @@ const AiAgents: React.FC = () => {
                             placeholder="Nome do Agente"
                             value={newAgentName}
                             onChange={(e) => setNewAgentName(e.target.value)}
+                            aria-label="Nome do Agente"
                             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-yellow-500/10 focus:border-yellow-500 outline-none transition-all"
                         />
                     </div>

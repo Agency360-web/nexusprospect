@@ -21,12 +21,13 @@ const LeadRowInstagram = React.memo(({
         type="checkbox" 
         checked={isSelected}
         onChange={() => onToggle(lead.id)}
+        aria-label={`Selecionar lead @${lead.username}`}
         className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
       />
     </td>
     <td className="p-4">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-400 via-fuchsia-500 to-indigo-600 p-[2px]">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-400 via-emerald-500 to-teal-600 p-[2px]">
           <div className="w-full h-full rounded-full bg-white p-[2px]">
             {lead.profile_pic_url ? (
               <img src={lead.profile_pic_url} alt="" className="w-full h-full rounded-full object-cover" />
@@ -328,6 +329,7 @@ const InstagramLeadSearch: React.FC = () => {
                           type="checkbox" 
                           checked={paginatedLeads.length > 0 && paginatedLeads.every(l => selectedLeads.includes(l.id))}
                           onChange={selectAllLeads}
+                          aria-label="Selecionar todos os leads da página"
                           className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
                         />
                       </th>

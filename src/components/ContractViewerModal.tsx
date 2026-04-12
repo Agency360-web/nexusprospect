@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { X, Printer, CheckCircle2, Send, Clock, FileText } from 'lucide-react';
 import { Contract } from '../types';
 import { supabase } from '../services/supabase';
+import { sanitizeHtml } from '../utils/security';
 
 interface ContractViewerModalProps {
     isOpen: boolean;
@@ -100,7 +101,7 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                 </head>
                 <body>
                     <div class="prose">
-                        ${content}
+                        ${sanitizeHtml(content)}
                     </div>
                     <script>
                         // Wait for all images to load before printing
@@ -187,7 +188,7 @@ const ContractViewerModal: React.FC<ContractViewerModalProps> = ({ isOpen, onClo
                     className="w-full max-w-[210mm] bg-white shadow-xl min-h-[297mm] pt-[20mm] px-[20mm] pb-[40mm] text-slate-900 overflow-y-auto"
                     style={{ fontFamily: '"Courier New", Courier, monospace' }}
                 >
-                    <div className="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none" dangerouslySetInnerHTML={{ __html: contract.content_snapshot }} />
+                    <div className="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(contract.content_snapshot) }} />
                 </div>
             </div>
         </div>

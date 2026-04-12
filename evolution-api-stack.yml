@@ -15,7 +15,7 @@ services:
     environment:
     ## ⚙️ Configurações Gerais
       - SERVER_URL=https://api.conectalab.sbs
-      - AUTHENTICATION_API_KEY=f9e4a52d9b4221679b1c493b0c096e13
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
       - DEL_INSTANCE=false
       - QRCODE_LIMIT=1902
@@ -30,7 +30,7 @@ services:
     ## 🗄️ Configuração do Banco de Dados
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://postgres:a479190831329f1eff98afd3133e5e77@postgres:5432/evolution
+      - DATABASE_CONNECTION_URI=${EVOLUTION_DATABASE_URL}
       - DATABASE_CONNECTION_CLIENT_NAME=evolution
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
@@ -60,7 +60,7 @@ services:
       - CHATWOOT_ENABLED=true
       - CHATWOOT_MESSAGE_READ=true
       - CHATWOOT_MESSAGE_DELETE=true
-      - CHATWOOT_IMPORT_DATABASE_CONNECTION_URI=postgresql://postgres:SENHA_DO_PGVECTOR@pgvector:5432/chatwoot?sslmode=disable
+      - CHATWOOT_IMPORT_DATABASE_CONNECTION_URI=${CHATWOOT_DATABASE_URL}
       - CHATWOOT_IMPORT_PLACEHOLDER_MEDIA_MESSAGE=false
       
     ## 🧊 Configuração do Cache

@@ -323,17 +323,48 @@
 
         const div = document.createElement('div');
         div.className = 'nexus-progress';
-        div.innerHTML = `
-      <h4>🔍 Nexus360 — Extraindo Leads</h4>
-      <div style="font-size:12px;color:#9aa4b2" id="nexus-status">Preparando...</div>
-      <div class="bar-bg"><div class="bar-fill" id="nexus-bar" style="width:0%"></div></div>
-      <div class="stats">
-        <span>Extraídos: <b id="nexus-count">0</b></span>
-        <span>Total: <b id="nexus-total">—</b></span>
-        <span>Salvos: <b id="nexus-saved">0</b></span>
-        <span>Falhas: <b id="nexus-failed">0</b></span>
-      </div>
-    `;
+        
+        const h4 = document.createElement('h4');
+        h4.textContent = '🔍 Nexus360 — Extraindo Leads';
+        
+        const statusDiv = document.createElement('div');
+        statusDiv.id = 'nexus-status';
+        statusDiv.style.fontSize = '12px';
+        statusDiv.style.color = '#9aa4b2';
+        statusDiv.textContent = 'Preparando...';
+        
+        const barBg = document.createElement('div');
+        barBg.className = 'bar-bg';
+        const barFill = document.createElement('div');
+        barFill.id = 'nexus-bar';
+        barFill.className = 'bar-fill';
+        barFill.style.width = '0%';
+        barBg.appendChild(barFill);
+        
+        const stats = document.createElement('div');
+        stats.className = 'stats';
+        
+        const createStat = (label, id) => {
+            const span = document.createElement('span');
+            span.textContent = `${label}: `;
+            const b = document.createElement('b');
+            b.id = id;
+            b.textContent = label === 'Total' ? '—' : '0';
+            span.appendChild(b);
+            return span;
+        };
+        
+        stats.appendChild(createStat('Extraídos', 'nexus-count'));
+        stats.appendChild(createStat('Total', 'nexus-total'));
+        stats.appendChild(createStat('Salvos', 'nexus-saved'));
+        stats.appendChild(createStat('Falhas', 'nexus-failed'));
+        
+        div.appendChild(h4);
+        div.appendChild(statusDiv);
+        div.appendChild(barBg);
+        div.appendChild(stats);
+        
+        document.body.appendChild(div);
         document.body.appendChild(div);
         return {
             setStatus: (s) => { document.getElementById('nexus-status').textContent = s; },

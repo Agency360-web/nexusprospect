@@ -230,7 +230,7 @@ export const getMonthRange = (date: Date): { start: Date; end: Date } => {
 export const GOOGLE_EVENT_COLORS: Record<string, { bg: string, text: string, border: string, dot: string }> = {
     '1': { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200', dot: 'bg-purple-500' }, // Lavender
     '2': { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' }, // Sage
-    '3': { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-200', dot: 'bg-fuchsia-500' }, // Grape
+    '3': { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200', dot: 'bg-teal-500' }, // Teal
     '4': { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-200', dot: 'bg-rose-500' }, // Flamingo
     '5': { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200', dot: 'bg-yellow-500' }, // Banana
     '6': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200', dot: 'bg-orange-500' }, // Tangerine
