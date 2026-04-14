@@ -84,9 +84,9 @@ const SettingsPage: React.FC = () => {
         </aside>
 
         {/* Content Area */}
-        <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[750px]">
+        <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[calc(100vh-180px)]">
 
-          <div className="p-8 flex-1 overflow-y-auto max-h-[750px]">
+          <div className="p-8 flex-1">
             {activeTab === 'integrations' && (
               <IntegrationsTab />
             )}
