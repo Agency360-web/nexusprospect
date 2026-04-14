@@ -41,7 +41,7 @@ const WhatsAppCampaignForm: React.FC = () => {
                 if (!error && data) {
                     setPlanLimit(data.plan_limit || 1);
                     if (data.connections && data.connections.length > 0) {
-                        const activeConnections = data.connections.filter((c: any) => c.status === 'connected');
+                        const activeConnections = data.connections.filter((c: any) => c.status === 'connected' || c.status === 'open');
                         setConnections(activeConnections);
                         if (activeConnections.length > 0) {
                             setSelectedConnection(activeConnections[0].instance);

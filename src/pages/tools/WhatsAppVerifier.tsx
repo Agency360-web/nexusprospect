@@ -52,13 +52,25 @@ export const WhatsAppVerifier: React.FC = () => {
 
     const fetchInstances = async () => {
         try {
-            const { data, error } = await supabase
-                .from('whatsapp_connections')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            if (data) {
-                setWhatsappInstances(data);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) return;
+
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+            const res = await fetch(`${supabaseUrl}/functions/v1/whatsapp-uazapi`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': anonKey,
+                },
+                body: JSON.stringify({ action: 'list' }),
+            });
+
+            const result = await res.json();
+            if (result?.connections) {
+                setWhatsappInstances(result.connections);
             }
         } catch (err) {
             console.error('Error fetching instances:', err);
@@ -196,7 +208,7 @@ export const WhatsAppVerifier: React.FC = () => {
     const handleVerifierAction = async () => {
         if (selectedLeads.length === 0) return;
 
-        const activeInstances = whatsappInstances.filter(i => i.status === 'connected');
+        const activeInstances = whatsappInstances.filter(i => i.status === 'connected' || i.status === 'open');
         if (activeInstances.length === 0) {
             alert('Você precisa de pelo menos uma instância de WhatsApp conectada para realizar esta verificação. Acesse a seção de Conexões na plataforma.');
             return;

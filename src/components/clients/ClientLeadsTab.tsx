@@ -219,7 +219,8 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
                 .insert([{
                     ...newLeadForm,
                     client_id: clientId,
-                    folder_id: activeFolderId
+                    folder_id: activeFolderId,
+                    user_id: user?.id
                 }]);
 
             if (error) throw error;
@@ -248,25 +249,37 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
                     name: parts[0] || 'Desconhecido',
                     phone: parts[1] || parts[0] || '',
                     client_id: clientId,
-                    folder_id: activeFolderId
+                    folder_id: activeFolderId,
+                    user_id: user?.id
                 }
             });
 
             if (newLeads.length === 0) return;
 
-            const { error } = await supabase
-                .from('leads')
-                .insert(newLeads);
+            // Insert leads in batches to avoid timeouts
+            const batchSize = 50;
+            let successCount = 0;
+            for (let i = 0; i < newLeads.length; i += batchSize) {
+                const batch = newLeads.slice(i, i + batchSize);
+                const { error: batchError } = await supabase.from('leads').insert(batch);
+                if (!batchError) {
+                    successCount += batch.length;
+                } else {
+                    console.error('Batch insert error:', batchError);
+                }
+            }
 
-            if (error) throw error;
+            if (successCount === 0) {
+                throw new Error('Nenhum lead foi inserido. Verifique as permissões.');
+            }
 
             setImportText('');
             setActiveModal('none');
             fetchData();
             alert(`${newLeads.length} leads importados com sucesso!`);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erro ao importar leads:', error);
-            alert('Erro ao realizar a importação em massa.');
+            alert(`Erro ao realizar a importação: ${error?.message || error?.details || 'Verifique o console.'}`);
         } finally {
             setModalLoading(false);
         }

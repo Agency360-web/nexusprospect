@@ -25,18 +25,34 @@ const SectionInstances: React.FC<Props> = ({ instances, setInstances }) => {
         setLoading(true);
         setError(null);
         try {
-            const { data, error: fetchError } = await supabase
-                .from('whatsapp_connections')
-                .select('*')
-                .order('created_at', { ascending: false });
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) {
+                setError('Sessão expirada. Faça login novamente.');
+                setLoading(false);
+                return;
+            }
 
-            if (fetchError) throw fetchError;
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-            if (data) {
+            const res = await fetch(`${supabaseUrl}/functions/v1/whatsapp-uazapi`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': anonKey,
+                },
+                body: JSON.stringify({ action: 'list' }),
+            });
+
+            const result = await res.json();
+            const data = result?.connections || [];
+
+            if (data.length > 0) {
                 // Map the DB connections to our local state
                 // Keep the active state if it was already selected previously
                 setInstances(prevInstances => {
-                    return data.map(conn => {
+                    return data.map((conn: any) => {
                         const existing = prevInstances.find(i => i.id === conn.id.toString());
                         return {
                             id: conn.id.toString(),
@@ -45,7 +61,7 @@ const SectionInstances: React.FC<Props> = ({ instances, setInstances }) => {
                             token: conn.token || '',
                             phone_number: conn.phone_number,
                             status: conn.status,
-                            active: existing ? existing.active : conn.status === 'connected', // By default, select if connected
+                            active: existing ? existing.active : (conn.status === 'connected' || conn.status === 'open'),
                         };
                     });
                 });
@@ -113,7 +129,7 @@ const SectionInstances: React.FC<Props> = ({ instances, setInstances }) => {
             ) : (
                 <div className="space-y-3">
                     {instances.map((instance) => {
-                        const isConnected = instance.status === 'connected';
+                        const isConnected = instance.status === 'connected' || instance.status === 'open';
                         return (
                             <div 
                                 key={instance.id} 

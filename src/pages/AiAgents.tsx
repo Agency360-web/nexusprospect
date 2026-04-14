@@ -81,12 +81,26 @@ const AiAgents: React.FC = () => {
 
     const fetchInstances = async () => {
         try {
-            const { data, error } = await supabase
-                .from('whatsapp_connections')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            setWhatsappInstances(data || []);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) return;
+
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+            const res = await fetch(`${supabaseUrl}/functions/v1/whatsapp-uazapi`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': anonKey,
+                },
+                body: JSON.stringify({ action: 'list' }),
+            });
+
+            const result = await res.json();
+            if (result?.connections) {
+                setWhatsappInstances(result.connections);
+            }
         } catch (err) {
             console.error('Error fetching instances:', err);
         }

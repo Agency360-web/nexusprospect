@@ -435,7 +435,7 @@ const ConnectionsTab: React.FC = () => {
             <div className="space-y-4">
                 {connections.map((conn) => {
                     const statusCfg = getStatusConfig(conn.status);
-                    const isConnected = conn.status === 'connected';
+                    const isConnected = conn.status === 'connected' || conn.status === 'open';
 
                     return (
                         <div

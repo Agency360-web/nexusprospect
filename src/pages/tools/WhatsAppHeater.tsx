@@ -42,15 +42,29 @@ const WhatsAppHeater: React.FC = () => {
     const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    // Fetch Instances
+    // Fetch Instances via Edge Function (bypasses RLS)
     const fetchInstances = async () => {
         try {
-            const { data, error } = await supabase
-                .from('whatsapp_connections')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            setWhatsappInstances(data || []);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) return;
+
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+            const res = await fetch(`${supabaseUrl}/functions/v1/whatsapp-uazapi`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': anonKey,
+                },
+                body: JSON.stringify({ action: 'list' }),
+            });
+
+            const result = await res.json();
+            if (result?.connections) {
+                setWhatsappInstances(result.connections);
+            }
         } catch (err) {
             console.error('Error fetching instances:', err);
         }
@@ -222,7 +236,7 @@ const WhatsAppHeater: React.FC = () => {
                                 <option value="" disabled>1. WhatsApp 1</option>
                                 {whatsappInstances.map(instance => (
                                     <option key={instance.id} value={instance.id} disabled={String(instance.id) === String(selectedInstance2Id)}>
-                                        {getInstanceDisplayName(instance)} {instance.status !== 'connected' ? '(Desconectada)' : ''}
+                                        {getInstanceDisplayName(instance)} {(instance.status !== 'connected' && instance.status !== 'open') ? '(Desconectada)' : ''}
                                     </option>
                                 ))}
                             </select>
@@ -251,7 +265,7 @@ const WhatsAppHeater: React.FC = () => {
                                 <option value="" disabled>2. WhatsApp 2</option>
                                 {whatsappInstances.map(instance => (
                                     <option key={instance.id} value={instance.id} disabled={String(instance.id) === String(selectedInstance1Id)}>
-                                        {getInstanceDisplayName(instance)} {instance.status !== 'connected' ? '(Desconectada)' : ''}
+                                        {getInstanceDisplayName(instance)} {(instance.status !== 'connected' && instance.status !== 'open') ? '(Desconectada)' : ''}
                                     </option>
                                 ))}
                             </select>
