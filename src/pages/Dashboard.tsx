@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
+
 import {
     TrendingUp,
     Activity,
@@ -490,86 +492,71 @@ const Dashboard: React.FC = () => {
                 )}
             </div>
 
-            {/* Tabela Inferior (Últimas Campanhas) */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-                <div className="p-5 border-b border-slate-100">
-                    <h2 className="text-base font-bold text-slate-900 mb-0.5">Campanhas Recentes</h2>
-                    <p className="text-xs text-slate-500">Acompanhamento detalhado das últimas execuções</p>
+            {/* Últimas Campanhas (Resumo Simplificado) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <div>
+                        <h2 className="text-base font-bold text-slate-900">Últimas Campanhas</h2>
+                        <p className="text-xs text-slate-500 font-medium">Resumo dos envios mais recentes</p>
+                    </div>
+                    <Link 
+                        to="/prospecting/messages" 
+                        className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                        Ver Monitoramento Detalhado
+                    </Link>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[700px]">
-                        <thead>
-                            <tr className="border-b border-slate-100 bg-slate-50/50">
-                                <th className="px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Campanha</th>
-                                <th className="px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                <th className="px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Progresso (Envios / Falhas)</th>
-                                <th className="px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Taxas (%)</th>
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                            <tr>
+                                <th className="px-6 py-4">Campanha</th>
+                                <th className="px-6 py-4">Data</th>
+                                <th className="px-6 py-4">Progresso</th>
+                                <th className="px-6 py-4 text-right">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {campaigns.length === 0 ? (
+                            {filteredCampaigns.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-5 py-8 text-center text-sm text-slate-500">
-                                        Nenhuma campanha para exibir.
+                                    <td colSpan={4} className="px-6 py-10 text-center text-slate-400 text-sm font-medium">
+                                        Nenhuma campanha encontrada no período.
                                     </td>
                                 </tr>
                             ) : (
-                                campaigns.slice(0, 5).map(camp => {
-                                    const total = camp.total_leads || 0;
-                                    const sent = camp.sent_count || 0;
-                                    const failed = camp.failed_count || 0;
-
-                                    const successRate = total > 0 ? ((sent / total) * 100).toFixed(1) : '0.0';
-                                    const failRate = total > 0 ? ((failed / total) * 100).toFixed(1) : '0.0';
+                                filteredCampaigns.slice(0, 5).map(c => {
+                                    const progress = c.total_leads > 0 ? Math.round(((c.sent_count + c.failed_count + c.invalid_count) / c.total_leads) * 100) : 0;
+                                    
+                                    // Status info mapping
+                                    const statusMap: Record<string, { label: string, color: string, bg: string }> = {
+                                        'active': { label: 'Ativa', color: 'text-blue-700', bg: 'bg-blue-50' },
+                                        'in_progress': { label: 'Em curso', color: 'text-blue-700', bg: 'bg-blue-50' },
+                                        'completed': { label: 'Finalizada', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+                                        'cancelled': { label: 'Cancelada', color: 'text-red-700', bg: 'bg-red-50' },
+                                        'scheduled': { label: 'Agendada', color: 'text-indigo-700', bg: 'bg-indigo-50' },
+                                        'inactive': { label: 'Pendente', color: 'text-purple-700', bg: 'bg-purple-50' },
+                                    };
+                                    
+                                    const st = statusMap[c.status] || { label: c.status, color: 'text-slate-600', bg: 'bg-slate-100' };
 
                                     return (
-                                        <tr key={camp.id} className="hover:bg-slate-50/80 transition-colors group">
-                                            {/* 1. Nome e Data */}
-                                            <td className="px-5 py-3">
-                                                <div className="font-bold text-slate-800 text-[13px] leading-tight mb-0.5">{camp.name}</div>
-                                                <div className="text-[11px] text-slate-400 font-medium">{new Date(camp.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+                                        <tr key={c.id} className="hover:bg-slate-50/30 transition-colors">
+                                            <td className="px-6 py-4 font-bold text-slate-800 text-sm">{c.name}</td>
+                                            <td className="px-6 py-4 text-slate-500 text-xs font-medium">
+                                                {new Date(c.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                             </td>
-
-                                            {/* 2. Status */}
-                                            <td className="px-5 py-3 text-center">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${camp.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60' :
-                                                        camp.status === 'active' || camp.status === 'in_progress' ? 'bg-blue-50 text-blue-600 border border-blue-200/60' :
-                                                            camp.status === 'failed' ? 'bg-rose-50 text-rose-600 border border-rose-200/60' :
-                                                                'bg-slate-100 text-slate-500 border border-slate-200/60'
-                                                    }`}>
-                                                    {camp.status === 'completed' ? 'Concluída' :
-                                                        camp.status === 'active' ? 'Ativa' :
-                                                            camp.status === 'in_progress' ? 'Progresso' :
-                                                                camp.status === 'failed' ? 'Falha' :
-                                                                    camp.status === 'paused' ? 'Pausada' :
-                                                                        'Pendente'}
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3 w-32">
+                                                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                                                    </div>
+                                                    <span className="text-[11px] font-bold text-slate-600 tabular-nums">{progress}%</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${st.bg} ${st.color}`}>
+                                                    {st.label}
                                                 </span>
-                                            </td>
-
-                                            {/* 3. Envios / Falhas (Barra de Progresso) */}
-                                            <td className="px-5 py-3">
-                                                <div className="flex flex-col gap-1.5 w-full max-w-[160px] mx-auto">
-                                                    <div className="flex h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                        <div className="bg-emerald-500 transition-all duration-500" style={{ width: `${successRate}%` }}></div>
-                                                        <div className="bg-rose-400 transition-all duration-500" style={{ width: `${failRate}%` }}></div>
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-[10px] font-medium">
-                                                        <span className="text-slate-500"><strong className="text-emerald-600 font-bold">{sent}</strong> env</span>
-                                                        <span className="text-slate-500"><strong className="text-rose-500 font-bold">{failed}</strong> fal</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* 4. Taxas */}
-                                            <td className="px-5 py-3 text-center">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-[11px] min-w-[42px] text-center" title="Taxa de Sucesso">
-                                                        {successRate}%
-                                                    </span>
-                                                    <span className="text-rose-700 font-bold bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded text-[11px] min-w-[42px] text-center" title="Taxa de Falha">
-                                                        {failRate}%
-                                                    </span>
-                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -578,6 +565,11 @@ const Dashboard: React.FC = () => {
                         </tbody>
                     </table>
                 </div>
+                {filteredCampaigns.length > 5 && (
+                    <div className="px-6 py-4 bg-slate-50/30 border-t border-slate-50 text-center">
+                        <p className="text-[11px] text-slate-400 font-medium">Mostrando as 5 campanhas mais recentes de um total de {filteredCampaigns.length}</p>
+                    </div>
+                )}
             </div>
         </div>
     );

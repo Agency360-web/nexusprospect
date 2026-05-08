@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Megaphone, Settings2, Play, Save, Loader2, Clock, ChevronLeft, Video, Phone, MoreVertical, CheckCheck, Building2, Folder, Users } from 'lucide-react';
+import { User, Megaphone, Settings2, Play, Save, Loader2, Clock, ChevronLeft, Video, Phone, MoreVertical, CheckCheck, Building2, Folder, Users, Calendar, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import { WEBHOOKS } from '../../config/webhooks';
@@ -45,6 +45,10 @@ const CampaignConfiguratorProV2: React.FC = () => {
     const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [leadsPerPage, setLeadsPerPage] = useState(20);
+
+    // === ESTADOS: AGENDAMENTO ===
+    const [isAutomated, setIsAutomated] = useState(false);
+    const [scheduledAt, setScheduledAt] = useState('');
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -169,6 +173,26 @@ const CampaignConfiguratorProV2: React.FC = () => {
         if (!prospectorName || !prospectorCompany) return alert('Preencha o Nome e Empresa do prospectador.');
         if (!campaignName) return alert('Dê um nome à campanha.');
 
+        // Validação de agendamento
+        if (isAutomated) {
+            if (!scheduledAt) {
+                alert('Por favor, defina a data e hora para o agendamento.');
+                return;
+            }
+            const selectedDate = new Date(scheduledAt);
+            const now = new Date();
+            const maxDate = new Date(Date.now() + 32 * 24 * 60 * 60 * 1000);
+            
+            if (selectedDate <= now) {
+                alert('A data de agendamento deve ser no futuro.');
+                return;
+            }
+            if (selectedDate > maxDate) {
+                alert('O agendamento pode ser feito no máximo para 32 dias à frente.');
+                return;
+            }
+        }
+
 
         setIsSubmitting(true);
         try {
@@ -198,7 +222,7 @@ const CampaignConfiguratorProV2: React.FC = () => {
                 .from('campaigns')
                 .insert([{
                     name: campaignName,
-                    status: 'active',
+                    status: isAutomated ? 'scheduled' : 'active',
                     type: 'whatsapp_pro_v2',
                     user_id: user?.id,
                     configuration: {
@@ -211,6 +235,8 @@ const CampaignConfiguratorProV2: React.FC = () => {
                         selectedLeadsCount: fullSelectedLeads.length,
                         clientId: selectedClientId,
                         folderId: selectedFolderId || null,
+                        isAutomated,
+                        scheduledAt: isAutomated ? new Date(scheduledAt).toISOString() : null,
                     }
                 }])
                 .select()
@@ -289,6 +315,8 @@ const CampaignConfiguratorProV2: React.FC = () => {
                     maxDelay, 
                     activeInstancesCount: activeInstances.length 
                 },
+                isAutomated,
+                scheduledAt: isAutomated ? new Date(scheduledAt).toISOString() : null,
                 instances: activeInstances.map(i => ({
                     id: i.id,
                     name: i.name,
@@ -661,6 +689,47 @@ const CampaignConfiguratorProV2: React.FC = () => {
                     }}
                 />
                 <SectionButtons buttons={buttons} setButtons={setButtons} />
+
+                {/* SEÇÃO 8: Agendamento */}
+                <section id="sec-agendamento" className="bg-white border border-slate-200 rounded-lg p-6">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={isAutomated}
+                            onChange={(e) => setIsAutomated(e.target.checked)}
+                            className="w-5 h-5 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
+                        />
+                        <div className="flex flex-col">
+                            <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                <Clock size={16} className="text-brand-500" />
+                                Agendar Campanha
+                            </span>
+                            <span className="text-xs text-slate-500">O sistema fará o disparo automaticamente na data e hora escolhidas.</span>
+                        </div>
+                    </label>
+
+                    {isAutomated && (
+                        <div className="mt-4 pt-6 border-t border-slate-200 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                <Calendar size={16} className="text-brand-500" />
+                                Data e Hora do Disparo *
+                            </label>
+                            <input 
+                                type="datetime-local" 
+                                required={isAutomated}
+                                value={scheduledAt}
+                                onChange={(e) => setScheduledAt(e.target.value)}
+                                min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                max={new Date(new Date().getTime() + 32 * 24 * 60 * 60 * 1000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                className="w-full bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all text-sm font-bold"
+                            />
+                            <p className="mt-3 text-xs text-slate-500 flex items-center gap-1">
+                                <AlertCircle size={12} />
+                                Selecione um horário com pelo menos 5 minutos de antecedência.
+                            </p>
+                        </div>
+                    )}
+                </section>
 
                 {/* BOTÃO DE SALVAR */}
                 <div className="pt-8">

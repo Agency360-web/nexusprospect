@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { WEBHOOKS } from '../../config/webhooks';
-import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone, Lock, Rocket } from 'lucide-react';
+import { Send, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Zap, Bot, Layers, X, ArrowRight, Building2, Folder, Smartphone, Lock, Rocket, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import CampaignMonitor from './CampaignMonitor';
 import CampaignConfiguratorProV2 from '../campaign/CampaignConfiguratorProV2';
@@ -28,6 +28,8 @@ const WhatsAppCampaignForm: React.FC = () => {
     const [folders, setFolders] = useState<any[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string>('');
     const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+    const [isAutomated, setIsAutomated] = useState(false);
+    const [scheduledAt, setScheduledAt] = useState('');
     const [connections, setConnections] = useState<any[]>([]);
     const [selectedConnection, setSelectedConnection] = useState<string>('');
     const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
@@ -126,6 +128,26 @@ const WhatsAppCampaignForm: React.FC = () => {
             return;
         }
 
+        // Check for automation restrictions
+        if (isAutomated) {
+            if (!scheduledAt) {
+                alert('Por favor, defina a data e hora para o agendamento.');
+                return;
+            }
+            const selectedDate = new Date(scheduledAt);
+            const now = new Date();
+            const maxDate = new Date(Date.now() + 32 * 24 * 60 * 60 * 1000);
+            
+            if (selectedDate <= now) {
+                alert('A data de agendamento deve ser no futuro.');
+                return;
+            }
+            if (selectedDate > maxDate) {
+                alert('O agendamento pode ser feito no máximo para 32 dias à frente.');
+                return;
+            }
+        }
+
         setLoading(true);
         setSuccess(false);
 
@@ -134,12 +156,17 @@ const WhatsAppCampaignForm: React.FC = () => {
             const { data: { session } } = await supabase.auth.getSession();
             const userId = session?.user?.id;
 
+            // Fetch the full details of the selected leads so N8N doesn't need to query them back
+            const fullSelectedLeads = selectedLeads
+                .map(id => leads.find(l => l.id === id))
+                .filter(Boolean); // Remove null/undefined
+
             // 1. Save locally to Supabase 'campaigns' table (optional but recommended for history)
             const { data: campaignData, error: dbError } = await supabase
                 .from('campaigns')
                 .insert([{
                     name,
-                    status: 'active',
+                    status: isAutomated ? 'scheduled' : 'inactive', // Status agendada ou inativa
                     type: 'whatsapp_marketing',
                     user_id: userId,
                     configuration: {
@@ -152,7 +179,10 @@ const WhatsAppCampaignForm: React.FC = () => {
                         clientId: selectedClientId,
                         folderId: selectedFolderId || null,
                         selectedConnection,
-                        selectedConnections
+                        selectedConnections,
+                        isAutomated,
+                        scheduledAt: isAutomated ? new Date(scheduledAt).toISOString() : null,
+                        fullSelectedLeads
                     }
                 }])
                 .select()
@@ -205,34 +235,6 @@ const WhatsAppCampaignForm: React.FC = () => {
             }
 
 
-            // 2. Prepare payload for N8N Webhook (JSON format)
-            const convertFileToBase64 = (file: File): Promise<string> => {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = () => resolve(reader.result as string);
-                    reader.onerror = (error) => reject(error);
-                });
-            };
-
-            let fileBase64 = null;
-            let fileMimeType = null;
-            let fileName = null;
-
-            if (file) {
-                fileBase64 = await convertFileToBase64(file);
-                fileMimeType = file.type;
-                fileName = file.name;
-            }
-
-            const currentConn = connections.find(c => c.instance === selectedConnection);
-            const currentFolder = folders.find(f => f.id === selectedFolderId);
-
-            // Fetch the full details of the selected leads so N8N doesn't need to query them back
-            const fullSelectedLeads = selectedLeads
-                .map(id => leads.find(l => l.id === id))
-                .filter(Boolean); // Remove null/undefined
-
             // 1.5. Inserir registros de campaign_messages com status 'pending'
             if (campaignData?.id) {
                 const messagesToInsert = fullSelectedLeads.map((lead: any) => ({
@@ -257,61 +259,7 @@ const WhatsAppCampaignForm: React.FC = () => {
                 console.log(`Inseridos ${messagesToInsert.length} registros de campaign_messages como pending.`);
             }
 
-            // Build instances data for the webhook
-            let instancesData;
-            if (campaignType === 'multi-ai') {
-                instancesData = selectedConnections.map(inst => {
-                    const conn = connections.find(c => c.instance === inst);
-                    return {
-                        instance: inst,
-                        token: conn?.token || null,
-                        profileName: conn?.profile_name || inst,
-                        phoneNumber: conn?.phone_number || null,
-                    };
-                });
-            } else {
-                instancesData = [{
-                    instance: selectedConnection,
-                    token: currentConn?.token || null,
-                    profileName: currentConn?.profile_name || selectedConnection,
-                    phoneNumber: currentConn?.phone_number || null,
-                }];
-            }
-
-            const payload = {
-                campaignType,
-                name,
-                minDelay,
-                maxDelay,
-                messageDelay,
-                messageText,
-                selectedLeads: fullSelectedLeads,
-                clientId: selectedClientId,
-                folderId: selectedFolderId || null,
-                folderName: currentFolder?.name || 'Todas as Pastas',
-                userId: userId || '',
-                campaignId: campaignData?.id || null,
-                file: fileBase64,
-                mimetype: fileMimeType,
-                fileName: fileName,
-                // Single instance (backward compatible)
-                instance: campaignType === 'multi-ai' ? instancesData[0]?.instance : selectedConnection,
-                instanceToken: campaignType === 'multi-ai' ? instancesData[0]?.token : (currentConn?.token || null),
-                // Multi-instance data
-                instances: instancesData,
-                instanceCount: instancesData.length,
-            };
-
-            // Disparo assíncrono (Fire and Forget) para evitar timeouts na tela
-            fetch(WEBHOOKS.CAMPAIGN_DISPATCH, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            }).catch(e => console.log('Fetch request completed or timeout as expected:', e));
-
-            console.log('Campanha enviada para a fila do n8n (Assíncrono).');
+            console.log('Campanha salva com sucesso. Aguardando início manual.');
 
             setSuccess(true);
 
@@ -452,7 +400,7 @@ const WhatsAppCampaignForm: React.FC = () => {
                 {/* Monitoramento de Campanhas (posição padrão: tipo não selecionado) */}
                 {!campaignType && (
                     <div className="mt-6">
-                        <CampaignMonitor />
+                        <CampaignMonitor initialExpanded={true} />
                     </div>
                 )}
             </div>
@@ -846,7 +794,48 @@ const WhatsAppCampaignForm: React.FC = () => {
                         </p>
                     </div>
 
-                    {/* 7. Criar Campanha */}
+                    {/* 8. Agendamento */}
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                checked={isAutomated}
+                                onChange={(e) => setIsAutomated(e.target.checked)}
+                                className="w-5 h-5 rounded border-slate-300 text-brand-500 focus:ring-brand-500/50"
+                            />
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <Clock size={16} className="text-brand-500" />
+                                    Agendar Campanha
+                                </span>
+                                <span className="text-xs text-slate-500">O sistema fará o disparo automaticamente na data e hora escolhidas.</span>
+                            </div>
+                        </label>
+
+                        {isAutomated && (
+                            <div className="mt-4 pt-6 border-t border-slate-200 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                    <Calendar size={16} className="text-brand-500" />
+                                    Data e Hora do Disparo *
+                                </label>
+                                <input 
+                                    type="datetime-local" 
+                                    required={isAutomated}
+                                    value={scheduledAt}
+                                    onChange={(e) => setScheduledAt(e.target.value)}
+                                    min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                    max={new Date(new Date().getTime() + 32 * 24 * 60 * 60 * 1000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                    className="w-full bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all text-lg font-bold"
+                                />
+                                <p className="mt-3 text-xs text-slate-500 flex items-center gap-1">
+                                    <AlertCircle size={12} />
+                                    Selecione um horário com pelo menos 5 minutos de antecedência.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 9. Criar Campanha */}
                     <div className="pt-6 border-t border-slate-100 flex justify-end">
                         <button
                             type="submit"
@@ -869,7 +858,7 @@ const WhatsAppCampaignForm: React.FC = () => {
 
                     {/* Monitoramento de Campanhas (posição: após formulário) */}
                     <div className="mt-2">
-                        <CampaignMonitor />
+                        <CampaignMonitor initialExpanded={true} />
                     </div>
                 </div>
             )}

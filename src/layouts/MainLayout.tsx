@@ -15,7 +15,7 @@ import {
     Plus,
     Target,
     Wrench,
-
+    GraduationCap,
 } from 'lucide-react';
 import { useRBAC } from '../hooks/useRBAC';
 
@@ -156,14 +156,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         )}
 
 
-
                         {/* Disparador temporariamente desativado */}
 
                     </nav>
 
                     <div className="p-4 border-t border-slate-100 space-y-2">
 
-
+                        {canAccess('clients') && (
+                            <SidebarItem
+                                to="/tutorials"
+                                icon={<GraduationCap size={20} />}
+                                label="Tutoriais"
+                                active={location.pathname.startsWith('/tutorials')}
+                                isCollapsed={isCollapsed}
+                            />
+                        )}
                         {canAccess('settings') && (
                             <SidebarItem
                                 to="/settings"

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { WEBHOOKS } from '../../config/webhooks';
 import {
     Activity,
     CheckCircle2,
@@ -25,7 +26,8 @@ import {
     Layers,
     Users,
     Timer,
-    Smartphone
+    Smartphone,
+    Play
 } from 'lucide-react';
 
 interface CampaignStats {
@@ -43,29 +45,37 @@ interface CampaignStats {
 
 const REFRESH_INTERVAL = 30000; // 30 segundos
 
-const CampaignMonitor: React.FC = () => {
+interface CampaignMonitorProps {
+    initialExpanded?: boolean;
+}
+
+const CampaignMonitor: React.FC<CampaignMonitorProps> = ({ initialExpanded = false }) => {
     const { user } = useAuth();
     const [campaigns, setCampaigns] = useState<CampaignStats[]>([]);
     const [loading, setLoading] = useState(true);
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState(initialExpanded);
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
     const [detailsCampaign, setDetailsCampaign] = useState<CampaignStats | null>(null);
+    const [instanceMismatch, setInstanceMismatch] = useState<{ campaign: CampaignStats; fallbackInstance: any; freshConfig: any } | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const CAMPAIGNS_PER_PAGE = 4;
 
     const fetchCampaigns = useCallback(async () => {
         if (!user) return;
 
         try {
-            const { data: campaignsData, error: campError } = await supabase
+            const { data: campaignsData } = await supabase
                 .from('campaigns')
-                .select('id, name, status, created_at, configuration')
+                .select('*')
                 .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(10);
+                .order('created_at', { ascending: false });
 
-            if (campError || !campaignsData || campaignsData.length === 0) {
+            if (!campaignsData) {
                 setCampaigns([]);
                 setLoading(false);
                 return;
@@ -198,6 +208,162 @@ const CampaignMonitor: React.FC = () => {
         }
     };
 
+    const handleStartCampaign = async (campaign: CampaignStats, overrideInstance?: any) => {
+        setActionLoading(campaign.id);
+        try {
+            // 1. Fetch from DB with user_id to guarantee multi-tenant safety
+            const { data: dbData, error: dbError } = await supabase
+                .from('campaigns')
+                .select('configuration')
+                .eq('id', campaign.id)
+                .eq('user_id', user?.id)
+                .single();
+
+            if (dbError || !dbData) {
+                alert('Erro de segurança: Campanha não encontrada ou não pertence a este usuário.');
+                return;
+            }
+            
+            const config = dbData.configuration;
+            
+            // 2. Fetch active connections
+            const { data: connData } = await supabase.functions.invoke('whatsapp-uazapi', {
+                body: { action: 'list' },
+            });
+            const activeConnections = (connData?.connections || []).filter((c: any) => c.status === 'connected' || c.status === 'open');
+
+            if (activeConnections.length === 0) {
+                alert('Nenhuma instância do WhatsApp está conectada no momento. Por favor, conecte uma instância antes de iniciar a campanha.');
+                return;
+            }
+
+            // 3. Validação de Instância (UX/UI)
+            if (!overrideInstance) {
+                let instanceIsStillActive = false;
+                if (config.campaignType === 'multi-ai') {
+                    instanceIsStillActive = config.selectedConnections?.every((inst: string) => 
+                        activeConnections.some((c: any) => c.instance === inst)
+                    );
+                } else {
+                    instanceIsStillActive = activeConnections.some((c: any) => c.instance === config.selectedConnection);
+                }
+
+                if (!instanceIsStillActive) {
+                    setInstanceMismatch({ 
+                        campaign, 
+                        fallbackInstance: activeConnections[0], // Sugere a primeira ativa
+                        freshConfig: config
+                    });
+                    return; // Interrompe e aguarda ação do usuário no modal
+                }
+            }
+
+            let instancesData;
+            if (config.campaignType === 'multi-ai') {
+                if (overrideInstance) {
+                    instancesData = [{
+                        instance: overrideInstance.instance,
+                        token: overrideInstance.token || null,
+                        profileName: overrideInstance.profile_name || overrideInstance.instance,
+                        phoneNumber: overrideInstance.phone_number || null,
+                    }];
+                } else {
+                    instancesData = (config.selectedConnections || []).map((inst: string) => {
+                        const conn = activeConnections.find((c: any) => c.instance === inst);
+                        return {
+                            instance: inst,
+                            token: conn?.token || null,
+                            profileName: conn?.profile_name || inst,
+                            phoneNumber: conn?.phone_number || null,
+                        };
+                    });
+
+                    // Se por algum motivo não houver instâncias (array vazio), pega a primeira ativa como fallback
+                    if (instancesData.length === 0 && activeConnections.length > 0) {
+                        instancesData = [{
+                            instance: activeConnections[0].instance,
+                            token: activeConnections[0].token || null,
+                            profileName: activeConnections[0].profile_name || activeConnections[0].instance,
+                            phoneNumber: activeConnections[0].phone_number || null,
+                        }];
+                    }
+                }
+            } else {
+                const connToUse = overrideInstance || activeConnections.find((c: any) => c.instance === config.selectedConnection) || activeConnections[0];
+                instancesData = [{
+                    instance: connToUse?.instance,
+                    token: connToUse?.token || null,
+                    profileName: connToUse?.profile_name || connToUse?.instance,
+                    phoneNumber: connToUse?.phone_number || null,
+                }];
+            }
+
+            // 2. Handle media if any
+            let fileBase64 = null;
+            if (config.mediaUrl) {
+                try {
+                    const response = await fetch(config.mediaUrl);
+                    const blob = await response.blob();
+                    fileBase64 = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(blob);
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.onerror = (error) => reject(error);
+                    });
+                } catch (err) {
+                    console.error('Erro ao baixar/converter mediaUrl para base64:', err);
+                }
+            }
+
+            const payload = {
+                campaignType: config.campaignType,
+                name: campaign.name,
+                minDelay: config.minDelay,
+                maxDelay: config.maxDelay,
+                messageDelay: config.messageDelay,
+                messageText: config.messageText,
+                selectedLeads: config.fullSelectedLeads || [],
+                clientId: config.clientId,
+                folderId: config.folderId || null,
+                folderName: config.folderName || 'Todas as Pastas',
+                userId: user?.id || '',
+                campaignId: campaign.id,
+                file: fileBase64,
+                mimetype: config.mediaType || null,
+                fileName: config.mediaName || null,
+                // Single instance (backward compatible)
+                instance: config.campaignType === 'multi-ai' ? instancesData[0]?.instance : config.selectedConnection,
+                instanceToken: config.campaignType === 'multi-ai' ? instancesData[0]?.token : instancesData[0]?.token,
+                // Multi-instance data
+                instances: instancesData,
+                instanceCount: instancesData?.length || 1,
+            };
+
+            // 4. Atualizar status no banco com RLS/multi-tenant check
+            await supabase
+                .from('campaigns')
+                .update({ status: 'active', configuration: { ...config, selectedConnection: instancesData[0]?.instance } })
+                .eq('id', campaign.id)
+                .eq('user_id', user?.id);
+
+            // 5. Disparar webhook
+            fetch(WEBHOOKS.CAMPAIGN_DISPATCH, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            }).catch(e => console.log('Webhook dispatched:', e));
+
+            await fetchCampaigns();
+        } catch (error) {
+            console.error('Erro ao iniciar campanha:', error);
+            alert('Houve um erro ao iniciar a campanha.');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     // === HELPERS ===
 
     const getProgressPercent = (c: CampaignStats) => {
@@ -208,6 +374,14 @@ const CampaignMonitor: React.FC = () => {
     const getCampaignStatusInfo = (c: CampaignStats) => {
         if (c.status === 'cancelled') {
             return { label: 'Cancelada', color: 'text-red-700', bg: 'bg-red-50', dotColor: 'bg-red-500' };
+        }
+        if (c.status === 'inactive') {
+            return { label: 'Pendente', color: 'text-purple-700', bg: 'bg-purple-50', dotColor: 'bg-purple-500' };
+        }
+        if (c.status === 'scheduled') {
+            const dateStr = c.configuration?.scheduledAt;
+            const formattedDate = dateStr ? new Date(dateStr).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+            return { label: `Agendada: ${formattedDate}`, color: 'text-indigo-700', bg: 'bg-indigo-50', dotColor: 'bg-indigo-500' };
         }
         if (c.total === 0) return { label: 'Sem envios', color: 'text-slate-400', bg: 'bg-slate-100', dotColor: 'bg-slate-300' };
 
@@ -252,6 +426,17 @@ const CampaignMonitor: React.FC = () => {
     };
 
     // === RENDER ===
+
+    const totalPages = Math.ceil(campaigns.length / CAMPAIGNS_PER_PAGE);
+    
+    // Auto adjust current page if out of bounds (e.g. after deletion)
+    useEffect(() => {
+        if (campaigns.length > 0 && totalPages > 0 && currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [campaigns.length, currentPage, totalPages]);
+
+    const paginatedCampaigns = campaigns.slice((currentPage - 1) * CAMPAIGNS_PER_PAGE, currentPage * CAMPAIGNS_PER_PAGE);
 
     if (loading) {
         return (
@@ -304,7 +489,7 @@ const CampaignMonitor: React.FC = () => {
             {/* Campaigns List */}
             {expanded && (
                 <div className="border-t border-slate-100 divide-y divide-slate-50">
-                    {campaigns.map((c) => {
+                    {paginatedCampaigns.map((c) => {
                         const progress = getProgressPercent(c);
                         const statusInfo = getCampaignStatusInfo(c);
                         const processed = c.sent + c.failed;
@@ -434,6 +619,23 @@ const CampaignMonitor: React.FC = () => {
                                         Ver Detalhes
                                     </button>
 
+                                    {/* Iniciar Campanha - só mostra se inativa */}
+                                    {c.status === 'inactive' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleStartCampaign(c)}
+                                            disabled={actionLoading === c.id}
+                                            className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            {actionLoading === c.id ? (
+                                                <RefreshCw size={12} className="animate-spin" />
+                                            ) : (
+                                                <Play size={12} />
+                                            )}
+                                            Iniciar Campanha
+                                        </button>
+                                    )}
+
                                     {/* Parar - só mostra se campanha está ativa com pendentes */}
                                     {active && (
                                         <button
@@ -491,6 +693,49 @@ const CampaignMonitor: React.FC = () => {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {expanded && totalPages > 1 && (
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <span className="text-xs font-medium text-slate-500">
+                        Mostrando {(currentPage - 1) * CAMPAIGNS_PER_PAGE + 1} a {Math.min(currentPage * CAMPAIGNS_PER_PAGE, campaigns.length)} de {campaigns.length} campanhas
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Anterior
+                        </button>
+                        <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                <button
+                                    key={page}
+                                    type="button"
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                                        currentPage === page
+                                            ? 'bg-slate-900 text-white'
+                                            : 'text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Próxima
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -721,6 +966,43 @@ const CampaignMonitor: React.FC = () => {
                     </div>
                 );
             })()}
+
+            {/* ============ MODAL DE AVISO DE INSTÂNCIA ============ */}
+            {instanceMismatch && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 p-6">
+                        <div className="flex items-center gap-3 mb-4 text-amber-600">
+                            <AlertTriangle size={24} />
+                            <h3 className="text-lg font-black text-slate-800">Instância Diferente</h3>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+                            A instância conectada no momento é diferente da instância configurada na criação desta campanha (ou a original está desconectada). Podemos prosseguir com o disparo usando a instância atual ativa (<strong>{instanceMismatch.fallbackInstance.profile_name || instanceMismatch.fallbackInstance.instance}</strong>)?
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const payload = instanceMismatch;
+                                    setInstanceMismatch(null);
+                                    handleStartCampaign(payload.campaign, payload.fallbackInstance);
+                                }}
+                                className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 font-bold py-3 px-4 rounded-xl transition-colors text-center"
+                            >
+                                Sim, prosseguir
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setInstanceMismatch(null);
+                                }}
+                                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl transition-colors text-center"
+                            >
+                                Não, reconectar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
