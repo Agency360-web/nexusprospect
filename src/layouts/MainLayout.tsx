@@ -7,12 +7,8 @@ import {
     X,
     Users,
     ChevronRight,
-    ShieldCheck,
-    DollarSign,
-    Building2,
     ChevronLeft,
     Bot,
-    Plus,
     Target,
     Wrench,
     GraduationCap,
@@ -109,15 +105,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             />
                         )}
 
-                        {canAccess('admin') && (
-                            <SidebarItem
-                                to="/admin"
-                                icon={<Building2 size={20} />}
-                                label="Administração"
-                                active={location.pathname.startsWith('/admin')}
-                                isCollapsed={isCollapsed}
-                            />
-                        )}
+
                         {canAccess('clients') && (
                             <SidebarItem
                                 to="/clients"

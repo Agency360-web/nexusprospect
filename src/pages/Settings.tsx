@@ -3,18 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut,
   User,
-  Link2,
   Cable,
   Webhook,
   ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import IntegrationsTab from '../components/settings/IntegrationsTab';
 import ConnectionsTab from '../components/settings/ConnectionsTab';
 import WebhookTab from '../components/settings/WebhookTab';
 import ChangePasswordTab from '../components/settings/ChangePasswordTab';
 
-type SettingsTab = 'integrations' | 'connections' | 'webhook' | 'security';
+type SettingsTab = 'connections' | 'webhook' | 'security';
 
 const SettingsPage: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -29,7 +27,7 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('integrations');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('connections');
   const displayName = user?.user_metadata?.full_name || '';
 
   const TabItem = ({ id, label, icon: Icon }: { id: SettingsTab, label: string, icon: any }) => (
@@ -66,7 +64,6 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
           <nav className="space-y-1">
-            <TabItem id="integrations" label="Integrações" icon={Link2} />
             <TabItem id="connections" label="Conexão do WhatsApp" icon={Cable} />
             <TabItem id="webhook" label="Webhook" icon={Webhook} />
             <TabItem id="security" label="Segurança" icon={ShieldCheck} />
@@ -87,10 +84,6 @@ const SettingsPage: React.FC = () => {
         <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[calc(100vh-180px)]">
 
           <div className="p-8 flex-1">
-            {activeTab === 'integrations' && (
-              <IntegrationsTab />
-            )}
-
             {activeTab === 'connections' && (
               <ConnectionsTab />
             )}

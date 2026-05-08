@@ -14,7 +14,7 @@ const ClientDetail = lazy(() => import('./pages/ClientDetail'));
 const AiAgents = lazy(() => import('./pages/AiAgents'));
 const Prospecting = lazy(() => import('./pages/Prospecting'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
-const AdministrationDashboard = lazy(() => import('./pages/Administration'));
+
 const ToolsManager = lazy(() => import('./pages/ToolsManager'));
 const WhatsAppVerifier = lazy(() => import('./pages/tools/WhatsAppVerifier'));
 const ContactSynchronizer = lazy(() => import('./pages/tools/ContactSynchronizer'));
@@ -98,13 +98,7 @@ const App: React.FC = () => {
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/admin" element={
-              <ProtectedRoute>
-                <Layout>
-                  <AdministrationDashboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
+
             <Route path="/tools" element={
               <ProtectedRoute>
                 <Layout>
