@@ -142,7 +142,7 @@ serve(async (req) => {
                     file: fileBase64,
                     mimetype: config.mediaType || null,
                     fileName: config.mediaName || null,
-                    instance: config.campaignType === 'multi-ai' ? instancesData[0]?.instance : instancesData[0]?.instance,
+                    instance: instancesData[0]?.instance,
                     instanceToken: instancesData[0]?.token,
                     instances: instancesData,
                     instanceCount: instancesData.length,

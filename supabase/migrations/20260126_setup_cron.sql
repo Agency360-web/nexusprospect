@@ -15,7 +15,7 @@ SELECT cron.schedule(
     '* * * * *',                       -- every minute
     $$
     SELECT net.http_post(
-        url := 'https://' || current_setting('request.headers')::json->>'host' || '/functions/v1/dispatch-campaigns',
+        url := 'https://' || current_setting('request.headers')::json->>'host' || '/functions/v1/process-scheduled-campaigns',
         headers := jsonb_build_object(
             'Content-Type', 'application/json',
             'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key')

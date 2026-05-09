@@ -161,6 +161,18 @@ const WhatsAppCampaignForm: React.FC = () => {
                 .map(id => leads.find(l => l.id === id))
                 .filter(Boolean); // Remove null/undefined
 
+            const folderName = folders.find(f => f.id === selectedFolderId)?.name || 'Todas as Pastas';
+            const instanceToken = connections.find(c => c.instance === selectedConnection)?.token || null;
+            
+            // For multi-ai, we might want all tokens
+            const selectedConnectionsDetails = selectedConnections.map(inst => {
+                const conn = connections.find(c => c.instance === inst);
+                return {
+                    instance: inst,
+                    token: conn?.token || null
+                };
+            });
+
             // 1. Save locally to Supabase 'campaigns' table (optional but recommended for history)
             const { data: campaignData, error: dbError } = await supabase
                 .from('campaigns')
@@ -179,9 +191,12 @@ const WhatsAppCampaignForm: React.FC = () => {
                         clientId: selectedClientId,
                         folderId: selectedFolderId || null,
                         selectedConnection,
+                        instanceToken,
                         selectedConnections,
+                        selectedConnectionsDetails,
                         isAutomated,
                         scheduledAt: isAutomated ? new Date(scheduledAt).toISOString() : null,
+                        folderName,
                         fullSelectedLeads
                     }
                 }])
@@ -259,7 +274,9 @@ const WhatsAppCampaignForm: React.FC = () => {
                 console.log(`Inseridos ${messagesToInsert.length} registros de campaign_messages como pending.`);
             }
 
-            console.log('Campanha salva com sucesso. Aguardando início manual.');
+            console.log(isAutomated 
+                ? `Campanha agendada para ${scheduledAt}. O disparador automático cuidará do envio.` 
+                : 'Campanha salva com sucesso. Aguardando início manual.');
 
             setSuccess(true);
 
