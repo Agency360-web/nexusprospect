@@ -69,13 +69,14 @@ const CampaignMonitor: React.FC<CampaignMonitorProps> = ({ initialExpanded = fal
         if (!user) return;
 
         try {
+            // Passo 1: Buscar TODAS as campanhas onde o status seja ativo
             const { data: campaignsData } = await supabase
                 .from('campaigns')
                 .select('*')
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
-            if (!campaignsData) {
+            if (!campaignsData || campaignsData.length === 0) {
                 setCampaigns([]);
                 setLoading(false);
                 return;
@@ -83,32 +84,62 @@ const CampaignMonitor: React.FC<CampaignMonitorProps> = ({ initialExpanded = fal
 
             const campaignIds = campaignsData.map(c => c.id);
 
-            const { data: messagesData, error: msgError } = await supabase
-                .from('campaign_messages')
-                .select('campaign_id, status')
-                .in('campaign_id', campaignIds);
+            // Realiza a busca paginada para contornar o limite de 1000 linhas do Supabase
+            let messagesData: any[] = [];
+            let from = 0;
+            const step = 1000;
+            
+            while (true) {
+                const { data, error: msgError } = await supabase
+                    .from('campaign_messages')
+                    .select('campaign_id, status')
+                    .in('campaign_id', campaignIds)
+                    .range(from, from + step - 1);
 
-            if (msgError) {
-                console.error('Erro ao buscar messages:', msgError);
+                if (msgError) {
+                    console.error('Erro ao buscar messages:', msgError);
+                    break;
+                }
+
+                if (data) {
+                    messagesData = [...messagesData, ...data];
+                }
+
+                if (!data || data.length < step) {
+                    break;
+                }
+                from += step;
             }
 
             const statsMap: Record<string, { total: number; sent: number; failed: number; invalid: number; pending: number }> = {};
             campaignIds.forEach(id => {
-                statsMap[id] = { total: 0, sent: 0, failed: 0, invalid: 0, pending: 0 };
+                const camp = campaignsData.find(c => c.id === id);
+                // Extrai o total do payload/config original (suporta versões e formulários diferentes)
+                const configTotal = camp?.configuration?.selectedLeadsCount || camp?.configuration?.fullSelectedLeads?.length || camp?.configuration?.totalLeads || 0;
+                statsMap[id] = { total: configTotal, sent: 0, failed: 0, invalid: 0, pending: 0 };
             });
 
             if (messagesData) {
                 messagesData.forEach((msg: any) => {
                     const s = statsMap[msg.campaign_id];
                     if (s) {
-                        s.total++;
                         if (msg.status === 'sent') s.sent++;
                         else if (msg.status === 'failed') s.failed++;
                         else if (msg.status === 'invalid') s.invalid++;
-                        else s.pending++;
+                        // Ignoramos s.total++ e s.pending++ aqui para evitar duplicidade 
+                        // e depender exclusivamente dos processados vs total original
                     }
                 });
             }
+
+            // Calcula os pendentes reais e ajusta o total se houver mais processados do que o esperado
+            Object.values(statsMap).forEach(s => {
+                const processed = s.sent + s.failed + s.invalid;
+                if (processed > s.total) {
+                    s.total = processed; // Corrige caso o banco tenha mais registros que o previsto
+                }
+                s.pending = Math.max(0, s.total - processed);
+            });
 
             const result: CampaignStats[] = campaignsData.map(c => {
                 const stats = statsMap[c.id];
@@ -383,23 +414,34 @@ const CampaignMonitor: React.FC<CampaignMonitorProps> = ({ initialExpanded = fal
             const formattedDate = dateStr ? new Date(dateStr).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
             return { label: `Agendada: ${formattedDate}`, color: 'text-indigo-700', bg: 'bg-indigo-50', dotColor: 'bg-indigo-500' };
         }
-        if (c.total === 0) return { label: 'Sem envios', color: 'text-slate-400', bg: 'bg-slate-100', dotColor: 'bg-slate-300' };
 
         const processed = c.sent + c.failed;
-        const isComplete = processed >= c.total || c.status === 'completed';
+        const isComplete = (processed >= c.total && c.total > 0) || c.status === 'completed';
 
-        if (isComplete && c.failed === 0 && c.pending === 0) {
-            return { label: 'Finalizada ✓', color: 'text-emerald-700', bg: 'bg-emerald-50', dotColor: 'bg-emerald-500' };
+        // 1. Prioridade para Campanhas Ativas ou com envios recentes
+        if (c.status === 'active' || (processed > 0 && !isComplete)) {
+            if (c.pending > 0 && processed > 0) {
+                return { label: 'Enviando...', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
+            }
+            if (c.pending > 0 && processed === 0) {
+                return { label: 'Aguardando', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
+            }
+            return { label: 'Em andamento', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
         }
-        if (isComplete && c.failed > 0) {
-            return { label: `Finalizada • ${c.failed} falha${c.failed !== 1 ? 's' : ''}`, color: 'text-amber-700', bg: 'bg-amber-50', dotColor: 'bg-amber-500' };
+
+        // 2. Campanhas finalizadas
+        if (isComplete && c.total > 0) {
+            if (c.failed === 0 && c.pending === 0) {
+                return { label: 'Finalizada ✓', color: 'text-emerald-700', bg: 'bg-emerald-50', dotColor: 'bg-emerald-500' };
+            }
+            if (c.failed > 0) {
+                return { label: `Finalizada • ${c.failed} falha${c.failed !== 1 ? 's' : ''}`, color: 'text-amber-700', bg: 'bg-amber-50', dotColor: 'bg-amber-500' };
+            }
         }
-        if (c.pending > 0 && processed > 0) {
-            return { label: 'Enviando...', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
-        }
-        if (c.pending > 0 && processed === 0) {
-            return { label: 'Aguardando', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
-        }
+
+        // 3. Fallbacks
+        if (c.total === 0) return { label: 'Sem envios', color: 'text-slate-400', bg: 'bg-slate-100', dotColor: 'bg-slate-300' };
+
         return { label: 'Em andamento', color: 'text-blue-700', bg: 'bg-blue-50', dotColor: 'bg-blue-500 animate-pulse' };
     };
 

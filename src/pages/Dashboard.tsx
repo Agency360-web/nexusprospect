@@ -72,16 +72,34 @@ const Dashboard: React.FC = () => {
                 return;
             }
 
-            // Step 2: Fetch messages for all campaigns (same as CampaignMonitor)
+            // Step 2: Fetch messages for all campaigns (with pagination to bypass 1000 limit)
             const campaignIds = campaignsData.map(c => c.id);
 
+            let messagesData: any[] = [];
+            let from = 0;
+            const step = 1000;
+            
+            while (true) {
+                const { data, error: msgError } = await supabase
+                    .from('campaign_messages')
+                    .select('campaign_id, status')
+                    .in('campaign_id', campaignIds)
+                    .range(from, from + step - 1);
 
-            const { data: messagesData, error: msgError } = await supabase
-                .from('campaign_messages')
-                .select('campaign_id, status')
-                .in('campaign_id', campaignIds);
+                if (msgError) {
+                    console.error('Erro ao buscar messages Dashboard:', msgError);
+                    break;
+                }
 
+                if (data) {
+                    messagesData = [...messagesData, ...data];
+                }
 
+                if (!data || data.length < step) {
+                    break;
+                }
+                from += step;
+            }
 
             // Step 3: Aggregate stats per campaign (same as CampaignMonitor)
             const statsMap: Record<string, { total: number; sent: number; failed: number; invalid: number; pending: number }> = {};
