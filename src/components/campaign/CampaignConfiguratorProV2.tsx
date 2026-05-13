@@ -227,16 +227,59 @@ const CampaignConfiguratorProV2: React.FC = () => {
                     user_id: user?.id,
                     configuration: {
                         campaignType: 'pro-v2',
-                        prospector: { name: prospectorName, company: prospectorCompany, role: prospectorRole },
+
+                        // === PROSPECTOR ===
+                        prospector: {
+                            name: prospectorName,
+                            company: prospectorCompany,
+                            role: prospectorRole,
+                            identificationMode,
+                            formattedIdentification: previewText.split('\n\n')[0] || '',
+                        },
+                        saudacao1: prospectorName,
+
+                        // === PRODUTO / OFERTA ===
                         product: productService,
                         promise: campaignPromise,
                         niche: campaignNiche,
+
+                        // === CONFIGURAÇÕES DE DISPARO ===
                         dispatch: { startTime, endTime, roundLimit, minDelay, maxDelay },
-                        selectedLeadsCount: fullSelectedLeads.length,
-                        clientId: selectedClientId,
-                        folderId: selectedFolderId || null,
+
+                        // === AGENDAMENTO ===
                         isAutomated,
                         scheduledAt: isAutomated ? new Date(scheduledAt).toISOString() : null,
+
+                        // === LEADS / PASTA / CLIENTE ===
+                        clientId: selectedClientId || null,
+                        clientName: currentClient?.name || null,
+                        folderId: selectedFolderId || null,
+                        folderName: currentFolder?.name || 'Todas as Pastas',
+                        selectedLeadsCount: fullSelectedLeads.length,
+
+                        // === INSTÂNCIAS WHATSAPP ===
+                        selectedInstances: activeInstances.map(i => ({
+                            id: i.id,
+                            name: i.name,
+                            instanceName: i.instanceName,
+                            token: i.token,
+                        })),
+
+                        // === ARRAYS DE MENSAGENS (cron job monta payload completo a partir daqui) ===
+                        ident: messageLibrary.greeting.map(i => replaceVars(i.text)),
+                        anuncio: messageLibrary.presentation.map(i => i.text),
+                        promessa: messageLibrary.product.map(i => i.text),
+                        nichosGenericos: messageLibrary.triggers.map(i => i.text),
+                        frasesNicho: messageLibrary.socialProof.map(i => i.text),
+                        pergunta: messageLibrary.cta.map(i => i.text),
+
+                        // === BOTÕES INTERATIVOS (text + url + type) ===
+                        buttons: buttons
+                            .filter(b => b.text.trim() !== '')
+                            .map(b => ({ text: b.text, url: b.url ?? '', type: b.type ?? 'reply' })),
+                        botao1: buttons[0]?.text || '',
+                        botao2: buttons[1]?.text || '',
+                        botao3: buttons[2]?.text || '',
                     }
                 }])
                 .select()
@@ -335,12 +378,8 @@ const CampaignConfiguratorProV2: React.FC = () => {
 
             const WEBHOOK_URL = WEBHOOKS.CAMPAIGN_PRO_V2;
 
-            // Disparo assíncrono (Fire and Forget)
-            fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).catch(e => console.log('Fetch request completed or timeout as expected:', e));
+            // Webhook dispatch removed. Campaign will be processed by backend (cron/edge function) based on its status.
+            // If manual start is required, implement a separate trigger action elsewhere.
 
             setSubmitSuccess(true);
             setTimeout(() => setSubmitSuccess(false), 4000);
