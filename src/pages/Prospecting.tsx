@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, Send, MapPin, Instagram, Building2 } from 'lucide-react';
+import { Target, Send, MapPin, Instagram, Building2, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, Link, Outlet } from 'react-router-dom';
 
@@ -12,6 +12,7 @@ const Prospecting: React.FC = () => {
         const path = location.pathname;
         if (path.includes('/maps')) return 'maps';
         if (path.includes('/instagram')) return 'instagram';
+        if (path.includes('/email')) return 'email';
         if (path.includes('/cnpj')) return 'cnpj';
         return 'messages';
     };
@@ -53,6 +54,7 @@ const Prospecting: React.FC = () => {
             {/* Tabs Nav - Premium Pills */}
             <div className="flex p-1 bg-white border border-slate-200 rounded-2xl w-full shadow-sm overflow-x-auto hide-scrollbar">
                 <TabButton id="messages" to="/prospecting/messages" label="Disparo no WhatsApp" icon={Send} />
+                <TabButton id="email" to="/prospecting/email" label="Disparo por E-mail" icon={Mail} />
                 <TabButton id="maps" to="/prospecting/maps" label="Leads no Google Maps" icon={MapPin} />
                 {/* <TabButton id="instagram" to="/prospecting/instagram" label="Leads no Instagram" icon={Instagram} /> */}
                 <TabButton id="cnpj" to="/prospecting/cnpj" label="Leads por CNPJ" icon={Building2} />

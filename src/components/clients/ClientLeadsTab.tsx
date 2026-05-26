@@ -531,8 +531,15 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 hidden md:table-cell">
-                                                    <div className="flex items-center space-x-2 text-slate-600 font-mono text-xs font-bold bg-slate-100 w-fit px-3 py-1.5 rounded-lg">
-                                                        <span>{lead.phone || '-'}</span>
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <div className="flex items-center space-x-2 text-slate-600 font-mono text-xs font-bold bg-slate-100 w-fit px-3 py-1.5 rounded-lg">
+                                                            <span>{lead.phone || '-'}</span>
+                                                        </div>
+                                                        {lead.email && (
+                                                            <div className="text-slate-500 text-[10px] font-medium truncate max-w-[180px]">
+                                                                {lead.email}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 hidden lg:table-cell">

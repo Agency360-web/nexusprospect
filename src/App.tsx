@@ -25,6 +25,7 @@ const Tutorials = lazy(() => import('./pages/Tutorials'));
 
 // Components for nested routing
 const WhatsAppCampaignForm = lazy(() => import('./components/prospecting/WhatsAppCampaignForm'));
+const EmailCampaignForm = lazy(() => import('./components/prospecting/EmailCampaignForm'));
 const GoogleMapsLeadSearch = lazy(() => import('./components/prospecting/GoogleMapsLeadSearch'));
 const InstagramLeadSearch = lazy(() => import('./components/prospecting/InstagramLeadSearch'));
 const CnpjLeadSearch = lazy(() => import('./components/prospecting/CnpjLeadSearch'));
@@ -87,6 +88,7 @@ const App: React.FC = () => {
             
               {/* Rotas das Abas */}
               <Route path="messages" element={<WhatsAppCampaignForm />} />
+              <Route path="email" element={<EmailCampaignForm />} />
               <Route path="maps" element={<GoogleMapsLeadSearch />} />
               {/* <Route path="instagram" element={<InstagramLeadSearch />} /> */}
               <Route path="cnpj" element={<CnpjLeadSearch />} />
