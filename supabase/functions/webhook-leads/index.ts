@@ -56,6 +56,17 @@ serve(async (req) => {
     let itemsToProcess: any[] = []
     const detectedSource = (payloadRoot.source || payloadRoot.origin || 'unknown').toLowerCase()
 
+    // Função auxiliar para padronizar o telefone (apenas números, removendo 55 inicial se houver)
+    const formatPhone = (phone: string | number | undefined | null): string => {
+      if (!phone) return '';
+      let digits = String(phone).replace(/\D/g, '');
+      // Se começar com 55 e tiver 12 ou 13 dígitos (ex: 5511999999999), remove o 55 para ficar DDD+NUMERO
+      if (digits.startsWith('55') && digits.length >= 12) {
+        digits = digits.substring(2);
+      }
+      return digits;
+    }
+
     if (Array.isArray(payloadRoot.items)) {
       itemsToProcess = payloadRoot.items
     } else if (Array.isArray(payloadRoot)) {
@@ -96,7 +107,7 @@ serve(async (req) => {
           cnpj: item.cnpj || '',
           razao_social: item.razao_social || '',
           nome_fantasia: item.nome_fantasia || '',
-          telefone: item.telefone || '',
+          telefone: formatPhone(item.telefone),
           email: item.email || '',
           whatsapp: !!(item.whatsapp === true || item.whatsapp === 'true' || item.whatsapp === 1),
           logradouro: item.logradouro || item.address || '',
@@ -118,7 +129,7 @@ serve(async (req) => {
           address: item.endereco || item.address || '',
           city: item.city || '',
           neighborhood: item.neighborhood || '',
-          phone: item.telefone || item.phone || item.phone_number || '',
+          phone: formatPhone(item.telefone || item.phone || item.phone_number),
           website: item.website || '',
           instagram: item.instagram || '',
           facebook: item.facebook || '',
@@ -138,7 +149,7 @@ serve(async (req) => {
           biography: item.biography || '',
           external_url: item.external_url || '',
           public_email: item.public_email || '',
-          public_phone_number: item.public_phone_number || item.contact_phone_number || '',
+          public_phone_number: formatPhone(item.public_phone_number || item.contact_phone_number),
           is_business_account: item.is_business_account === true,
           status: 'new'
         })
