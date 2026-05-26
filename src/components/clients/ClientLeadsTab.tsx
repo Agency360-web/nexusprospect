@@ -42,7 +42,7 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
     const [modalLoading, setModalLoading] = useState(false);
 
     const [newFolderName, setNewFolderName] = useState('');
-    const [newLeadForm, setNewLeadForm] = useState({ name: '', phone: '', company: '', website: '' });
+    const [newLeadForm, setNewLeadForm] = useState({ name: '', phone: '', company: '', website: '', email: '' });
     const [importText, setImportText] = useState('');
     const [targetFolderId, setTargetFolderId] = useState<string>('');
 
@@ -225,7 +225,7 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
 
             if (error) throw error;
 
-            setNewLeadForm({ name: '', phone: '', company: '', website: '' });
+            setNewLeadForm({ name: '', phone: '', company: '', website: '', email: '' });
             setActiveModal('none');
             fetchData();
         } catch (err) {
@@ -605,6 +605,10 @@ export const ClientLeadsTab: React.FC<ClientLeadsTabProps> = ({ clientId }) => {
                         <div className="space-y-2">
                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">WhatsApp</label>
                             <input placeholder="Ex: 5511999999999" required value={newLeadForm.phone} onChange={e => setNewLeadForm({ ...newLeadForm, phone: e.target.value })} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono font-bold" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">E-mail (Opcional)</label>
+                            <input type="email" placeholder="Ex: contato@empresa.com" value={newLeadForm.email} onChange={e => setNewLeadForm({ ...newLeadForm, email: e.target.value })} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-600" />
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Empresa (Opcional)</label>

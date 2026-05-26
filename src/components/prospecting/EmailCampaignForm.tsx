@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { Mail, Image as ImageIcon, Users, Clock, AlignLeft, AlertCircle, CheckCircle2, Building2, Folder, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import CampaignMonitor from './CampaignMonitor';
+import EmailCampaignMonitor from './EmailCampaignMonitor';
 
 const EmailCampaignForm: React.FC = () => {
     const [name, setName] = useState('');
@@ -23,6 +23,8 @@ const EmailCampaignForm: React.FC = () => {
     const [folders, setFolders] = useState<any[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string>('');
     const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+    const [emailConnections, setEmailConnections] = useState<any[]>([]);
+    const [selectedEmailConnectionId, setSelectedEmailConnectionId] = useState<string>('');
     const [isAutomated, setIsAutomated] = useState(false);
     const [scheduledAt, setScheduledAt] = useState('');
 
@@ -30,12 +32,12 @@ const EmailCampaignForm: React.FC = () => {
         const fetchClients = async () => {
             if (!user) return;
             try {
-                const { data, error } = await supabase
-                    .from('clients')
-                    .select('id, name')
-                    .eq('user_id', user.id)
-                    .order('name');
-                if (!error && data) setClients(data);
+                const [clientsRes, emailsRes] = await Promise.all([
+                    supabase.from('clients').select('id, name').eq('user_id', user.id).order('name'),
+                    supabase.from('email_connections').select('id, name, email').eq('user_id', user.id).order('name')
+                ]);
+                if (!clientsRes.error && clientsRes.data) setClients(clientsRes.data);
+                if (!emailsRes.error && emailsRes.data) setEmailConnections(emailsRes.data);
             } catch (err) {
                 console.error(err);
             }
@@ -85,6 +87,10 @@ const EmailCampaignForm: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!selectedEmailConnectionId) {
+            alert('Por favor, selecione um E-mail Remetente para fazer o disparo.');
+            return;
+        }
         if (!name.trim()) {
             alert('Por favor, insira o nome da campanha.');
             return;
@@ -129,6 +135,8 @@ const EmailCampaignForm: React.FC = () => {
                 .filter(Boolean);
 
             const folderName = folders.find(f => f.id === selectedFolderId)?.name || 'Todas as Pastas';
+            const selectedClient = clients.find(c => c.id === selectedClientId);
+            const emailConn = emailConnections.find(ec => ec.id === selectedEmailConnectionId);
 
             const { data: campaignData, error: dbError } = await supabase
                 .from('campaigns')
@@ -144,10 +152,14 @@ const EmailCampaignForm: React.FC = () => {
                         messageText: messageText || '',
                         selectedLeadsCount: selectedLeads.length,
                         clientId: selectedClientId,
+                        clientName: selectedClient?.name,
                         folderId: selectedFolderId || null,
                         isAutomated,
                         scheduledAt: isAutomated ? new Date(scheduledAt).toISOString() : null,
                         folderName,
+                        emailConnectionId: selectedEmailConnectionId,
+                        senderEmail: emailConn?.email,
+                        senderName: emailConn?.name,
                         fullSelectedLeads
                     }
                 }])
@@ -216,6 +228,41 @@ const EmailCampaignForm: React.FC = () => {
                 }
             }
 
+            // Obter detalhes da conexão de e-mail selecionada para enviar no webhook (já obtido acima)
+
+            // Converter arquivo para base64, se existir, para o webhook
+            let fileBase64 = null;
+            if (file) {
+                fileBase64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = (error) => reject(error);
+                });
+            }
+
+            // Disparar Webhook
+            const payload = {
+                campaignType: 'email_marketing',
+                name,
+                subject,
+                minDelay,
+                maxDelay,
+                messageText,
+                selectedLeads: fullSelectedLeads,
+                clientId: selectedClientId,
+                folderId: selectedFolderId,
+                folderName,
+                userId,
+                campaignId: campaignData?.id,
+                emailConnection: emailConn,
+                isAutomated,
+                scheduledAt: isAutomated ? new Date(scheduledAt).toISOString() : null,
+                file: fileBase64,
+                mimetype: file?.type || null,
+                fileName: file?.name || null,
+            };
+
             setSuccess(true);
 
             setTimeout(() => {
@@ -227,6 +274,7 @@ const EmailCampaignForm: React.FC = () => {
                 setFile(null);
                 setSelectedClientId('');
                 setSelectedFolderId('');
+                setSelectedEmailConnectionId('');
             }, 3000);
 
         } catch (error: any) {
@@ -273,7 +321,8 @@ const EmailCampaignForm: React.FC = () => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-slate-200 animate-in slide-in-from-bottom-2 duration-400">
+        <div className="space-y-6">
+            <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-slate-200 animate-in slide-in-from-bottom-2 duration-400">
             <div className="mb-8">
                 <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
                     <Mail className="text-brand-500" size={28} />
@@ -286,9 +335,31 @@ const EmailCampaignForm: React.FC = () => {
 
             <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
                 
-                {/* 1. Nome da Campanha */}
+                {/* 1. E-mail Remetente */}
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">1. Nome da Campanha (Interno) *</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">1. E-mail Remetente *</label>
+                    <select
+                        required
+                        value={selectedEmailConnectionId}
+                        onChange={(e) => setSelectedEmailConnectionId(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
+                    >
+                        <option value="">Selecione uma conta de e-mail...</option>
+                        {emailConnections.map(ec => (
+                            <option key={ec.id} value={ec.id}>{ec.name} ({ec.email})</option>
+                        ))}
+                    </select>
+                    {emailConnections.length === 0 && (
+                        <p className="text-xs text-amber-600 mt-2 font-medium flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            Nenhuma conexão de e-mail configurada. Vá em Configurações &gt; Conexões de E-mail para adicionar.
+                        </p>
+                    )}
+                </div>
+
+                {/* 2. Nome da Campanha */}
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">2. Nome da Campanha (Interno) *</label>
                     <input
                         type="text"
                         required
@@ -299,9 +370,9 @@ const EmailCampaignForm: React.FC = () => {
                     />
                 </div>
 
-                {/* 2. Assunto do E-mail */}
+                {/* 3. Assunto do E-mail */}
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">2. Assunto do E-mail *</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">3. Assunto do E-mail *</label>
                     <input
                         type="text"
                         required
@@ -312,11 +383,11 @@ const EmailCampaignForm: React.FC = () => {
                     />
                 </div>
 
-                {/* 3. Delay Mínimo e Máximo */}
+                {/* 4. Delay Mínimo e Máximo */}
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                     <label className="block text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
                         <Clock size={16} className="text-slate-400" />
-                        3. Intervalo de Disparo Base (Delay Mínimo e Máximo)
+                        4. Intervalo de Disparo Base (Delay Mínimo e Máximo)
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -349,9 +420,9 @@ const EmailCampaignForm: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* 4. Upload de Anexo (Opcional) */}
+                    {/* 5. Upload de Anexo (Opcional) */}
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">4. Anexo (Opcional)</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">5. Anexo (Opcional)</label>
                         <label className={`cursor-pointer border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center transition-colors h-48 ${file ? 'border-brand-400 bg-brand-50' : 'border-slate-300 hover:border-brand-400 hover:bg-slate-50'}`}>
                             {file ? (
                                 <div className="text-center">
@@ -370,11 +441,11 @@ const EmailCampaignForm: React.FC = () => {
                         </label>
                     </div>
 
-                    {/* 5. Corpo do E-mail */}
+                    {/* 6. Corpo do E-mail */}
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                             <AlignLeft size={16} className="text-slate-400" />
-                            5. Corpo do E-mail *
+                            6. Corpo do E-mail *
                         </label>
                         <textarea
                             value={messageText}
@@ -386,16 +457,22 @@ const EmailCampaignForm: React.FC = () => {
                     </div>
                 </div>
 
-                {/* 6. Agendamento */}
+                {/* 7. Agendamento */}
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                    <label className="flex items-center gap-3 cursor-pointer">
+                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={isAutomated}
+                            onChange={(e) => setIsAutomated(e.target.checked)}
+                        />
                         <div className={`w-12 h-6 rounded-full transition-colors relative flex items-center ${isAutomated ? 'bg-brand-500' : 'bg-slate-300'}`}>
                             <div className={`w-4 h-4 bg-white rounded-full shadow-sm absolute transition-transform ${isAutomated ? 'translate-x-7' : 'translate-x-1'}`} />
                         </div>
                         <div>
                             <span className="block text-sm font-bold text-slate-700 flex items-center gap-2">
                                 <Calendar size={16} className={isAutomated ? 'text-brand-500' : 'text-slate-400'} />
-                                6. Agendar Disparo
+                                7. Agendar Disparo
                             </span>
                             <span className="text-xs text-slate-500">Agende para enviar automaticamente no futuro</span>
                         </div>
@@ -409,7 +486,8 @@ const EmailCampaignForm: React.FC = () => {
                                 required={isAutomated}
                                 value={scheduledAt}
                                 onChange={(e) => setScheduledAt(e.target.value)}
-                                min={new Date().toISOString().slice(0, 16)}
+                                min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                max={new Date(new Date().getTime() + 32 * 24 * 60 * 60 * 1000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                                 className="w-full md:w-1/2 bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all font-medium"
                             />
                             <p className="text-xs text-amber-600 mt-2 font-medium flex items-center gap-1">
@@ -420,13 +498,13 @@ const EmailCampaignForm: React.FC = () => {
                     )}
                 </div>
 
-                {/* 7. Selecionar Cliente e Pasta */}
+                {/* 8. Selecionar Cliente e Pasta */}
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                                 <Building2 size={16} className="text-slate-400" />
-                                7. Cliente
+                                8. Cliente
                             </label>
                             <select
                                 value={selectedClientId}
@@ -445,7 +523,7 @@ const EmailCampaignForm: React.FC = () => {
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                                 <Folder size={16} className="text-slate-400" />
-                                8. Pasta de Leads (Opcional)
+                                9. Pasta de Leads (Opcional)
                             </label>
                             <select
                                 value={selectedFolderId}
@@ -464,7 +542,7 @@ const EmailCampaignForm: React.FC = () => {
                     <div className="flex items-center justify-between mb-4 mt-6">
                         <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
                             <Users size={18} className="text-slate-400" />
-                            9. Selecionar Leads com E-mail ({leads.length})
+                            10. Selecionar Leads com E-mail ({leads.length})
                         </label>
                         <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-0.5">
@@ -590,6 +668,9 @@ const EmailCampaignForm: React.FC = () => {
                 </div>
             )}
         </form>
+
+        <EmailCampaignMonitor initialExpanded={true} />
+    </div>
     );
 };
 

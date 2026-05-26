@@ -6,13 +6,15 @@ import {
   Cable,
   Webhook,
   ShieldCheck,
+  Mail,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ConnectionsTab from '../components/settings/ConnectionsTab';
 import WebhookTab from '../components/settings/WebhookTab';
 import ChangePasswordTab from '../components/settings/ChangePasswordTab';
+import EmailConnectionsTab from '../components/settings/EmailConnectionsTab';
 
-type SettingsTab = 'connections' | 'webhook' | 'security';
+type SettingsTab = 'connections' | 'email' | 'webhook' | 'security';
 
 const SettingsPage: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -65,6 +67,7 @@ const SettingsPage: React.FC = () => {
           </div>
           <nav className="space-y-1">
             <TabItem id="connections" label="Conexão do WhatsApp" icon={Cable} />
+            <TabItem id="email" label="Conexões de E-mail" icon={Mail} />
             <TabItem id="webhook" label="Webhook" icon={Webhook} />
             <TabItem id="security" label="Segurança" icon={ShieldCheck} />
 
@@ -86,6 +89,10 @@ const SettingsPage: React.FC = () => {
           <div className="p-8 flex-1">
             {activeTab === 'connections' && (
               <ConnectionsTab />
+            )}
+
+            {activeTab === 'email' && (
+              <EmailConnectionsTab />
             )}
 
             {activeTab === 'webhook' && (

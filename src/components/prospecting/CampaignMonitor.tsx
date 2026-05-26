@@ -69,11 +69,12 @@ const CampaignMonitor: React.FC<CampaignMonitorProps> = ({ initialExpanded = fal
         if (!user) return;
 
         try {
-            // Passo 1: Buscar TODAS as campanhas onde o status seja ativo
+            // Passo 1: Buscar TODAS as campanhas de WhatsApp do usuário
             const { data: campaignsData } = await supabase
                 .from('campaigns')
                 .select('*')
                 .eq('user_id', user.id)
+                .eq('type', 'whatsapp_marketing')
                 .order('created_at', { ascending: false });
 
             if (!campaignsData || campaignsData.length === 0) {
@@ -661,8 +662,8 @@ const CampaignMonitor: React.FC<CampaignMonitorProps> = ({ initialExpanded = fal
                                         Ver Detalhes
                                     </button>
 
-                                    {/* Iniciar Campanha - só mostra se inativa */}
-                                    {c.status === 'inactive' && (
+                                    {/* Iniciar Campanha - só mostra se inativa e não for campanha de email */}
+                                    {c.status === 'inactive' && c.configuration?.campaignType !== 'email_marketing' && (
                                         <button
                                             type="button"
                                             onClick={() => handleStartCampaign(c)}
